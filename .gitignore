@@ -1,0 +1,7 @@
+# ATDC web — archivos a ignorar en Git
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+.env
+node_modules/
