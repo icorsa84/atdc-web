@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<!-- Fix QA-LANDING-01: este archivo se sirve en DOS dominios distintos
+     (atdc.app = landing pública, outplacement.atdc.app = app de usuario).
+     Antes redirigía SIEMPRE a landing.html sin mirar el dominio, por lo que
+     los botones "Acceder", "Ya tengo cuenta" y "Subir de plan desde mi
+     cuenta" (que apuntan a la raíz de outplacement.atdc.app) devolvían al
+     usuario a la misma landing en lugar de llevarlo a su cuenta. -->
+<script>
+  (function () {
+    var destino = (location.hostname.indexOf('outplacement') === 0)
+      ? 'agente-chat.html'
+      : 'landing.html';
+    location.replace(destino + location.search);
+  })();
+</script>
+<!-- Fix UX-INDEX-01: antes había aquí un <meta http-equiv="refresh"
+     content="2; url=landing.html"> como respaldo si el script de arriba no
+     llegaba a ejecutar (JS desactivado, bloqueado, etc.). El problema es que
+     ese respaldo SIEMPRE apuntaba a landing.html sin mirar el dominio — es
+     decir, deshacía silenciosamente el mismo fix (QA-LANDING-01) que el
+     script de arriba implementa: un visitante sin JS en
+     outplacement.atdc.app terminaría en la landing pública en vez de su
+     cuenta. Se quita: el script en <head> corre de forma síncrona antes de
+     pintar la página en la inmensa mayoría de los casos, y para el caso
+     sin JS ya existen los dos enlaces manuales más abajo (que sí dejan
+     elegir el destino correcto) en lugar de un redirect automático que
+     adivina mal. -->
+<link rel="canonical" href="https://outplacement.atdc.app/landing.html">
+<title>ATDC — Redirigiendo…</title>
+</head>
+<body>
+<p>Cargando...</p>
+<p>Si no redirige automáticamente: ir a la <a href="landing.html">landing pública</a> o a <a href="agente-chat.html">mi cuenta / proceso ATDC</a>.</p>
+</body>
+</html>
