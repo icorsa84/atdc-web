@@ -1,5 +1,0 @@
-# GitHub Pages — configuración mínima
-# No se usa Jekyll: archivos HTML se sirven directamente.
-# Este archivo existe para que GitHub Pages no procese la carpeta como Jekyll.
-exclude:
-  - README.md
