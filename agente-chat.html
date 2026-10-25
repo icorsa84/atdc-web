@@ -1409,9 +1409,15 @@
     <button id="btnCuenta" onclick="_abrirCambiarPassword()" title="Cambiar mi contraseña" aria-label="Ajustes de cuenta: cambiar contraseña"
       style="background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r-full);width:30px;height:30px;
       display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text2);font-size:.85rem;flex-shrink:0;">⚙️</button>
+    <!-- Fix QA-UX-TEMA-02: el emoji 🌙 se veía desalineado y genérico junto
+         a los íconos de línea (micrófono, enviar) del resto de la app — se
+         reemplaza por un ícono SVG consistente con ese mismo lenguaje visual. -->
     <button id="btnTema" onclick="_alternarTema()" title="Cambiar a tema claro" aria-label="Cambiar tema claro/oscuro"
-      style="background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r-full);width:30px;height:30px;
-      display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text2);font-size:.85rem;flex-shrink:0;">🌙</button>
+      style="background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r-full);width:34px;height:34px;
+      display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text2);flex-shrink:0;transition:background .2s,color .2s;">
+      <svg id="iconoTemaLuna" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+      <svg id="iconoTemaSol" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none;"><circle cx="12" cy="12" r="4"></circle><line x1="12" y1="2" x2="12" y2="4"></line><line x1="12" y1="20" x2="12" y2="22"></line><line x1="4.93" y1="4.93" x2="6.34" y2="6.34"></line><line x1="17.66" y1="17.66" x2="19.07" y2="19.07"></line><line x1="2" y1="12" x2="4" y2="12"></line><line x1="20" y1="12" x2="22" y2="12"></line><line x1="4.93" y1="19.07" x2="6.34" y2="17.66"></line><line x1="17.66" y1="6.34" x2="19.07" y2="4.93"></line></svg>
+    </button>
   </div>
 </div>
 
@@ -1425,13 +1431,13 @@
 <div class="proceso-bar">
   <div class="paso ok" id="pasoPerfil" onclick="etapaIrA('perfil')"
        title="Ir a Perfil — puedes volver cuando quieras">✔ Perfil</div>
-  <div class="paso-sep">—</div>
+  <div class="paso-sep" id="sepCvAts">—</div>
   <div class="paso ok" id="pasoCvAts" onclick="etapaIrA('cv_ats')"
        title="Ir a CV + ATS — puedes volver cuando quieras">✔ CV + ATS</div>
-  <div class="paso-sep">—</div>
+  <div class="paso-sep" id="sepDiagnostico">—</div>
   <div class="paso activo" id="pasoDiagnostico" onclick="etapaIrA('diagnostico')"
        title="Ir a Diagnóstico IA — puedes volver cuando quieras">⟳ Diagnóstico IA</div>
-  <div class="paso-sep">—</div>
+  <div class="paso-sep" id="sepInforme">—</div>
   <div class="paso listo" id="pasoInforme" onclick="etapaIrA('informe')"
        title="Ir a Informe final">✦ Informe final</div>
 </div>
@@ -4268,12 +4274,16 @@ function _establecerTema(tema) {
 
 function _sincronizarBotonTema(tema) {
   const btn = document.getElementById('btnTema');
+  const luna = document.getElementById('iconoTemaLuna');
+  const sol = document.getElementById('iconoTemaSol');
   if (btn) {
     if (tema === 'light') {
-      btn.textContent = '☀️';
+      if (luna) luna.style.display = 'none';
+      if (sol) sol.style.display = '';
       btn.title = 'Cambiar a tema oscuro';
     } else {
-      btn.textContent = '🌙';
+      if (luna) luna.style.display = '';
+      if (sol) sol.style.display = 'none';
       btn.title = 'Cambiar a tema claro';
     }
   }
@@ -5861,6 +5871,7 @@ function etapaAvanzar(contexto) {
    en que el usuario hizo clic por última vez. */
 const ETAPA_ICONOS = { perfil:'👤', cv_ats:'📄', diagnostico:'⟳', informe:'✦' };
 const ETAPA_IDS_PASO = { perfil:'pasoPerfil', cv_ats:'pasoCvAts', diagnostico:'pasoDiagnostico', informe:'pasoInforme' };
+const ETAPA_IDS_SEP  = { perfil:null, cv_ats:'sepCvAts', diagnostico:'sepDiagnostico', informe:'sepInforme' };
 
 function _etapaCompletada(etapa) {
   const h = etapaEstado.hitos;
@@ -5888,19 +5899,33 @@ function _etapaDisponible(etapa) {
   return true;
 }
 
+/* Fix QA-UX-REDISEÑO-01: antes una etapa no incluida en el plan se
+   mostraba igual, atenuada con 🔒 — Isaac pidió explícitamente que una
+   función que el plan no incluye no aparezca EN ABSOLUTO, no solo
+   bloqueada. Se oculta la pastilla completa y su separador (para no
+   dejar un "—" suelto), en vez de pintarla deshabilitada. */
 function etapaActualizarProcesoBar() {
   Object.keys(ETAPAS).forEach(etapa => {
     const el = document.getElementById(ETAPA_IDS_PASO[etapa]);
+    const sepId = ETAPA_IDS_SEP[etapa];
+    const sepEl = sepId ? document.getElementById(sepId) : null;
     if (!el) return;
+    const disponible = _etapaDisponible(etapa);
+    if (!disponible) {
+      el.style.display = 'none';
+      if (sepEl) sepEl.style.display = 'none';
+      return;
+    }
+    el.style.display = '';
+    if (sepEl) sepEl.style.display = '';
     const completada = _etapaCompletada(etapa);
     const esActual = etapaEstado.etapaActual === etapa;
-    const disponible = _etapaDisponible(etapa);
     el.classList.remove('ok', 'activo', 'listo', 'bloqueada');
     let icono = ETAPA_ICONOS[etapa];
-    if (!disponible)        { el.classList.add('bloqueada'); icono = '🔒'; el.title = `${ETAPAS[etapa].nombre} no está incluido en tu plan actual — actualiza tu plan para acceder.`; }
-    else if (esActual)      { el.classList.add('activo'); icono = completada ? '✔' : '⟳'; }
-    else if (completada) { el.classList.add('ok');     icono = '✔'; }
-    else                { el.classList.add('listo'); }
+    if (esActual)         { el.classList.add('activo'); icono = completada ? '✔' : '⟳'; }
+    else if (completada)  { el.classList.add('ok');     icono = '✔'; }
+    else                  { el.classList.add('listo'); }
+    el.title = `Ir a ${ETAPAS[etapa].nombre} — puedes volver cuando quieras`;
     el.textContent = `${icono} ${ETAPAS[etapa].nombre}`;
   });
 }
@@ -5948,6 +5973,16 @@ function etapaIrA(etapa) {
     } else if (!etapaEstado.hitos.kostick) {
       setTimeout(() => { try { abrirTestKostick(); } catch(e){} }, 450);
     }
+  } else if ((etapa === 'cv_ats' || etapa === 'informe') && !IS_ADMIN) {
+    // Fix QA-UX-REDISEÑO-01: al saltar a CV+ATS o Informe final, ofrecer
+    // ahí mismo la acción propia de esa etapa — en vez de dejar al
+    // participante sin ningún chip hasta que vuelva a limpiar el chat.
+    const chipsEtapa = chips_bienvenida();
+    if (chipsEtapa.length) {
+      agentMsg(etapa === 'cv_ats'
+        ? '¿Qué necesitas para tu CV?'
+        : 'Cuando quieras, preparamos tu entrevista.', chipsEtapa);
+    }
   }
 }
 
@@ -5966,21 +6001,32 @@ function etapaCargar() {
    CHIPS DE INICIO DE TESTS — aparecen en el chat al cargar
    ================================================================ */
 function chips_bienvenida() {
-  // Retorna chips de acción rápida incluyendo inicio de tests si no completados
-  // Fix QA-PLANGATE-DISC-01: no ofrecer los chips de DISC/Kostick si el plan
-  // actual no los incluye (solo Profesional/Premium — ver PLAN_RESTRICCIONES).
+  // Fix QA-UX-REDISEÑO-01: antes se mostraban las 4 acciones (DISC, Kostick,
+  // CV, entrevista) TODAS juntas sin importar la etapa en la que estaba el
+  // participante — Isaac pidió que cada etapa ofrezca solo sus propias
+  // acciones. Además, ninguna de estas 4 acciones usa el chat con la IA
+  // más que para responder, así que si el plan no incluye chat (Inicial)
+  // no tiene sentido ofrecerlas: no funcionarían igual.
   const chips = [];
   const planChipsGate = getPlanActual();
   const restriccionChipsGate = PLAN_RESTRICCIONES[planChipsGate] || PLAN_RESTRICCIONES['Inicial'];
+  if (!restriccionChipsGate.chat && !IS_ADMIN) return chips;
+
   const testsDisponibles = restriccionChipsGate.tests_psicometricos || IS_ADMIN;
-  if (testsDisponibles && !etapaEstado.hitos.disc) {
-    chips.push({ label:'📊 Hacer test DISC', action:'abrirTestDisc()' });
+  const etapa = etapaEstado.etapaActual;
+
+  if (etapa === 'cv_ats') {
+    chips.push({ label:'📄 Optimizar mi CV', action:`preguntar('¿Qué palabras clave le faltan a mi CV para llegar a 85 en ATS?')` });
+  } else if (etapa === 'diagnostico') {
+    if (testsDisponibles && !etapaEstado.hitos.disc) {
+      chips.push({ label:'📊 Hacer test DISC', action:'abrirTestDisc()' });
+    }
+    if (testsDisponibles && !etapaEstado.hitos.kostick) {
+      chips.push({ label:'🧠 Hacer test Kostick', action:'abrirTestKostick()' });
+    }
+  } else if (etapa === 'informe') {
+    chips.push({ label:'🎤 Preparar entrevista', action:`preguntar('¿Cómo me preparo para la entrevista con ${PARTICIPANTE.entrevista}?')` });
   }
-  if (testsDisponibles && !etapaEstado.hitos.kostick) {
-    chips.push({ label:'🧠 Hacer test Kostick', action:'abrirTestKostick()' });
-  }
-  chips.push({ label:'📄 Optimizar mi CV', action:`preguntar('¿Qué palabras clave le faltan a mi CV para llegar a 85 en ATS?')` });
-  chips.push({ label:'🎤 Preparar entrevista', action:`preguntar('¿Cómo me preparo para la entrevista con ${PARTICIPANTE.entrevista}?')` });
   return chips;
 }
 
