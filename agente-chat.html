@@ -676,9 +676,23 @@
     flex-shrink:0;
     display:flex;flex-direction:column;
     backdrop-filter:blur(8px);
+    transition:width var(--t-med),opacity var(--t-med),border-color var(--t-med);
   }
   .side::-webkit-scrollbar{width:3px}
   .side::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
+  /* Fix QA-UX-PANEL-01: panel colapsable tipo "hamburguesa" — antes el
+     panel solo se escondía de golpe (display:none) bajo los 720px, sin
+     forma de volver a mostrarlo. Ahora se colapsa a 0 con transición y el
+     botón del topbar lo alterna en cualquier tamaño de pantalla, para el
+     participante y para el Consultor (vista admin de esta misma página). */
+  .side.colapsado{
+    width:0;min-width:0;opacity:0;border-left-color:transparent;
+    overflow:hidden;pointer-events:none;
+  }
+  .panel-backdrop{
+    display:none;position:fixed;inset:0;z-index:55;
+    background:rgba(0,0,0,.45);
+  }
 
   .s-sec{padding:14px;border-bottom:1px solid var(--border)}
   .s-lbl{
@@ -1173,7 +1187,17 @@
      RESPONSIVE
      ================================================================ */
   @media(max-width:720px){
-    .side{display:none}
+    /* Fix QA-UX-PANEL-01: en móvil el panel pasa a ser un drawer flotante
+       (en vez de empujar el chat con 262px fijos) para que el botón de
+       hamburguesa sirva igual que en desktop, con un fondo oscuro que
+       permite cerrarlo tocando afuera. */
+    .side{
+      position:fixed;top:0;right:0;bottom:0;z-index:60;
+      width:min(82vw,300px);
+      box-shadow:-10px 0 28px rgba(0,0,0,.4);
+    }
+    .side.colapsado{width:0;box-shadow:none;}
+    .panel-backdrop.visible{display:block}
     .chat-body{padding:14px 12px}
     .input-area{padding:8px 10px}
     /* Fix UX-MOVIL-01: en pantallas de teléfono el subtítulo del agente y la
@@ -1189,7 +1213,7 @@
     .status-label{display:none}
     .topbar-right{gap:6px}
     /* Area tactil minima comoda en pantalla tactil (WCAG 2.5.5) */
-    #btnCuenta,#btnTema{width:36px!important;height:36px!important}
+    #btnCuenta,#btnTema,#btnTogglePanel{width:36px!important;height:36px!important}
   }
 
   /* ================================================================
@@ -1420,6 +1444,18 @@
       <svg id="iconoTemaLuna" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
       <svg id="iconoTemaSol" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none;"><circle cx="12" cy="12" r="4"></circle><line x1="12" y1="2" x2="12" y2="4"></line><line x1="12" y1="20" x2="12" y2="22"></line><line x1="4.93" y1="4.93" x2="6.34" y2="6.34"></line><line x1="17.66" y1="17.66" x2="19.07" y2="19.07"></line><line x1="2" y1="12" x2="4" y2="12"></line><line x1="20" y1="12" x2="22" y2="12"></line><line x1="4.93" y1="19.07" x2="6.34" y2="17.66"></line><line x1="17.66" y1="6.34" x2="19.07" y2="4.93"></line></svg>
     </button>
+    <!-- Fix QA-UX-PANEL-01: el panel lateral (participante/CV+ATS/DISC/
+         Kostick/accesos rápidos) antes solo desaparecía por completo en
+         pantallas chicas (media query), sin forma de volver a abrirlo.
+         Isaac pidió que sea siempre colapsable, con comportamiento de
+         hamburguesa — mismo botón, mismo panel, para usuario y para el
+         Consultor (vista admin de esta misma página). -->
+    <button id="btnTogglePanel" onclick="_alternarPanelLateral()" title="Ocultar panel lateral" aria-label="Mostrar u ocultar el panel lateral" aria-expanded="true" aria-controls="sidePanel"
+      style="background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r-full);width:34px;height:34px;
+      display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text2);flex-shrink:0;transition:background .2s,color .2s;">
+      <svg id="iconoPanelAbrir" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none;"><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+      <svg id="iconoPanelCerrar" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+    </button>
   </div>
 </div>
 
@@ -1580,6 +1616,9 @@
       </div>
     </div>
   </div>
+
+  <!-- Fondo oscuro del panel lateral en móvil — clic afuera lo cierra -->
+  <div class="panel-backdrop" id="panelBackdrop" onclick="_alternarPanelLateral()"></div>
 
   <!-- PANEL LATERAL -->
   <div class="side" id="sidePanel">
@@ -4355,6 +4394,65 @@ function _sincronizarBotonTema(tema) {
 }
 
 /* ================================================================
+   PANEL LATERAL COLAPSABLE (hamburguesa) — Fix QA-UX-PANEL-01
+   Isaac detectó que el panel (participante/CV+ATS/DISC/Kostick/
+   accesos rápidos) solo desaparecía de golpe bajo los 720px, sin
+   forma de volver a abrirlo. Ahora es colapsable en cualquier ancho
+   de pantalla con un botón de hamburguesa en la cabecera, igual para
+   el participante que para el Consultor (IS_ADMIN usa esta misma
+   página). La preferencia se recuerda por dispositivo; si nunca se
+   ha tocado el botón, el panel arranca abierto en desktop y cerrado
+   en pantallas angostas (igual que antes, pero reversible).
+   ================================================================ */
+const _PANEL_LAT_KEY = 'atdc_panel_colapsado';
+
+function _alternarPanelLateral() {
+  const side = document.getElementById('sidePanel');
+  if (!side) return;
+  const colapsado = !side.classList.contains('colapsado');
+  _aplicarEstadoPanelLateral(colapsado, true);
+}
+
+function _aplicarEstadoPanelLateral(colapsado, guardarPreferencia) {
+  const side = document.getElementById('sidePanel');
+  const backdrop = document.getElementById('panelBackdrop');
+  if (!side) return;
+  side.classList.toggle('colapsado', colapsado);
+  if (backdrop) backdrop.classList.toggle('visible', !colapsado && window.innerWidth <= 720);
+  if (guardarPreferencia) {
+    try { localStorage.setItem(_PANEL_LAT_KEY, colapsado ? '1' : '0'); } catch (e) {}
+  }
+  const btn = document.getElementById('btnTogglePanel');
+  const abrirIco = document.getElementById('iconoPanelAbrir');
+  const cerrarIco = document.getElementById('iconoPanelCerrar');
+  if (btn) btn.title = colapsado ? 'Mostrar panel lateral' : 'Ocultar panel lateral';
+  btn && btn.setAttribute('aria-expanded', colapsado ? 'false' : 'true');
+  if (abrirIco) abrirIco.style.display = colapsado ? '' : 'none';
+  if (cerrarIco) cerrarIco.style.display = colapsado ? 'none' : '';
+}
+
+function _restaurarPanelLateral() {
+  let colapsado;
+  try {
+    const guardado = localStorage.getItem(_PANEL_LAT_KEY);
+    colapsado = guardado !== null ? guardado === '1' : window.innerWidth <= 720;
+  } catch (e) { colapsado = window.innerWidth <= 720; }
+  _aplicarEstadoPanelLateral(colapsado, false);
+}
+
+// El fondo oscuro solo tiene sentido como overlay de móvil: si la
+// ventana crece (o gira el teléfono) por sobre los 720px con el panel
+// abierto, se apaga para no dejar un velo oscuro pegado sin motivo.
+window.addEventListener('resize', () => {
+  const side = document.getElementById('sidePanel');
+  const backdrop = document.getElementById('panelBackdrop');
+  if (!side || !backdrop) return;
+  if (window.innerWidth > 720 || side.classList.contains('colapsado')) {
+    backdrop.classList.remove('visible');
+  }
+});
+
+/* ================================================================
    CONTRASEÑA — cambiar (logueado), recuperar (olvidé mi clave) y
    restablecer (desde el enlace del correo, ?reset_token=...)
    Reutiliza el mismo look & feel que el modal de onboarding (vars
@@ -5104,6 +5202,11 @@ async function _solicitarSesionConsultor() {
 async function init() {
   // Fix UX-TEMA-01: reflejar en el botón el tema que ya se aplicó al cargar
   _sincronizarBotonTema(document.documentElement.getAttribute('data-theme') || 'dark');
+
+  // Fix QA-UX-PANEL-01: restaura si el panel lateral queda abierto o
+  // colapsado (preferencia guardada, o abierto/cerrado por defecto según
+  // el ancho de pantalla si nunca se ha tocado el botón).
+  _restaurarPanelLateral();
 
   // Admin: cargar override de plan antes de cualquier renderizado
   // (garantiza que PARTICIPANTE.plan ya tiene el valor correcto cuando se sincronizan el panel y el topbar)
