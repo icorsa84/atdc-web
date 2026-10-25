@@ -1584,34 +1584,53 @@
       </div>
 
       <!-- Panel de Citas Pendientes (Admin) con Calendario Visual -->
-      <div id="adminCitasPanel" style="display:none;margin-top:12px;padding:12px;background:var(--bg2);border-radius:8px;border:1px solid var(--border2);">
-        <div style="font-weight:700;margin-bottom:12px;color:var(--text);display:flex;align-items:center;justify-content:space-between;">
-          <span>📅 Calendario de Sesiones</span>
-          <button onclick="_cambiarMesCalendar(-1)" style="background:none;border:none;color:var(--text);cursor:pointer;font-size:.9rem;">◀</button>
-          <span id="adminCalendarMes" style="font-size:.85rem;color:var(--muted);min-width:140px;text-align:center;">Octubre 2026</span>
-          <button onclick="_cambiarMesCalendar(1)" style="background:none;border:none;color:var(--text);cursor:pointer;font-size:.9rem;">▶</button>
+      <div id="adminCitasPanel" style="display:none;margin-top:12px;padding:16px;background:var(--bg2);border-radius:8px;border:1px solid var(--amber);box-shadow:0 4px 12px rgba(210,153,34,.12);transition:all .3s;">
+        <div style="font-weight:700;margin-bottom:14px;color:var(--text);display:flex;align-items:center;justify-content:space-between;gap:8px;">
+          <div style="display:flex;align-items:center;gap:8px;font-size:.9rem;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+            Calendario de Sesiones
+          </div>
+          <div style="display:flex;align-items:center;gap:4px;">
+            <button onclick="_cambiarMesCalendar(-1)" style="background:none;border:none;color:var(--text);cursor:pointer;font-size:1rem;padding:4px 6px;border-radius:4px;transition:all .2s;" onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background='none';">◀</button>
+            <span id="adminCalendarMes" style="font-size:.85rem;color:var(--muted);min-width:120px;text-align:center;font-weight:600;">Octubre 2026</span>
+            <button onclick="_cambiarMesCalendar(1)" style="background:none;border:none;color:var(--text);cursor:pointer;font-size:1rem;padding:4px 6px;border-radius:4px;transition:all .2s;" onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background='none';">▶</button>
+          </div>
         </div>
 
         <!-- Calendario Visual -->
-        <div id="adminCalendarGrid" style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:12px;background:var(--bg3);padding:8px;border-radius:6px;">
+        <div id="adminCalendarGrid" style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-bottom:16px;background:var(--bg3);padding:10px;border-radius:6px;">
           <!-- Encabezados días de la semana -->
-          <div style="text-align:center;font-weight:600;color:var(--muted);font-size:.7rem;padding:4px;">L</div>
-          <div style="text-align:center;font-weight:600;color:var(--muted);font-size:.7rem;padding:4px;">M</div>
-          <div style="text-align:center;font-weight:600;color:var(--muted);font-size:.7rem;padding:4px;">M</div>
-          <div style="text-align:center;font-weight:600;color:var(--muted);font-size:.7rem;padding:4px;">J</div>
-          <div style="text-align:center;font-weight:600;color:var(--muted);font-size:.7rem;padding:4px;">V</div>
-          <div style="text-align:center;font-weight:600;color:var(--muted);font-size:.7rem;padding:4px;">S</div>
-          <div style="text-align:center;font-weight:600;color:var(--muted);font-size:.7rem;padding:4px;">D</div>
+          <div style="text-align:center;font-weight:600;color:var(--muted);font-size:.7rem;padding:6px;border-bottom:1px solid var(--border2);">L</div>
+          <div style="text-align:center;font-weight:600;color:var(--muted);font-size:.7rem;padding:6px;border-bottom:1px solid var(--border2);">M</div>
+          <div style="text-align:center;font-weight:600;color:var(--muted);font-size:.7rem;padding:6px;border-bottom:1px solid var(--border2);">M</div>
+          <div style="text-align:center;font-weight:600;color:var(--muted);font-size:.7rem;padding:6px;border-bottom:1px solid var(--border2);">J</div>
+          <div style="text-align:center;font-weight:600;color:var(--muted);font-size:.7rem;padding:6px;border-bottom:1px solid var(--border2);">V</div>
+          <div style="text-align:center;font-weight:600;color:var(--muted);font-size:.7rem;padding:6px;border-bottom:1px solid var(--border2);">S</div>
+          <div style="text-align:center;font-weight:600;color:var(--muted);font-size:.7rem;padding:6px;border-bottom:1px solid var(--border2);">D</div>
           <!-- Días del mes -->
           <div id="adminCalendarDays"></div>
         </div>
 
         <!-- Lista de Citas (debajo del calendario) -->
-        <div style="font-weight:700;margin:12px 0 8px;color:var(--text);font-size:.85rem;">📋 Detalles de Citas Seleccionadas</div>
-        <div id="adminCitasLista" style="max-height:280px;overflow-y:auto;font-size:.78rem;">
-          <div style="color:var(--muted);padding:8px;text-align:center;">Cargando solicitudes...</div>
+        <div style="font-weight:700;margin:12px 0 10px;color:var(--text);font-size:.85rem;display:flex;align-items:center;gap:6px;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+          Detalles de Citas Seleccionadas
+        </div>
+        <div id="adminCitasLista" style="max-height:300px;overflow-y:auto;font-size:.78rem;border-radius:6px;border:1px solid var(--border2);padding:8px;">
+          <div style="color:var(--muted);padding:12px;text-align:center;display:flex;align-items:center;justify-content:center;gap:6px;">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="animation:spin 1s linear infinite;">
+              <circle cx="12" cy="12" r="10"></circle>
+              <path d="M12 6v6l4 2"></path>
+            </svg>
+            Cargando solicitudes...
+          </div>
         </div>
       </div>
+      <style>
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
+      </style>
       <!-- Barra de tabs dinámica -->
       <div class="inf-tabs-bar" id="infTabsBar" style="display:none"></div>
       <!-- Cuerpo scrolleable -->
