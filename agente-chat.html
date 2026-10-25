@@ -1806,6 +1806,80 @@ function icono(nombre, tam) {
   return `<svg width="${t}" height="${t}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;flex-shrink:0;">${svg}</svg>`;
 }
 
+/* ================================================================
+   CATÁLOGOS — Cargo objetivo / Sector / Renta objetivo (Fix
+   QA-UX-CATALOGO-01). Antes los tres eran texto libre y nunca se le
+   preguntaban al participante al registrarse, por eso quedaban en
+   "Por definir" indefinidamente. Ahora son listas desplegables con
+   una opción "Otro" que revela un campo de texto — así los datos
+   quedan estandarizados (comparables entre participantes, útiles
+   para reportes/estudios de mercado) sin perder la posibilidad de
+   un valor específico que no esté en el catálogo. El mismo set vive
+   también en admin/dashboard.html, duplicado igual que _ICONOS_SVG,
+   porque son páginas HTML independientes sin un módulo JS compartido. */
+const CATALOGO_SECTORES = [
+  'Retail / Comercio','Logística / Transporte','Manufactura / Industria',
+  'Construcción / Inmobiliario','Minería','Energía','Finanzas / Banca / Seguros',
+  'Tecnología / TI','Telecomunicaciones','Salud','Educación','Agroindustria',
+  'Turismo / Hotelería / Gastronomía','Servicios profesionales / Consultoría',
+  'Sector público / Gobierno','ONG / Sin fines de lucro',
+];
+const CATALOGO_CARGOS = [
+  'Gerencia General','Gerencia de Área','Subgerencia / Jefatura',
+  'Coordinación / Supervisión','Analista Senior / Especialista',
+  'Analista / Ejecutivo','Asistente / Administrativo','Técnico / Operativo',
+];
+const CATALOGO_RENTAS = [
+  'Menos de $500.000','$500.000 - $800.000','$800.000 - $1.200.000',
+  '$1.200.000 - $1.800.000','$1.800.000 - $2.500.000','$2.500.000 - $3.500.000',
+  '$3.500.000 - $5.000.000','Más de $5.000.000','Prefiero no indicar',
+];
+
+/* Arma un <select> + campo de texto condicional ("Otro") a partir de un
+   catálogo. valorActual puede ser cualquier string ya guardado (incluido
+   "Por definir", un valor del catálogo, o texto libre viejo que ya no
+   está en la lista — en ese caso selecciona "Otro" y precarga el texto). */
+function _selectConOtro(idBase, catalogo, valorActual, estiloSelect) {
+  const limpio = (valorActual || '').trim();
+  const sinDefinir = !limpio || limpio === 'Por definir';
+  const enCatalogo = catalogo.includes(limpio);
+  const esOtro = !sinDefinir && !enCatalogo;
+  const estiloBase = estiloSelect || `
+    width:100%;padding:10px 12px;border-radius:8px;background:var(--bg);
+    border:1.5px solid var(--border);color:var(--text);font-size:14px;
+    outline:none;box-sizing:border-box;`;
+  const opciones = catalogo.map(op =>
+    `<option value="${escHtml(op)}"${op === limpio ? ' selected' : ''}>${escHtml(op)}</option>`
+  ).join('');
+  return `
+    <select id="${idBase}" onchange="_alternarCampoOtro('${idBase}')" style="${estiloBase}">
+      <option value=""${sinDefinir ? ' selected' : ''}>Sin definir</option>
+      ${opciones}
+      <option value="__otro__"${esOtro ? ' selected' : ''}>Otro (especificar)</option>
+    </select>
+    <input id="${idBase}_otro" type="text" placeholder="Especifica…"
+      value="${esOtro ? escHtml(limpio) : ''}"
+      style="${estiloBase}margin-top:6px;display:${esOtro ? '' : 'none'};">`;
+}
+
+function _alternarCampoOtro(idBase) {
+  const sel = document.getElementById(idBase);
+  const otro = document.getElementById(idBase + '_otro');
+  if (!sel || !otro) return;
+  const mostrar = sel.value === '__otro__';
+  otro.style.display = mostrar ? '' : 'none';
+  if (mostrar) otro.focus();
+}
+
+/* Lee el valor final de un select-con-otro: el valor elegido del
+   catálogo, el texto libre de "Otro", o '' si quedó "Sin definir". */
+function _valorSelectConOtro(idBase) {
+  const sel = document.getElementById(idBase);
+  if (!sel) return '';
+  if (sel.value === '__otro__') return (document.getElementById(idBase + '_otro')?.value || '').trim();
+  return sel.value;
+}
+
 const CONFIG = {
   participante_id: null,        // Se llena tras el ingreso
   plan: null,                   // Se llena tras el ingreso
@@ -2051,6 +2125,20 @@ function _mostrarOnboarding(planPreseleccionado) {
             position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:none;
             color:var(--muted);cursor:pointer;padding:5px 8px;line-height:1;display:flex;">${icono('eye',16)}</button>
         </div>
+
+        <!-- Fix QA-UX-CATALOGO-01: antes estos tres nunca se preguntaban al
+             registrarse y quedaban en "Por definir" hasta que el participante
+             (o el Admin) los completara a mano después. Opcionales — si se
+             dejan en "Sin definir" el backend sigue poniendo "Por definir". -->
+        <div style="margin-top:2px;padding-top:12px;border-top:1px solid var(--border);">
+          <div style="font-size:11.5px;color:var(--muted);margin-bottom:8px;">Datos para tu proceso (opcional, puedes completarlos después en "Mi cuenta")</div>
+          <label style="display:block;font-size:11.5px;color:var(--muted);margin-bottom:3px;">Cargo objetivo</label>
+          <div style="margin-bottom:8px;">${_selectConOtro('_ob_cargo', CATALOGO_CARGOS, '')}</div>
+          <label style="display:block;font-size:11.5px;color:var(--muted);margin-bottom:3px;">Sector</label>
+          <div style="margin-bottom:8px;">${_selectConOtro('_ob_sector', CATALOGO_SECTORES, '')}</div>
+          <label style="display:block;font-size:11.5px;color:var(--muted);margin-bottom:3px;">Renta objetivo</label>
+          <div>${_selectConOtro('_ob_renta', CATALOGO_RENTAS, '')}</div>
+        </div>
       </div>
 
       <!-- FORMULARIO LOGIN (oculto por defecto) -->
@@ -2165,6 +2253,9 @@ async function _registrarParticipante(plan) {
   const email    = (document.getElementById('_ob_email')?.value || '').trim();
   const password = (document.getElementById('_ob_password')?.value || '');
   const passwordConfirmar = (document.getElementById('_ob_password_confirmar')?.value || '');
+  const cargo_objetivo = _valorSelectConOtro('_ob_cargo');
+  const sector = _valorSelectConOtro('_ob_sector');
+  const renta_objetivo = _valorSelectConOtro('_ob_renta');
   const btn      = document.getElementById('_ob_btn');
 
   if (!nombre)    { _mostrarErrorAuth('Por favor ingresa tu nombre.'); document.getElementById('_ob_nombre')?.focus(); return; }
@@ -2180,7 +2271,7 @@ async function _registrarParticipante(plan) {
     const res = await fetch(CONFIG.auth_registro_url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ nombre, apellido, email, password, plan }),
+      body: JSON.stringify({ nombre, apellido, email, password, plan, cargo_objetivo, sector, renta_objetivo }),
       signal: AbortSignal.timeout(70000)   // Render free plan puede tardar 60s en despertar
     });
 
@@ -4733,12 +4824,16 @@ async function _abrirMiCuenta() {
     <div style="font-size:.73rem;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;margin-bottom:8px;">Mis datos</div>
     <input id="_mc_nombre" placeholder="Nombre completo" style="width:100%;padding:10px 12px;border-radius:8px;background:var(--bg);
       border:1.5px solid var(--border);color:var(--text);font-size:13.5px;outline:none;box-sizing:border-box;margin-bottom:8px;">
-    <input id="_mc_cargo" placeholder="Cargo objetivo" style="width:100%;padding:10px 12px;border-radius:8px;background:var(--bg);
-      border:1.5px solid var(--border);color:var(--text);font-size:13.5px;outline:none;box-sizing:border-box;margin-bottom:8px;">
-    <input id="_mc_sector" placeholder="Sector" style="width:100%;padding:10px 12px;border-radius:8px;background:var(--bg);
-      border:1.5px solid var(--border);color:var(--text);font-size:13.5px;outline:none;box-sizing:border-box;margin-bottom:8px;">
-    <input id="_mc_renta" placeholder="Renta objetivo" style="width:100%;padding:10px 12px;border-radius:8px;background:var(--bg);
-      border:1.5px solid var(--border);color:var(--text);font-size:13.5px;outline:none;box-sizing:border-box;margin-bottom:8px;">
+    <!-- Fix QA-UX-CATALOGO-01: antes eran <input> de texto libre, siempre
+         "Por definir" hasta que alguien escribía algo a mano. _cargarMiPerfil()
+         llena estos contenedores con _selectConOtro() una vez que llega el
+         perfil real, porque el valor a preseleccionar recién se conoce ahí. -->
+    <label style="display:block;font-size:11.5px;color:var(--muted);margin-bottom:3px;">Cargo objetivo</label>
+    <div id="_mc_cargo_wrap" style="margin-bottom:8px;"></div>
+    <label style="display:block;font-size:11.5px;color:var(--muted);margin-bottom:3px;">Sector</label>
+    <div id="_mc_sector_wrap" style="margin-bottom:8px;"></div>
+    <label style="display:block;font-size:11.5px;color:var(--muted);margin-bottom:3px;">Renta objetivo</label>
+    <div id="_mc_renta_wrap" style="margin-bottom:8px;"></div>
     <div id="_mc_perfil_msg" style="display:none;margin:4px 0 10px 0;padding:9px 12px;border-radius:7px;font-size:13px;"></div>
     <button id="_mc_guardar_btn" onclick="_guardarMiPerfil()" style="
       width:100%;padding:11px;border-radius:9px;background:var(--blue2);color:#fff;
@@ -4804,9 +4899,12 @@ async function _cargarMiPerfil() {
     _aplicarPerfilAlEstado(d);   // Fix QA-REHIDRATAR-01: mantiene el panel lateral sincronizado también al abrir "Mi Cuenta"
 
     const elNombre = document.getElementById('_mc_nombre'); if (elNombre) elNombre.value = d.nombre || '';
-    const elCargo = document.getElementById('_mc_cargo'); if (elCargo) elCargo.value = (d.cargo_objetivo === 'Por definir' ? '' : d.cargo_objetivo) || '';
-    const elSector = document.getElementById('_mc_sector'); if (elSector) elSector.value = (d.sector === 'Por definir' ? '' : d.sector) || '';
-    const elRenta = document.getElementById('_mc_renta'); if (elRenta) elRenta.value = (d.renta_objetivo === 'Por definir' ? '' : d.renta_objetivo) || '';
+    const wrapCargo = document.getElementById('_mc_cargo_wrap');
+    if (wrapCargo) wrapCargo.innerHTML = _selectConOtro('_mc_cargo', CATALOGO_CARGOS, d.cargo_objetivo);
+    const wrapSector = document.getElementById('_mc_sector_wrap');
+    if (wrapSector) wrapSector.innerHTML = _selectConOtro('_mc_sector', CATALOGO_SECTORES, d.sector);
+    const wrapRenta = document.getElementById('_mc_renta_wrap');
+    if (wrapRenta) wrapRenta.innerHTML = _selectConOtro('_mc_renta', CATALOGO_RENTAS, d.renta_objetivo);
     const elPlanNota = document.getElementById('_mc_plan_nota');
     const elPlanSelect = document.getElementById('_mc_plan_select');
     const elPlanBtn = document.getElementById('_mc_plan_btn');
@@ -4928,9 +5026,9 @@ async function _guardarMiPerfil() {
   const msgEl = document.getElementById('_mc_perfil_msg');
   const body = {
     nombre: document.getElementById('_mc_nombre')?.value?.trim() || undefined,
-    cargo_objetivo: document.getElementById('_mc_cargo')?.value?.trim() ?? undefined,
-    sector: document.getElementById('_mc_sector')?.value?.trim() ?? undefined,
-    renta_objetivo: document.getElementById('_mc_renta')?.value?.trim() ?? undefined,
+    cargo_objetivo: _valorSelectConOtro('_mc_cargo'),
+    sector: _valorSelectConOtro('_mc_sector'),
+    renta_objetivo: _valorSelectConOtro('_mc_renta'),
   };
   btn.disabled = true; btn.textContent = 'Guardando…';
   try {

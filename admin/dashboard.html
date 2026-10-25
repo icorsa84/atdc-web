@@ -275,6 +275,80 @@ function icono(nombre, tam) {
   const t = tam || 16;
   return `<svg width="${t}" height="${t}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;flex-shrink:0;">${svg}</svg>`;
 }
+
+function escHtml(str) {
+  if (!str && str !== 0) return '';
+  return String(str)
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;')
+    .replace(/'/g,'&#39;');
+}
+
+/* ================================================================
+   CATÁLOGOS — Cargo objetivo / Sector / Renta objetivo (Fix
+   QA-UX-CATALOGO-01). Mismo set y mismo patrón "select + Otro" que
+   agente-chat.html — ver el comentario ahí para el porqué. Se duplica
+   acá porque son páginas HTML independientes sin módulo JS compartido.
+   ================================================================ */
+const CATALOGO_SECTORES = [
+  'Retail / Comercio','Logística / Transporte','Manufactura / Industria',
+  'Construcción / Inmobiliario','Minería','Energía','Finanzas / Banca / Seguros',
+  'Tecnología / TI','Telecomunicaciones','Salud','Educación','Agroindustria',
+  'Turismo / Hotelería / Gastronomía','Servicios profesionales / Consultoría',
+  'Sector público / Gobierno','ONG / Sin fines de lucro',
+];
+const CATALOGO_CARGOS = [
+  'Gerencia General','Gerencia de Área','Subgerencia / Jefatura',
+  'Coordinación / Supervisión','Analista Senior / Especialista',
+  'Analista / Ejecutivo','Asistente / Administrativo','Técnico / Operativo',
+];
+const CATALOGO_RENTAS = [
+  'Menos de $500.000','$500.000 - $800.000','$800.000 - $1.200.000',
+  '$1.200.000 - $1.800.000','$1.800.000 - $2.500.000','$2.500.000 - $3.500.000',
+  '$3.500.000 - $5.000.000','Más de $5.000.000','Prefiero no indicar',
+];
+
+function _selectConOtro(idBase, catalogo, valorActual, estiloSelect) {
+  const limpio = (valorActual || '').trim();
+  const sinDefinir = !limpio || limpio === 'Por definir';
+  const enCatalogo = catalogo.includes(limpio);
+  const esOtro = !sinDefinir && !enCatalogo;
+  const estiloBase = estiloSelect || `
+    width:100%;padding:8px 10px;border-radius:7px;background:var(--bg,#0a0f1c);
+    border:1px solid var(--border,#1e2a3a);color:var(--text,#f1f5f9);font-size:13px;
+    outline:none;box-sizing:border-box;`;
+  const opciones = catalogo.map(op =>
+    `<option value="${escHtml(op)}"${op === limpio ? ' selected' : ''}>${escHtml(op)}</option>`
+  ).join('');
+  return `
+    <select id="${idBase}" onchange="_alternarCampoOtro('${idBase}')" style="${estiloBase}">
+      <option value=""${sinDefinir ? ' selected' : ''}>Sin definir</option>
+      ${opciones}
+      <option value="__otro__"${esOtro ? ' selected' : ''}>Otro (especificar)</option>
+    </select>
+    <input id="${idBase}_otro" type="text" placeholder="Especifica…"
+      value="${esOtro ? escHtml(limpio) : ''}"
+      style="${estiloBase}margin-top:6px;display:${esOtro ? '' : 'none'};">`;
+}
+
+function _alternarCampoOtro(idBase) {
+  const sel = document.getElementById(idBase);
+  const otro = document.getElementById(idBase + '_otro');
+  if (!sel || !otro) return;
+  const mostrar = sel.value === '__otro__';
+  otro.style.display = mostrar ? '' : 'none';
+  if (mostrar) otro.focus();
+}
+
+function _valorSelectConOtro(idBase) {
+  const sel = document.getElementById(idBase);
+  if (!sel) return '';
+  if (sel.value === '__otro__') return (document.getElementById(idBase + '_otro')?.value || '').trim();
+  return sel.value;
+}
+
 let ADMIN_KEY = sessionStorage.getItem('atdc_admin_key') || '';
 let LISTADO = [];
 
@@ -839,11 +913,16 @@ function _renderDetalle(p) {
       <div class="sec-title">Datos del participante</div>
       <div class="field-row">
         <div class="field"><label>Nombre</label><input id="_d_nombre" value="${(p.nombre||'').replace(/"/g,'&quot;')}"></div>
-        <div class="field"><label>Cargo objetivo</label><input id="_d_cargo" value="${(p.cargo_objetivo||'').replace(/"/g,'&quot;')}"></div>
+        <!-- Fix QA-UX-CATALOGO-01: antes texto libre; mostraba literalmente
+             "Por definir" como si fuera un valor real tipeado, y no había
+             forma de distinguir de un vistazo "no lo sabemos" de "el
+             participante escribió esto". Ahora lista desplegable con el
+             mismo catálogo estándar usado en el registro y en "Mi cuenta". -->
+        <div class="field"><label>Cargo objetivo</label>${_selectConOtro('_d_cargo', CATALOGO_CARGOS, p.cargo_objetivo)}</div>
       </div>
       <div class="field-row">
-        <div class="field"><label>Sector</label><input id="_d_sector" value="${(p.sector||'').replace(/"/g,'&quot;')}"></div>
-        <div class="field"><label>Renta objetivo</label><input id="_d_renta" value="${(p.renta_objetivo||'').replace(/"/g,'&quot;')}"></div>
+        <div class="field"><label>Sector</label>${_selectConOtro('_d_sector', CATALOGO_SECTORES, p.sector)}</div>
+        <div class="field"><label>Renta objetivo</label>${_selectConOtro('_d_renta', CATALOGO_RENTAS, p.renta_objetivo)}</div>
       </div>
       <div class="field-row">
         <div class="field">
@@ -1006,9 +1085,9 @@ async function _guardarDatos(id) {
   try {
     const body = {
       nombre: document.getElementById('_d_nombre').value.trim(),
-      cargo_objetivo: document.getElementById('_d_cargo').value.trim(),
-      sector: document.getElementById('_d_sector').value.trim(),
-      renta_objetivo: document.getElementById('_d_renta').value.trim(),
+      cargo_objetivo: _valorSelectConOtro('_d_cargo'),
+      sector: _valorSelectConOtro('_d_sector'),
+      renta_objetivo: _valorSelectConOtro('_d_renta'),
     };
     await _apiSend('PUT', `/api/admin/participantes/${id}`, body);
     _mostrarMsg('_d_msg', 'Datos guardados.', false);
