@@ -2749,6 +2749,9 @@ function _mostrarEncuestaAleatorio(callback) {
   // Crear overlay
   const overlay = document.createElement('div');
   overlay.id = '_encuestaOverlay';
+  overlay.setAttribute('role', 'dialog');
+  overlay.setAttribute('aria-modal', 'true');
+  overlay.setAttribute('aria-labelledby', '_encuestaTitle');
   overlay.style.cssText = `
     position:fixed;inset:0;z-index:8888;
     background:rgba(0,0,0,.6);backdrop-filter:blur(4px);
@@ -2772,8 +2775,8 @@ function _mostrarEncuestaAleatorio(callback) {
     flex-shrink:0;
   `;
   header.innerHTML = `
-    <h3 style="margin:0;color:var(--text,#eceef5);font-size:.95rem;font-weight:600;">Tu opinión importa 📋</h3>
-    <button style="
+    <h3 id="_encuestaTitle" style="margin:0;color:var(--text,#eceef5);font-size:.95rem;font-weight:600;">Tu opinión importa 📋</h3>
+    <button aria-label="Cerrar encuesta" style="
       background:transparent;border:none;color:var(--muted,#7a829e);
       cursor:pointer;font-size:24px;padding:0;width:24px;height:24px;
       display:flex;align-items:center;justify-content:center;transition:color .2s;
