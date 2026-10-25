@@ -2555,11 +2555,18 @@ function setOnline(online) {
 
 // ── RESTRICCIONES POR PLAN (frontend) ────────────────────────────────────────
 // Esencial: 20 msg/día; Inicial: sin chat; Pro/Premium: sin límite
+/* Fix QA-PLANGATE-DISC-01: el plan Inicial (y Esencial) no incluyen los
+   tests psicométricos DISC/Kostick — solo Profesional y Premium (ver
+   PLANES_CON_TESTS_PSICOMETRICOS en el backend, atdc_agent.py). Antes esta
+   tabla no tenía este campo y abrirTestDisc()/abrirTestKostick() dejaban
+   iniciar el test a cualquier plan, aunque el backend igual rechazaba el
+   guardado al final — el usuario completaba las 28 preguntas sin poder
+   guardarlas nunca. */
 const PLAN_RESTRICCIONES = {
-  Inicial:      { chat: false, msgs_dia: 0,     memoria: false },
-  Esencial:     { chat: true,  msgs_dia: 20,    memoria: false },
-  Profesional:  { chat: true,  msgs_dia: 9999,  memoria: true  },
-  Premium:      { chat: true,  msgs_dia: 9999,  memoria: true  },
+  Inicial:      { chat: false, msgs_dia: 0,     memoria: false, tests_psicometricos: false },
+  Esencial:     { chat: true,  msgs_dia: 20,    memoria: false, tests_psicometricos: false },
+  Profesional:  { chat: true,  msgs_dia: 9999,  memoria: true,  tests_psicometricos: true  },
+  Premium:      { chat: true,  msgs_dia: 9999,  memoria: true,  tests_psicometricos: true  },
 };
 
 function getPlanActual() {
@@ -5058,6 +5065,15 @@ let discEstado = {
 };
 
 function abrirTestDisc() {
+  // Fix QA-PLANGATE-DISC-01: bloquear ANTES de abrir el modal — evita que
+  // alguien del plan Inicial/Esencial complete las 28 preguntas y recién
+  // al final descubra (por el 403 del backend) que no se guardó nada.
+  const planGate = getPlanActual();
+  const restriccionGate = PLAN_RESTRICCIONES[planGate] || PLAN_RESTRICCIONES['Inicial'];
+  if (!restriccionGate.tests_psicometricos && !IS_ADMIN) {
+    agentMsg(`🔒 El test DISC no está incluido en tu plan **${planGate}**. Actualiza a Profesional o Premium para acceder a esta evaluación.`);
+    return;
+  }
   discEstado = { grupoActual:0, respuestas: new Array(28).fill(null).map(()=>({most:null,least:null})), modoSeleccion:null, completado:false };
   discRenderGrupo();
   document.getElementById('discOverlay').classList.add('visible');
@@ -5454,6 +5470,13 @@ let kostickEstado = {
 };
 
 function abrirTestKostick() {
+  // Fix QA-PLANGATE-DISC-01 (ver abrirTestDisc): misma validación de plan.
+  const planGateK = getPlanActual();
+  const restriccionGateK = PLAN_RESTRICCIONES[planGateK] || PLAN_RESTRICCIONES['Inicial'];
+  if (!restriccionGateK.tests_psicometricos && !IS_ADMIN) {
+    agentMsg(`🔒 El test Kostick no está incluido en tu plan **${planGateK}**. Actualiza a Profesional o Premium para acceder a esta evaluación.`);
+    return;
+  }
   kostickEstado = { parActual:0, respuestas: new Array(90).fill(null), completado:false };
   kostickRenderPar();
   document.getElementById('kostickOverlay').classList.add('visible');
@@ -5695,9 +5718,19 @@ function etapaIrA(etapa) {
 
   // Para "Diagnóstico IA": si el participante aún no completó un test,
   // abrirlo directamente en vez de solo mostrar el panel lateral.
+  // Fix QA-PLANGATE-DISC-01: no autodisparar el test si el plan actual no
+  // lo incluye — abrirTestDisc()/abrirTestKostick() ya lo bloquean, pero
+  // mejor ni ofrecerlo: se muestra un aviso de mejora de plan en su lugar.
   if (etapa === 'diagnostico') {
-    if (!etapaEstado.hitos.disc) setTimeout(() => { try { abrirTestDisc(); } catch(e){} }, 450);
-    else if (!etapaEstado.hitos.kostick) setTimeout(() => { try { abrirTestKostick(); } catch(e){} }, 450);
+    const planEtapaGate = getPlanActual();
+    const restriccionEtapaGate = PLAN_RESTRICCIONES[planEtapaGate] || PLAN_RESTRICCIONES['Inicial'];
+    if (!restriccionEtapaGate.tests_psicometricos && !IS_ADMIN) {
+      agentMsg(`🔒 El diagnóstico DISC + Kostick no está incluido en tu plan **${planEtapaGate}**. Actualiza a Profesional o Premium para acceder a esta evaluación.`);
+    } else if (!etapaEstado.hitos.disc) {
+      setTimeout(() => { try { abrirTestDisc(); } catch(e){} }, 450);
+    } else if (!etapaEstado.hitos.kostick) {
+      setTimeout(() => { try { abrirTestKostick(); } catch(e){} }, 450);
+    }
   }
 }
 
@@ -5717,11 +5750,16 @@ function etapaCargar() {
    ================================================================ */
 function chips_bienvenida() {
   // Retorna chips de acción rápida incluyendo inicio de tests si no completados
+  // Fix QA-PLANGATE-DISC-01: no ofrecer los chips de DISC/Kostick si el plan
+  // actual no los incluye (solo Profesional/Premium — ver PLAN_RESTRICCIONES).
   const chips = [];
-  if (!etapaEstado.hitos.disc) {
+  const planChipsGate = getPlanActual();
+  const restriccionChipsGate = PLAN_RESTRICCIONES[planChipsGate] || PLAN_RESTRICCIONES['Inicial'];
+  const testsDisponibles = restriccionChipsGate.tests_psicometricos || IS_ADMIN;
+  if (testsDisponibles && !etapaEstado.hitos.disc) {
     chips.push({ label:'📊 Hacer test DISC', action:'abrirTestDisc()' });
   }
-  if (!etapaEstado.hitos.kostick) {
+  if (testsDisponibles && !etapaEstado.hitos.kostick) {
     chips.push({ label:'🧠 Hacer test Kostick', action:'abrirTestKostick()' });
   }
   chips.push({ label:'📄 Optimizar mi CV', action:`preguntar('¿Qué palabras clave le faltan a mi CV para llegar a 85 en ATS?')` });
