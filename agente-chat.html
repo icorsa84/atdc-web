@@ -1829,62 +1829,147 @@ const CATALOGO_SECTORES = [
    Usamos un array plano acá, pero en la UI de multi-select se pueden
    mostrar por grupo si el frontend así lo requiere. */
 const CATALOGO_CARGOS = [
-  /* Gerencia (8 títulos) */
-  'Gerente General','Gerente / Director de Área','Subgerente','Jefe de Departamento',
-  'Coordinador / Supervisor de Equipo','Coordinador','Supervisor','Encargado',
-  /* Administración y RRHH (12) */
-  'Analista Administrativo','Especialista en Recursos Humanos','Coordinador RRHH',
-  'Asistente de RRHH','Especialista en Nómina','Analista de Organización',
-  'Especialista en Selección','Coordinador de Capacitación','Asistente Administrativo',
-  'Secretaria / Asistente Ejecutiva','Recepcionista','Auxiliar Administrativo',
-  /* Finanzas y Contabilidad (12) */
-  'Contabilista / Contador Senior','Contador','Analista Contable','Auxiliar Contable',
-  'Especialista en Finanzas','Analista Financiero','Tesorero','Especialista en Presupuestos',
-  'Analista de Costos','Auditor Interno','Asistente Financiero','Coordinador de Tesorería',
-  /* Ventas y Comercial (12) */
-  'Gerente Comercial','Gerente de Ventas','Jefe de Ventas','Ejecutivo de Ventas Senior',
-  'Ejecutivo de Ventas','Asesor Comercial','Ejecutivo de Cuenta','Especialista en Mercado',
-  'Ejecutivo de Negocios','Coordinador Comercial','Asistente Comercial','Teleoperador de Ventas',
-  /* Marketing y Comunicaciones (10) */
-  'Gerente de Marketing','Especialista en Marketing Digital','Coordinador de Marketing',
-  'Especialista en Publicidad','Especialista en Redes Sociales','Coordinador de Comunicaciones',
-  'Community Manager','Especialista en Contenidos','Asistente de Marketing','Diseñador Gráfico',
-  /* Tecnología e IT (15) */
-  'Gerente IT / CIO','Especialista en Sistemas','Analista de Sistemas','Desarrollador Senior',
-  'Desarrollador Full Stack','Desarrollador Backend','Desarrollador Frontend','Desarrollador Mobile',
-  'Especialista en Base de Datos','Administrador de Servidores','Especialista en Seguridad Informática',
-  'Técnico en Redes','Support IT / Help Desk','Coordinador IT','Asistente Técnico',
-  /* Logística y Operaciones (12) */
-  'Gerente de Logística','Gerente de Operaciones','Jefe de Almacén','Coordinador Logístico',
-  'Especialista en Supply Chain','Planificador de Demanda','Coordinador de Distribución',
-  'Especialista en Procesos','Coordinador de Calidad','Asistente de Almacén','Operario de Almacén',
-  'Conductor / Transportista',
-  /* Calidad y Aseguramiento (8) */
-  'Gerente de Calidad','Especialista en Calidad','Coordinador de Aseguramiento','Inspector de Calidad',
-  'Auditor Externo','Especialista en Mejora Continua','Coordinador de Estándares','Asistente de Calidad',
-  /* Producción y Manufactura (10) */
-  'Gerente de Producción','Jefe de Turno / Supervisor de Producción','Especialista en Mantenimiento',
-  'Técnico en Producción','Operario de Manufactura','Especialista en Seguridad Industrial',
-  'Coordinador de Mantenimiento','Electricista Industrial','Mecánico Industrial','Ayudante de Producción',
-  /* Proyectos (6) */
-  'Project Manager / Gestor de Proyectos','PMO Coordinator','Especialista en Metodología Ágil',
-  'Coordinador de Proyectos','Asistente de Proyectos','Especialista en Cambio Organizacional',
-  /* Servicio al Cliente (10) */
-  'Gerente de Atención al Cliente','Especialista en Servicio al Cliente','Coordinador de Servicio',
-  'Ejecutivo de Servicio al Cliente','Asesor de Servicio','Supervisor de Call Center',
-  'Agente de Servicio al Cliente','Especialista en Satisfacción del Cliente','Coordinador de Reclamos',
-  'Asistente de Atención al Cliente',
-  /* Recursos Especializados (15) */
-  'Abogado / Asesor Legal','Especialista en Asuntos Legales','Notario','Notario Público',
-  'Ingeniero / Especialista Técnico','Arquitecto','Analista de Datos / Data Scientist','Ingeniero de Datos',
-  'Especialista en BI (Business Intelligence)','Consultor','Asesor Empresarial','Analista de Negocio',
-  'Especialista en Sostenibilidad / ESG','Especialista Ambiental','Coach / Trainer',
-  /* Educación y Capacitación (6) */
-  'Docente / Instructor','Coordinador Académico','Especialista en Capacitación',
-  'Formador Corporativo','Orientador Educacional','Diseñador Instruccional',
-  /* Otros Profesionales (8) */
-  'Periodista / Comunicador','Traductor / Intérprete','Especialista en Compliance','Especialista en Riesgos',
-  'Analista de Inteligencia de Mercado','Especialista en Relaciones Públicas','Community Strategist','Especialista en Negocios Internacionales',
+  /* Dirección y Gerencia General (12) */
+  'CEO / Presidente Ejecutivo','Gerente General','Director de Área / Negocio','Subdirector',
+  'Subgerente','Jefe de Departamento','Gerente Ejecutivo','Gerente Senior',
+  'Director de Operaciones (COO)','Director Financiero (CFO)','Director de Tecnología (CTO)','Gerente Estratégico',
+
+  /* Recursos Humanos y Organización (22) */
+  'Jefe de RRHH / Director de Personas','Manager de RRHH','Especialista en Recursos Humanos',
+  'Especialista en Relaciones Laborales','Coordinador RRHH','Especialista en Nómina y Beneficios',
+  'Especialista en Selección y Reclutamiento','Especialista en Desarrollo y Capacitación',
+  'Coordinador de Capacitación','Especialista en Clima Laboral / Cultura Organizacional',
+  'Especialista en Compensación','Coordinador de Beneficios','Especialista en Gestión de Personas',
+  'Especialista en Seguridad y Salud Ocupacional','Asistente de RRHH','Coordinador de Reclutamiento',
+  'Especialista en Talento','Especialista en Evaluación de Desempeño','Especialista en Sucesión',
+  'Especialista en Change Management (RRHH)','Asistente Administrativo RRHH','Especialista en Compliance Laboral',
+
+  /* Administración (15) */
+  'Gerente Administrativo','Analista Administrativo','Especialista en Procesos',
+  'Coordinador / Supervisor Administrativo','Coordinador Administrativo','Especialista en Gestión Administrativa',
+  'Asistente Administrativo','Secretaria / Asistente Ejecutiva','Auxiliar Administrativo',
+  'Recepcionista / Auxiliar de Recepción','Coordinador de Servicios Generales','Especialista en Protocolos',
+  'Coordinador de Infraestructura','Asistente de Servicios','Gestor de Espacios',
+
+  /* Finanzas y Contabilidad (18) */
+  'Gerente / Director Financiero','Jefe de Contabilidad','Contabilista / Contador Senior',
+  'Contador','Analista Contable','Especialista en Finanzas','Analista Financiero Senior',
+  'Analista Financiero','Tesorero / Especialista en Tesorería','Especialista en Presupuestos',
+  'Especialista en Costos','Auditor Interno / Jefe de Auditoría','Auditor Externo',
+  'Analista de Riesgo Financiero','Asistente Financiero','Asistente Contable','Coordinador de Tesorería',
+  'Especialista en Impuestos / Tributación',
+
+  /* Ventas y Comercial (18) */
+  'Gerente Comercial / Director de Ventas','Gerente de Ventas','Jefe de Ventas',
+  'Ejecutivo de Ventas Senior','Ejecutivo de Ventas','Ejecutivo de Negocios',
+  'Ejecutivo de Cuenta / Account Manager','Asesor Comercial / Asesor de Ventas',
+  'Especialista en Desarrollo Comercial','Especialista de Mercado','Representante de Ventas',
+  'Coordinador Comercial','Asistente Comercial','Teleoperador de Ventas / Sales Support',
+  'Especialista en Licitaciones','Business Developer','Ejecutivo de Ventas B2B',
+  'Ejecutivo de Ventas B2C','Key Account Manager',
+
+  /* Marketing y Comunicaciones (14) */
+  'Gerente / Director de Marketing','Especialista en Marketing Digital','Especialista en Marketing',
+  'Coordinador de Marketing','Especialista en Publicidad / Advertising',
+  'Especialista en Redes Sociales / Social Media Manager','Especialista en Contenidos',
+  'Coordinador de Comunicaciones / Comunicador','Community Manager','Content Creator',
+  'Especialista en Branding','Diseñador Gráfico / Diseñador UX-UI','Asistente de Marketing',
+  'Especialista en Email Marketing',
+
+  /* Tecnología e IT (22) */
+  'Gerente IT / CIO / Director de Tecnología','Jefe de IT','Especialista en Sistemas',
+  'Analista de Sistemas / Systems Analyst','Arquitecto de Soluciones','Arquitecto de Sistemas',
+  'Desarrollador Senior','Desarrollador Full Stack','Desarrollador Backend',
+  'Desarrollador Frontend','Desarrollador Mobile (iOS/Android)','Especialista en Base de Datos / DBA',
+  'Especialista en Data Warehouse','Administrador de Servidores / SysAdmin',
+  'Especialista en Seguridad Informática / Ciberseguridad','Especialista en Infraestructura',
+  'Técnico en Redes / Network Administrator','Técnico de Soporte / Help Desk',
+  'Coordinador IT / IT Coordinator','QA / Tester','DevOps Engineer','Especialista en Cloud Computing',
+  'Asistente Técnico',
+
+  /* Logística y Supply Chain (16) */
+  'Gerente de Logística','Gerente de Supply Chain','Gerente de Operaciones',
+  'Jefe de Almacén','Jefe de Logística','Coordinador Logístico',
+  'Especialista en Supply Chain Management','Especialista en Procesos Logísticos',
+  'Planificador de Demanda','Coordinador de Distribución','Especialista en Inventarios',
+  'Analista de Operaciones','Coordinador de Almacén','Asistente de Almacén',
+  'Operario de Almacén','Conductor / Transportista',
+
+  /* Calidad, Mejora y Aseguramiento (14) */
+  'Gerente / Director de Calidad','Jefe de Calidad','Especialista en Calidad',
+  'Especialista en Mejora Continua / Six Sigma','Coordinador de Aseguramiento',
+  'Especialista en Gestión de Procesos','Inspector de Calidad','Coordinador de Estándares',
+  'Especialista en Normas ISO','Analista de Calidad','Asistente de Calidad',
+  'Especialista en Auditoría Interna','Especialista en Compliance / Cumplimiento',
+  'Coordinador de Mejoras',
+
+  /* Producción y Manufactura (14) */
+  'Gerente / Director de Producción','Jefe de Producción','Jefe de Turno / Supervisor de Producción',
+  'Supervisor de Planta','Especialista en Mantenimiento / Jefe de Mantenimiento',
+  'Técnico en Producción','Especialista en Seguridad Industrial / Higiene y Seguridad',
+  'Coordinador de Mantenimiento','Coordinador de Seguridad','Electricista Industrial',
+  'Mecánico Industrial','Operario de Manufactura / Operario de Planta',
+  'Técnico de Mantenimiento','Ayudante de Producción',
+
+  /* Gestión de Proyectos y PMO (10) */
+  'Project Manager / Gestor de Proyectos','PMO Director / Jefe de PMO','PMO Coordinator',
+  'Especialista en Metodología Ágil / Scrum Master','Especialista en Gestión de Cambio',
+  'Coordinador de Proyectos','Especialista en Planning','Analista de Proyectos',
+  'Asistente de Proyectos','Coordinador de Iniciativas',
+
+  /* Servicio al Cliente y Atención (14) */
+  'Gerente / Director de Servicio al Cliente','Gerente de Contact Center',
+  'Especialista en Servicio al Cliente','Coordinador de Servicio',
+  'Ejecutivo de Servicio al Cliente','Asesor de Servicio / Asesor de Cliente',
+  'Supervisor de Call Center','Supervisor de Centro de Contacto',
+  'Agente de Servicio al Cliente','Especialista en Satisfacción del Cliente',
+  'Coordinador de Reclamos / Especialista en Resolución','Especialista en Retención de Clientes',
+  'Asistente de Atención al Cliente','Especialista en Experiencia del Cliente (CX)',
+
+  /* Análisis de Datos y Business Intelligence (12) */
+  'Gerente de Datos / Chief Data Officer','Especialista en Business Intelligence (BI)',
+  'Especialista en Data Analytics','Analista de Datos / Data Analyst','Data Scientist',
+  'Ingeniero de Datos','Especialista en BI Developer','Especialista en Reporting',
+  'Analista de Inteligencia de Mercado','Especialista en Business Analytics',
+  'Especialista en Visualización de Datos','Consultor de Datos','Asistente de Analytics',
+
+  /* Asesoría Legal y Compliance (10) */
+  'Director Legal / Abogado Jefe','Abogado / Asesor Legal','Especialista en Asuntos Legales',
+  'Especialista en Derecho Laboral','Especialista en Derecho Tributario','Especialista en Derecho Corporativo',
+  'Especialista en Compliance / Oficial de Cumplimiento','Notario / Notario Público',
+  'Asistente Legal','Especialista en Contratos',
+
+  /* Recursos Especializados y Consultoría (18) */
+  'Consultor / Asesor Empresarial','Consultor Senior','Analista de Negocio',
+  'Especialista en Transformación Digital','Especialista en Sostenibilidad / ESG',
+  'Especialista Ambiental / Especialista en Medio Ambiente',
+  'Coach Ejecutivo / Executive Coach','Trainer / Formador','Especialista en Liderazgo',
+  'Especialista en Innovación','Especialista en Estrategia','Especialista en Riesgos Empresariales',
+  'Especialista en Relaciones Públicas / RP','Especialista en Negocios Internacionales',
+  'Especialista en Comercio Exterior','Especialista en Importación y Exportación',
+  'Especialista en Inteligencia de Negocios',
+
+  /* Educación, Capacitación y Desarrollo (10) */
+  'Director Académico','Docente / Instructor','Coordinador Académico',
+  'Especialista en Capacitación / Training Specialist','Especialista en Educación Corporativa',
+  'Formador Corporativo / Facilitador','Orientador Educacional / Orientador Vocacional',
+  'Diseñador Instruccional','Especialista en e-Learning','Coordinador de Programas Educativos',
+
+  /* Infraestructura, Facilities y Servicios Generales (10) */
+  'Gerente de Infraestructura / Facilities Manager','Jefe de Servicios Generales',
+  'Especialista en Gestión de Instalaciones','Coordinador de Servicios Generales',
+  'Coordinador de Infraestructura','Especialista en Mantenimiento de Edificios',
+  'Supervisor de Limpieza y Servicios','Asistente de Servicios Generales',
+  'Especialista en Seguridad Física','Encargado de Vigilancia',
+
+  /* Otras especialidades profesionales (14) */
+  'Periodista / Comunicador','Traductor / Intérprete','Especialista en Relaciones Laborales',
+  'Especialista en Negociación','Especialista en Resolución de Conflictos',
+  'Especialista en Bienestar Laboral','Psicólogo Laboral / Psicólogo Organizacional',
+  'Sociólogo / Científico Social','Especialista en Responsabilidad Social Empresarial (RSE)',
+  'Especialista en Asuntos Públicos','Especialista en Comunicación Interna',
+  'Especialista en Gestión de Riesgos Laborales','Especialista en Prevención de Riesgos',
+  'Community Strategist',
 ];
 const CATALOGO_RENTAS = [
   'Menos de $500.000','$500.000 - $800.000','$800.000 - $1.200.000',
