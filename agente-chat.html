@@ -1932,9 +1932,26 @@ function _mostrarOnboarding(planPreseleccionado) {
         <input id="_ob_email" type="email" placeholder="Correo electrónico" autocomplete="email" style="
           width:100%;padding:12px 14px;border-radius:8px;background:var(--bg);border:1.5px solid var(--border);
           color:var(--text);font-size:15px;outline:none;transition:border-color .2s;box-sizing:border-box;">
-        <input id="_ob_password" type="password" placeholder="Contraseña (mínimo 8 caracteres)" autocomplete="new-password" style="
-          width:100%;padding:12px 14px;border-radius:8px;background:var(--bg);border:1.5px solid var(--border);
-          color:var(--text);font-size:15px;outline:none;transition:border-color .2s;box-sizing:border-box;">
+        <!-- Fix QA-UX-PASSWORD-01: antes no había forma de ver lo que se
+             tipeaba (ningún 👁) ni un segundo campo para confirmar — un
+             typo al crear la cuenta quedaba invisible hasta el próximo
+             intento de ingresar. -->
+        <div style="position:relative;width:100%;">
+          <input id="_ob_password" type="password" placeholder="Contraseña (mínimo 8 caracteres)" autocomplete="new-password" style="
+            width:100%;padding:12px 42px 12px 14px;border-radius:8px;background:var(--bg);border:1.5px solid var(--border);
+            color:var(--text);font-size:15px;outline:none;transition:border-color .2s;box-sizing:border-box;">
+          <button type="button" onclick="_toggleVerPassword('_ob_password', this)" tabindex="-1" title="Mostrar/ocultar contraseña" style="
+            position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:none;
+            color:var(--muted);cursor:pointer;font-size:17px;padding:5px 8px;line-height:1;">👁</button>
+        </div>
+        <div style="position:relative;width:100%;">
+          <input id="_ob_password_confirmar" type="password" placeholder="Confirmar contraseña" autocomplete="new-password" style="
+            width:100%;padding:12px 42px 12px 14px;border-radius:8px;background:var(--bg);border:1.5px solid var(--border);
+            color:var(--text);font-size:15px;outline:none;transition:border-color .2s;box-sizing:border-box;">
+          <button type="button" onclick="_toggleVerPassword('_ob_password_confirmar', this)" tabindex="-1" title="Mostrar/ocultar contraseña" style="
+            position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:none;
+            color:var(--muted);cursor:pointer;font-size:17px;padding:5px 8px;line-height:1;">👁</button>
+        </div>
       </div>
 
       <!-- FORMULARIO LOGIN (oculto por defecto) -->
@@ -1942,9 +1959,14 @@ function _mostrarOnboarding(planPreseleccionado) {
         <input id="_login_email" type="email" placeholder="Correo electrónico" autocomplete="email" style="
           width:100%;padding:12px 14px;border-radius:8px;background:var(--bg);border:1.5px solid var(--border);
           color:var(--text);font-size:15px;outline:none;transition:border-color .2s;box-sizing:border-box;">
-        <input id="_login_password" type="password" placeholder="Contraseña" autocomplete="current-password" style="
-          width:100%;padding:12px 14px;border-radius:8px;background:var(--bg);border:1.5px solid var(--border);
-          color:var(--text);font-size:15px;outline:none;transition:border-color .2s;box-sizing:border-box;">
+        <div style="position:relative;width:100%;">
+          <input id="_login_password" type="password" placeholder="Contraseña" autocomplete="current-password" style="
+            width:100%;padding:12px 42px 12px 14px;border-radius:8px;background:var(--bg);border:1.5px solid var(--border);
+            color:var(--text);font-size:15px;outline:none;transition:border-color .2s;box-sizing:border-box;">
+          <button type="button" onclick="_toggleVerPassword('_login_password', this)" tabindex="-1" title="Mostrar/ocultar contraseña" style="
+            position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:none;
+            color:var(--muted);cursor:pointer;font-size:17px;padding:5px 8px;line-height:1;">👁</button>
+        </div>
         <a href="#" onclick="_abrirRecuperarPassword();return false;" style="
           align-self:flex-end;color:var(--cyan2);font-size:12.5px;text-decoration:none;margin-top:-4px;
         ">¿Olvidaste tu contraseña?</a>
@@ -2007,6 +2029,17 @@ async function _enviarAuth(plan) {
   return _registrarParticipante(plan);
 }
 
+/* Fix QA-UX-PASSWORD-01: alterna type="password"/"text" en cualquier
+   campo de contraseña de la app, cambiando el ícono del botón que lo
+   acompaña. Reutilizado por registro, login, cambio y restablecimiento. */
+function _toggleVerPassword(id, btnEl) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const mostrar = el.type === 'password';
+  el.type = mostrar ? 'text' : 'password';
+  if (btnEl) btnEl.textContent = mostrar ? '🙈' : '👁';
+}
+
 function _mostrarErrorAuth(msg) {
   const errEl = document.getElementById('_ob_error');
   if (errEl) { errEl.textContent = msg; errEl.style.display = 'block'; }
@@ -2032,12 +2065,14 @@ async function _registrarParticipante(plan) {
   const apellido = (document.getElementById('_ob_apellido')?.value || '').trim();
   const email    = (document.getElementById('_ob_email')?.value || '').trim();
   const password = (document.getElementById('_ob_password')?.value || '');
+  const passwordConfirmar = (document.getElementById('_ob_password_confirmar')?.value || '');
   const btn      = document.getElementById('_ob_btn');
 
   if (!nombre)    { _mostrarErrorAuth('Por favor ingresa tu nombre.'); document.getElementById('_ob_nombre')?.focus(); return; }
   if (!apellido)  { _mostrarErrorAuth('Por favor ingresa tu apellido.'); document.getElementById('_ob_apellido')?.focus(); return; }
   if (!email || !email.includes('@')) { _mostrarErrorAuth('Ingresa un correo electrónico válido.'); document.getElementById('_ob_email')?.focus(); return; }
   if (!password || password.length < 8) { _mostrarErrorAuth('La contraseña debe tener al menos 8 caracteres.'); document.getElementById('_ob_password')?.focus(); return; }
+  if (password !== passwordConfirmar) { _mostrarErrorAuth('Las contraseñas no coinciden.'); document.getElementById('_ob_password_confirmar')?.focus(); return; }
 
   document.getElementById('_ob_error').style.display = 'none';
   if (btn) { btn.textContent = 'Creando tu cuenta…'; btn.disabled = true; }
@@ -4290,9 +4325,15 @@ function _modalPassword(id, tituloHtml, cuerpoHtml) {
 }
 
 function _inputPasswordHtml(id, placeholder, autocomplete) {
-  return `<input id="${id}" type="password" placeholder="${placeholder}" autocomplete="${autocomplete}" style="
-    width:100%;padding:11px 13px;border-radius:8px;background:var(--bg);border:1.5px solid var(--border);
-    color:var(--text);font-size:14.5px;outline:none;box-sizing:border-box;margin-bottom:10px;">`;
+  // Fix QA-UX-PASSWORD-01: agrega el botón 👁 para mostrar/ocultar lo tipeado.
+  return `<div style="position:relative;width:100%;margin-bottom:10px;">
+    <input id="${id}" type="password" placeholder="${placeholder}" autocomplete="${autocomplete}" style="
+      width:100%;padding:11px 40px 11px 13px;border-radius:8px;background:var(--bg);border:1.5px solid var(--border);
+      color:var(--text);font-size:14.5px;outline:none;box-sizing:border-box;">
+    <button type="button" onclick="_toggleVerPassword('${id}', this)" tabindex="-1" title="Mostrar/ocultar contraseña" style="
+      position:absolute;right:5px;top:50%;transform:translateY(-50%);background:none;border:none;
+      color:var(--muted);cursor:pointer;font-size:16px;padding:5px 7px;line-height:1;">👁</button>
+  </div>`;
 }
 
 /* 1) Cambiar contraseña — usuario ya logueado (botón ⚙️ en la barra superior) */
@@ -4304,6 +4345,7 @@ function _abrirCambiarPassword() {
   const overlay = _modalPassword('_pwModalCambiar', 'Cambiar mi contraseña', `
     ${_inputPasswordHtml('_pw_actual', 'Contraseña actual', 'current-password')}
     ${_inputPasswordHtml('_pw_nueva', 'Nueva contraseña (mínimo 8 caracteres)', 'new-password')}
+    ${_inputPasswordHtml('_pw_nueva_confirmar', 'Confirmar nueva contraseña', 'new-password')}
     <div id="_pw_cambiar_msg" style="display:none;margin:4px 0 10px 0;padding:9px 12px;border-radius:7px;font-size:13px;"></div>
     <button id="_pw_cambiar_btn" onclick="_enviarCambiarPassword()" style="
       width:100%;padding:12px;border-radius:9px;background:var(--blue2);color:#fff;
@@ -4327,8 +4369,13 @@ function _mostrarMsgPassword(elId, texto, esError) {
 async function _enviarCambiarPassword() {
   const actual = document.getElementById('_pw_actual')?.value || '';
   const nueva = document.getElementById('_pw_nueva')?.value || '';
+  const nuevaConfirmar = document.getElementById('_pw_nueva_confirmar')?.value || '';
   if (nueva.length < 8) {
     _mostrarMsgPassword('_pw_cambiar_msg', 'La nueva contraseña debe tener al menos 8 caracteres.', true);
+    return;
+  }
+  if (nueva !== nuevaConfirmar) {
+    _mostrarMsgPassword('_pw_cambiar_msg', 'Las contraseñas no coinciden.', true);
     return;
   }
   const btn = document.getElementById('_pw_cambiar_btn');
@@ -4402,6 +4449,7 @@ async function _enviarRecuperarPassword() {
 function _abrirRestablecerPassword(token) {
   const overlay = _modalPassword('_pwModalRestablecer', 'Crea tu nueva contraseña', `
     ${_inputPasswordHtml('_pw_restablecer_nueva', 'Nueva contraseña (mínimo 8 caracteres)', 'new-password')}
+    ${_inputPasswordHtml('_pw_restablecer_confirmar', 'Confirmar nueva contraseña', 'new-password')}
     <div id="_pw_restablecer_msg" style="display:none;margin:4px 0 10px 0;padding:9px 12px;border-radius:7px;font-size:13px;"></div>
     <button id="_pw_restablecer_btn" onclick="_enviarRestablecerPassword('${token}')" style="
       width:100%;padding:12px;border-radius:9px;background:var(--blue2);color:#fff;
@@ -4418,8 +4466,13 @@ function _abrirRestablecerPassword(token) {
 
 async function _enviarRestablecerPassword(token) {
   const nueva = document.getElementById('_pw_restablecer_nueva')?.value || '';
+  const nuevaConfirmar = document.getElementById('_pw_restablecer_confirmar')?.value || '';
   if (nueva.length < 8) {
     _mostrarMsgPassword('_pw_restablecer_msg', 'La contraseña debe tener al menos 8 caracteres.', true);
+    return;
+  }
+  if (nueva !== nuevaConfirmar) {
+    _mostrarMsgPassword('_pw_restablecer_msg', 'Las contraseñas no coinciden.', true);
     return;
   }
   const btn = document.getElementById('_pw_restablecer_btn');
