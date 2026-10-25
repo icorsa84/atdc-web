@@ -2244,7 +2244,8 @@ function cerrarSesion() {
    clic accidental no deje a la persona fuera sin aviso. */
 function _confirmarCerrarSesion() {
   if (confirm('¿Cerrar tu sesión en este dispositivo? Tendrás que volver a ingresar tu correo y contraseña.')) {
-    cerrarSesion();
+    // Mostrar encuesta (60% de probabilidad) antes de cerrar sesión
+    _mostrarEncuestaAleatorio(cerrarSesion);
   }
 }
 
@@ -2726,19 +2727,23 @@ async function _arrancarAppSiCorresponde() {
   _appIniciada = true;
   await _rehidratarPerfilCompleto();   // Fix QA-REHIDRATAR-01
   init();
-  // Mostrar encuesta aleatoriamente después de inicializar
-  setTimeout(() => _mostrarEncuestaAleatorio(), 2000);
 }
 
-function _mostrarEncuestaAleatorio() {
-  // 30% de probabilidad de mostrar la encuesta
-  if (Math.random() > 0.3) return;
+function _mostrarEncuestaAleatorio(callback) {
+  // 60% de probabilidad de mostrar la encuesta antes de cerrar sesión
+  if (Math.random() > 0.6) {
+    if (callback) callback();
+    return;
+  }
 
   // No mostrar si ya la vio recientemente (cada 7 días)
   const ultimaVista = localStorage.getItem('atdc_encuesta_fecha');
   if (ultimaVista) {
     const dias = (Date.now() - parseInt(ultimaVista)) / (1000 * 60 * 60 * 24);
-    if (dias < 7) return;
+    if (dias < 7) {
+      if (callback) callback();
+      return;
+    }
   }
 
   // Crear overlay
@@ -2768,7 +2773,7 @@ function _mostrarEncuestaAleatorio() {
   `;
   header.innerHTML = `
     <h3 style="margin:0;color:var(--text,#eceef5);font-size:.95rem;font-weight:600;">Tu opinión importa 📋</h3>
-    <button onclick="document.getElementById('_encuestaOverlay')?.remove()" style="
+    <button style="
       background:transparent;border:none;color:var(--muted,#7a829e);
       cursor:pointer;font-size:24px;padding:0;width:24px;height:24px;
       display:flex;align-items:center;justify-content:center;transition:color .2s;
@@ -2776,6 +2781,15 @@ function _mostrarEncuestaAleatorio() {
       ×
     </button>
   `;
+
+  // Función para cerrar modal y ejecutar callback
+  const cerrarModal = () => {
+    overlay.remove();
+    if (callback) callback();
+  };
+
+  // Botón cerrar ejecuta callback
+  header.querySelector('button').onclick = cerrarModal;
 
   // Body con iframe
   const body = document.createElement('div');
@@ -2799,7 +2813,7 @@ function _mostrarEncuestaAleatorio() {
   // Cerrar si hace clic fuera del modal
   overlay.addEventListener('click', e => {
     if (e.target === overlay) {
-      overlay.remove();
+      cerrarModal();
     }
   });
 }
