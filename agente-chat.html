@@ -2,6 +2,16 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
+<!-- Microsoft Clarity — analítica de uso de la app (proyecto "ATDC", outplacement.atdc.app).
+     Es un proyecto de Clarity DISTINTO al de landing.html (z2y4tytpjr, que mide solo la
+     landing pública en atdc.app) — este mide el uso real dentro de la app del participante. -->
+<script type="text/javascript">
+    (function(c,l,a,r,i,t,y){
+        c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
+        t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
+        y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
+    })(window, document, "clarity", "script", "z2y52edk0j");
+</script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"><!-- Fix CHAT4-IOS-01: safe areas para notch/Dynamic Island iOS -->
 <meta name="theme-color" content="#0b0d14">
 <meta name="mobile-web-app-capable" content="yes">
@@ -4192,21 +4202,42 @@ function _aplicarGateoPorPlan() {
    ================================================================ */
 function _alternarTema() {
   const actual = document.documentElement.getAttribute('data-theme') || 'dark';
-  const nuevo = actual === 'light' ? 'dark' : 'light';
-  document.documentElement.setAttribute('data-theme', nuevo);
-  try { localStorage.setItem('atdc_tema', nuevo); } catch (e) {}
-  _sincronizarBotonTema(nuevo);
+  _establecerTema(actual === 'light' ? 'dark' : 'light');
+}
+
+/* Fix QA-UX-TEMA-01: antes solo existía _alternarTema() (toggle ciego),
+   usado por el botoncito 🌙/☀️ de 30px en la cabecera — fácil de pasar
+   por alto entre los demás íconos. _establecerTema() permite elegir el
+   tema explícitamente (no solo alternar) para poder ofrecer un control
+   con etiqueta clara "Oscuro / Claro" dentro de "Mi cuenta", además del
+   botón rápido de la cabecera — ambos quedan sincronizados entre sí. */
+function _establecerTema(tema) {
+  document.documentElement.setAttribute('data-theme', tema);
+  try { localStorage.setItem('atdc_tema', tema); } catch (e) {}
+  _sincronizarBotonTema(tema);
 }
 
 function _sincronizarBotonTema(tema) {
   const btn = document.getElementById('btnTema');
-  if (!btn) return;
-  if (tema === 'light') {
-    btn.textContent = '☀️';
-    btn.title = 'Cambiar a tema oscuro';
-  } else {
-    btn.textContent = '🌙';
-    btn.title = 'Cambiar a tema claro';
+  if (btn) {
+    if (tema === 'light') {
+      btn.textContent = '☀️';
+      btn.title = 'Cambiar a tema oscuro';
+    } else {
+      btn.textContent = '🌙';
+      btn.title = 'Cambiar a tema claro';
+    }
+  }
+  // Sincroniza el selector con etiqueta dentro del modal "Mi cuenta", si está abierto
+  // (mismo patrón de pestañas activas ya usado en _cambiarTabAuth)
+  const btnOscuro = document.getElementById('_mcTemaOscuro');
+  const btnClaro = document.getElementById('_mcTemaClaro');
+  if (btnOscuro && btnClaro) {
+    const oscuroActivo = tema !== 'light';
+    btnOscuro.style.background = oscuroActivo ? 'var(--blue2)' : 'transparent';
+    btnOscuro.style.color      = oscuroActivo ? '#fff' : 'var(--muted)';
+    btnClaro.style.background  = oscuroActivo ? 'transparent' : 'var(--blue2)';
+    btnClaro.style.color       = oscuroActivo ? 'var(--muted)' : '#fff';
   }
 }
 
@@ -4460,6 +4491,16 @@ async function _abrirMiCuenta() {
       <div id="_mcFotoMsg" style="font-size:.72rem;color:var(--muted);margin-top:4px;"></div>
     </div>
 
+    <div style="font-size:.73rem;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;margin-bottom:8px;">Apariencia</div>
+    <div style="display:flex;gap:4px;background:var(--bg);border-radius:10px;padding:4px;margin-bottom:18px;">
+      <button id="_mcTemaOscuro" onclick="_establecerTema('dark')" style="
+        flex:1;padding:9px;border-radius:7px;border:none;cursor:pointer;
+        font-size:13.5px;font-weight:700;transition:background .2s;">🌙 Oscuro</button>
+      <button id="_mcTemaClaro" onclick="_establecerTema('light')" style="
+        flex:1;padding:9px;border-radius:7px;border:none;cursor:pointer;
+        font-size:13.5px;font-weight:700;transition:background .2s;">☀️ Claro</button>
+    </div>
+
     <div style="font-size:.73rem;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;margin-bottom:8px;">Mis datos</div>
     <input id="_mc_nombre" placeholder="Nombre completo" style="width:100%;padding:10px 12px;border-radius:8px;background:var(--bg);
       border:1.5px solid var(--border);color:var(--text);font-size:13.5px;outline:none;box-sizing:border-box;margin-bottom:8px;">
@@ -4469,11 +4510,32 @@ async function _abrirMiCuenta() {
       border:1.5px solid var(--border);color:var(--text);font-size:13.5px;outline:none;box-sizing:border-box;margin-bottom:8px;">
     <input id="_mc_renta" placeholder="Renta objetivo" style="width:100%;padding:10px 12px;border-radius:8px;background:var(--bg);
       border:1.5px solid var(--border);color:var(--text);font-size:13.5px;outline:none;box-sizing:border-box;margin-bottom:8px;">
-    <div id="_mc_plan_nota" style="font-size:.72rem;color:var(--muted);margin-bottom:10px;"></div>
     <div id="_mc_perfil_msg" style="display:none;margin:4px 0 10px 0;padding:9px 12px;border-radius:7px;font-size:13px;"></div>
     <button id="_mc_guardar_btn" onclick="_guardarMiPerfil()" style="
       width:100%;padding:11px;border-radius:9px;background:var(--blue2);color:#fff;
       font-size:14px;font-weight:700;border:none;cursor:pointer;margin-bottom:18px;">Guardar mis datos</button>
+
+    <!-- Fix QA-UX-PLAN-01: antes esta sección era un texto fijo diciendo que
+         "el cambio de plan lo gestiona el equipo de ATDC" — el participante
+         no tenía ningún botón de autoservicio, solo cambio de contraseña.
+         Ahora puede pedir el cambio él mismo (ver PATCH /api/mi-perfil/plan);
+         subir de plan queda con pago pendiente hasta que el Admin lo
+         confirme, igual que al registrarse. -->
+    <div style="font-size:.73rem;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;margin-bottom:8px;">Tu plan</div>
+    <div id="_mc_plan_nota" style="font-size:.78rem;color:var(--text2);margin-bottom:10px;line-height:1.5;"></div>
+    <div style="display:flex;gap:8px;margin-bottom:8px;">
+      <select id="_mc_plan_select" style="flex:1;padding:10px 12px;border-radius:8px;background:var(--bg);
+        border:1.5px solid var(--border);color:var(--text);font-size:13.5px;outline:none;">
+        <option value="Inicial">Inicial</option>
+        <option value="Esencial">Esencial</option>
+        <option value="Profesional">Profesional</option>
+        <option value="Premium">Premium</option>
+      </select>
+      <button id="_mc_plan_btn" onclick="_cambiarPlanMiCuenta()" style="
+        padding:10px 16px;border-radius:8px;border:none;background:var(--blue2);color:#fff;
+        font-weight:700;font-size:13px;cursor:pointer;white-space:nowrap;">Cambiar plan</button>
+    </div>
+    <div id="_mc_plan_msg" style="display:none;margin:0 0 18px 0;padding:9px 12px;border-radius:7px;font-size:12.5px;"></div>
 
     <div style="font-size:.73rem;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;margin-bottom:8px;">Seguridad</div>
     <button onclick="document.getElementById('_miCuentaModal').remove();_abrirCambiarPassword();" style="
@@ -4495,6 +4557,7 @@ async function _abrirMiCuenta() {
         color:var(--red);font-weight:700;font-size:13px;cursor:pointer;">🗑 Solicitar eliminación de mis datos</button>
     </div>
   `);
+  _sincronizarBotonTema(document.documentElement.getAttribute('data-theme') || 'dark');
   await _cargarMiPerfil();
 }
 
@@ -4513,6 +4576,8 @@ async function _cargarMiPerfil() {
     const elSector = document.getElementById('_mc_sector'); if (elSector) elSector.value = (d.sector === 'Por definir' ? '' : d.sector) || '';
     const elRenta = document.getElementById('_mc_renta'); if (elRenta) elRenta.value = (d.renta_objetivo === 'Por definir' ? '' : d.renta_objetivo) || '';
     const elPlanNota = document.getElementById('_mc_plan_nota');
+    const elPlanSelect = document.getElementById('_mc_plan_select');
+    const elPlanBtn = document.getElementById('_mc_plan_btn');
     if (elPlanNota) {
       if (d.pago_estado === 'pendiente') {
         // Mismo compromiso de 1 hora que ve el Admin en su panel — aquí se
@@ -4531,11 +4596,18 @@ async function _cargarMiPerfil() {
             `Nos comprometemos a confirmar tu pago y activar tu plan dentro de un máximo de 1 hora desde que recibamos tu comprobante.`;
           elPlanNota.style.color = '#F59E0B';
         }
+        // Mientras hay un pago pendiente no se puede pedir otro cambio —
+        // evita pisar la solicitud en curso con una nueva.
+        if (elPlanBtn) { elPlanBtn.disabled = true; elPlanBtn.style.opacity = '.5'; elPlanBtn.style.cursor = 'not-allowed'; }
+        if (elPlanSelect) elPlanSelect.disabled = true;
       } else {
-        elPlanNota.textContent = `Plan actual: ${d.plan} — el cambio de plan lo gestiona el equipo de ATDC.`;
+        elPlanNota.innerHTML = `Plan actual: <strong>${d.plan}</strong>. Subir de plan queda pendiente de pago hasta que confirmemos tu transferencia; bajar a Inicial es inmediato.`;
         elPlanNota.style.color = '';
+        if (elPlanBtn) { elPlanBtn.disabled = false; elPlanBtn.style.opacity = '1'; elPlanBtn.style.cursor = 'pointer'; }
+        if (elPlanSelect) elPlanSelect.disabled = false;
       }
     }
+    if (elPlanSelect && d.plan) elPlanSelect.value = d.plan;
 
     // Estado de una solicitud de eliminación previa, si existe
     const se = d.solicitud_eliminacion || { estado: 'ninguna' };
@@ -4564,6 +4636,43 @@ async function _cargarMiPerfil() {
   }
 }
 let _MI_PERFIL_CACHE = null;
+
+async function _cambiarPlanMiCuenta() {
+  const sel = document.getElementById('_mc_plan_select');
+  const btn = document.getElementById('_mc_plan_btn');
+  const msgEl = document.getElementById('_mc_plan_msg');
+  if (!sel || !msgEl) return;
+  const planNuevo = sel.value;
+  const planActual = (_MI_PERFIL_CACHE && _MI_PERFIL_CACHE.plan) || '';
+  if (planNuevo === planActual) {
+    msgEl.style.display = 'block'; msgEl.style.background = 'rgba(148,163,184,.12)'; msgEl.style.color = 'var(--muted)';
+    msgEl.textContent = `Ya tienes el plan ${planNuevo} activo.`;
+    return;
+  }
+  const esBajada = planNuevo === 'Inicial';
+  const confirmado = confirm(esBajada
+    ? `¿Confirmas que quieres bajar tu plan a ${planNuevo}? El cambio es inmediato.`
+    : `¿Confirmas que quieres pedir el plan ${planNuevo}? Te enviaremos los datos bancarios por correo y tu plan se activa una vez confirmemos tu pago.`);
+  if (!confirmado) return;
+  btn.disabled = true; sel.disabled = true;
+  msgEl.style.display = 'none';
+  try {
+    const res = await fetch(`${_BACKEND}/api/mi-perfil/plan`, {
+      method: 'PATCH',
+      headers: { 'Authorization': `Bearer ${_obtenerToken()}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ plan: planNuevo })
+    });
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(d.detail || 'No se pudo cambiar el plan.');
+    msgEl.style.display = 'block'; msgEl.style.background = 'rgba(16,185,129,.12)'; msgEl.style.color = '#10B981';
+    msgEl.textContent = d.mensaje || 'Listo.';
+    await _cargarMiPerfil();
+  } catch (e) {
+    msgEl.style.display = 'block'; msgEl.style.background = 'rgba(239,68,68,.12)'; msgEl.style.color = 'var(--red)';
+    msgEl.textContent = e.message || 'Error al cambiar el plan.';
+    btn.disabled = false; sel.disabled = false;
+  }
+}
 
 async function _cargarFotoMiCuenta() {
   const img = document.getElementById('_mcFotoImg');
