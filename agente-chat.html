@@ -1557,10 +1557,32 @@
         <button class="admin-validate-btn" id="adminCitasBtn" onclick="_toggleAdminCitas()" style="background:var(--amber);margin-left:8px;">📅 Citas Pendientes</button>
       </div>
 
-      <!-- Panel de Citas Pendientes (Admin) -->
+      <!-- Panel de Citas Pendientes (Admin) con Calendario Visual -->
       <div id="adminCitasPanel" style="display:none;margin-top:12px;padding:12px;background:var(--bg2);border-radius:8px;border:1px solid var(--border2);">
-        <div style="font-weight:700;margin-bottom:8px;color:var(--text);">📋 Solicitudes de Sesión Pendientes</div>
-        <div id="adminCitasLista" style="max-height:300px;overflow-y:auto;font-size:.78rem;">
+        <div style="font-weight:700;margin-bottom:12px;color:var(--text);display:flex;align-items:center;justify-content:space-between;">
+          <span>📅 Calendario de Sesiones</span>
+          <button onclick="_cambiarMesCalendar(-1)" style="background:none;border:none;color:var(--text);cursor:pointer;font-size:.9rem;">◀</button>
+          <span id="adminCalendarMes" style="font-size:.85rem;color:var(--muted);min-width:140px;text-align:center;">Octubre 2026</span>
+          <button onclick="_cambiarMesCalendar(1)" style="background:none;border:none;color:var(--text);cursor:pointer;font-size:.9rem;">▶</button>
+        </div>
+
+        <!-- Calendario Visual -->
+        <div id="adminCalendarGrid" style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:12px;background:var(--bg3);padding:8px;border-radius:6px;">
+          <!-- Encabezados días de la semana -->
+          <div style="text-align:center;font-weight:600;color:var(--muted);font-size:.7rem;padding:4px;">L</div>
+          <div style="text-align:center;font-weight:600;color:var(--muted);font-size:.7rem;padding:4px;">M</div>
+          <div style="text-align:center;font-weight:600;color:var(--muted);font-size:.7rem;padding:4px;">M</div>
+          <div style="text-align:center;font-weight:600;color:var(--muted);font-size:.7rem;padding:4px;">J</div>
+          <div style="text-align:center;font-weight:600;color:var(--muted);font-size:.7rem;padding:4px;">V</div>
+          <div style="text-align:center;font-weight:600;color:var(--muted);font-size:.7rem;padding:4px;">S</div>
+          <div style="text-align:center;font-weight:600;color:var(--muted);font-size:.7rem;padding:4px;">D</div>
+          <!-- Días del mes -->
+          <div id="adminCalendarDays"></div>
+        </div>
+
+        <!-- Lista de Citas (debajo del calendario) -->
+        <div style="font-weight:700;margin:12px 0 8px;color:var(--text);font-size:.85rem;">📋 Detalles de Citas Seleccionadas</div>
+        <div id="adminCitasLista" style="max-height:280px;overflow-y:auto;font-size:.78rem;">
           <div style="color:var(--muted);padding:8px;text-align:center;">Cargando solicitudes...</div>
         </div>
       </div>
@@ -4584,6 +4606,10 @@ function cargarPlanOverride() {
    GESTIÓN DE CITAS PENDIENTES (Admin) - Funcionalidades 1, 2, 3
    ================================================================ */
 
+/* Variables globales para calendario */
+let _calendarActual = { año: new Date().getFullYear(), mes: new Date().getMonth() };
+let _citasPorFecha = {}; // Mapeo: "YYYY-MM-DD" -> [{id, nombre, hora}]
+
 /* Función 1: Toggle panel de citas pendientes */
 function _toggleAdminCitas() {
   const panel = document.getElementById('adminCitasPanel');
@@ -4594,6 +4620,109 @@ function _toggleAdminCitas() {
   } else {
     panel.style.display = 'none';
   }
+}
+
+/* Función auxiliar: Cambiar mes en calendario */
+function _cambiarMesCalendar(delta) {
+  _calendarActual.mes += delta;
+  if (_calendarActual.mes > 11) {
+    _calendarActual.mes = 0;
+    _calendarActual.año += 1;
+  } else if (_calendarActual.mes < 0) {
+    _calendarActual.mes = 11;
+    _calendarActual.año -= 1;
+  }
+  _renderCalendar();
+}
+
+/* Función auxiliar: Renderizar calendario visual */
+function _renderCalendar() {
+  const año = _calendarActual.año;
+  const mes = _calendarActual.mes;
+
+  // Actualizar encabezado
+  const meses = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  const mesLbl = document.getElementById('adminCalendarMes');
+  if (mesLbl) mesLbl.textContent = `${meses[mes]} ${año}`;
+
+  // Calcular primer día y días del mes
+  const primerDia = new Date(año, mes, 1).getDay(); // 0=domingo, 1=lunes...
+  const diasMes = new Date(año, mes + 1, 0).getDate();
+
+  // Ajustar: el calendario empieza en lunes (1), pero Date devuelve domingo (0)
+  const primerDiaLunes = primerDia === 0 ? 6 : primerDia - 1;
+
+  let html = '';
+
+  // Días vacíos antes del mes
+  for (let i = 0; i < primerDiaLunes; i++) {
+    html += '<div style="background:var(--bg2);"></div>';
+  }
+
+  // Días del mes
+  for (let dia = 1; dia <= diasMes; dia++) {
+    const fechaStr = `${String(año).padStart(4,'0')}-${String(mes+1).padStart(2,'0')}-${String(dia).padStart(2,'0')}`;
+    const citasDelDia = _citasPorFecha[fechaStr] || [];
+    const tieneCita = citasDelDia.length > 0;
+
+    const bgColor = tieneCita ? 'var(--amber)' : 'var(--bg3)';
+    const textColor = tieneCita ? '#111' : 'var(--text)';
+    const fontWeight = tieneCita ? '700' : '500';
+
+    html += `
+      <div onclick="if(${tieneCita}) _mostrarCitasDia('${fechaStr}')"
+           style="
+             padding:6px;
+             text-align:center;
+             background:${bgColor};
+             color:${textColor};
+             border-radius:4px;
+             font-weight:${fontWeight};
+             font-size:.75rem;
+             cursor:${tieneCita ? 'pointer' : 'default'};
+             border:${tieneCita ? '2px solid var(--cyan)' : '1px solid var(--border2)'};
+             transition:all .2s;
+           "
+           onmouseover="if(${tieneCita}) this.style.transform='scale(1.05)'"
+           onmouseout="if(${tieneCita}) this.style.transform='scale(1)'">
+        ${dia}${tieneCita ? '<br/><span style="font-size:.6rem;">●</span>' : ''}
+      </div>
+    `;
+  }
+
+  const daysDiv = document.getElementById('adminCalendarDays');
+  if (daysDiv) daysDiv.innerHTML = html;
+}
+
+/* Función auxiliar: Mostrar citas de un día específico */
+function _mostrarCitasDia(fechaStr) {
+  const citas = _citasPorFecha[fechaStr] || [];
+  if (citas.length === 0) return;
+
+  const listaDiv = document.getElementById('adminCitasLista');
+  if (!listaDiv) return;
+
+  const partes = fechaStr.split('-');
+  const fecha = new Date(partes[0], parseInt(partes[1]) - 1, partes[2]);
+  const fechaFormato = fecha.toLocaleDateString('es-CL', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+
+  let html = `<div style="font-weight:600;color:var(--cyan);margin-bottom:10px;font-size:.8rem;">📅 ${fechaFormato}</div>`;
+
+  citas.forEach(cita => {
+    html += `
+      <div style="padding:10px;margin-bottom:8px;background:var(--bg3);border-radius:6px;border-left:3px solid var(--amber);">
+        <div style="font-weight:600;color:var(--text);margin-bottom:4px;">👤 ${escHtml(cita.nombre || 'Sin nombre')}</div>
+        <div style="font-size:.73rem;color:var(--muted);margin-bottom:6px;">⏰ ${cita.hora}</div>
+        <div style="display:flex;gap:6px;">
+          <button onclick="_aceptarCita('${cita.id}')" style="flex:1;padding:6px;background:var(--green);color:white;border:none;border-radius:4px;font-size:.73rem;cursor:pointer;font-weight:600;">✓ Aceptar</button>
+          <button onclick="_rechazarCita('${cita.id}')" style="flex:1;padding:6px;background:var(--red);color:white;border:none;border-radius:4px;font-size:.73rem;cursor:pointer;font-weight:600;">✕ Rechazar</button>
+          <button onclick="_abrirCalendarioGoogle('${fechaStr}', '${cita.hora}')" style="flex:1;padding:6px;background:var(--cyan);color:white;border:none;border-radius:4px;font-size:.73rem;cursor:pointer;font-weight:600;">📆 Cal</button>
+        </div>
+      </div>
+    `;
+  });
+
+  listaDiv.innerHTML = html;
 }
 
 /* Función 2: Cargar citas pendientes desde el backend */
@@ -4622,31 +4751,57 @@ async function _cargarCitasPendientes() {
     const data = await res.json();
     const sesiones = data.sesiones || [];
 
+    // Limpiar mapa de citas anterior
+    _citasPorFecha = {};
+
     if (sesiones.length === 0) {
       listaDiv.innerHTML = '<div style="color:var(--muted);padding:12px;text-align:center;">✓ No hay solicitudes pendientes</div>';
+      _renderCalendar();
       return;
     }
 
-    let html = '';
+    // Rellenar mapa de citas por fecha (YYYY-MM-DD)
     sesiones.forEach(sesion => {
-      const fecha = new Date(sesion.fecha + ' ' + sesion.hora);
-      const fechaStr = fecha.toLocaleDateString('es-CL', { month: 'short', day: 'numeric', year: '2-digit', hour: '2-digit', minute: '2-digit' });
-
-      html += `
-        <div style="padding:10px;margin-bottom:8px;background:var(--bg3);border-radius:6px;border-left:3px solid var(--amber);">
-          <div style="font-weight:600;color:var(--text);margin-bottom:4px;">👤 ${escHtml(sesion.participante_nombre || 'Sin nombre')}</div>
-          <div style="font-size:.73rem;color:var(--muted);margin-bottom:6px;">
-            📅 ${fechaStr}
-            ${sesion.comentario ? `<br/>💬 ${escHtml(sesion.comentario)}` : ''}
-          </div>
-          <div style="display:flex;gap:6px;">
-            <button onclick="_aceptarCita('${sesion.id}')" style="flex:1;padding:6px;background:var(--green);color:white;border:none;border-radius:4px;font-size:.73rem;cursor:pointer;font-weight:600;">✓ Aceptar</button>
-            <button onclick="_rechazarCita('${sesion.id}')" style="flex:1;padding:6px;background:var(--red);color:white;border:none;border-radius:4px;font-size:.73rem;cursor:pointer;font-weight:600;">✕ Rechazar</button>
-            <button onclick="_abrirCalendarioGoogle('${sesion.fecha}', '${sesion.hora}')" style="flex:1;padding:6px;background:var(--cyan);color:white;border:none;border-radius:4px;font-size:.73rem;cursor:pointer;font-weight:600;">📆 Calendario</button>
-          </div>
-        </div>
-      `;
+      const fechaKey = sesion.fecha; // YYYY-MM-DD
+      if (!_citasPorFecha[fechaKey]) {
+        _citasPorFecha[fechaKey] = [];
+      }
+      _citasPorFecha[fechaKey].push({
+        id: sesion.id,
+        nombre: sesion.participante_nombre,
+        hora: sesion.hora,
+        comentario: sesion.comentario
+      });
     });
+
+    // Renderizar calendario con citas
+    _renderCalendar();
+
+    // Mostrar citas del mes actual
+    const ahora = new Date();
+    const mesActual = `${String(ahora.getFullYear()).padStart(4,'0')}-${String(ahora.getMonth()+1).padStart(2,'0')}`;
+    const citasDelMes = sesiones.filter(s => s.fecha.startsWith(mesActual));
+
+    let html = '';
+    if (citasDelMes.length > 0) {
+      html = '<div style="font-size:.75rem;color:var(--muted);margin-bottom:8px;">💡 Haz clic en un día del calendario para ver detalles</div>';
+      citasDelMes.slice(0, 3).forEach(sesion => {
+        const fecha = new Date(sesion.fecha + ' ' + sesion.hora);
+        const fechaFormato = fecha.toLocaleDateString('es-CL', { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+        html += `
+          <div style="padding:8px;margin-bottom:6px;background:var(--bg3);border-radius:4px;border-left:2px solid var(--cyan);font-size:.73rem;">
+            <div style="font-weight:600;color:var(--text);">👤 ${escHtml(sesion.participante_nombre || 'Sin nombre')}</div>
+            <div style="color:var(--muted);">📅 ${fechaFormato}</div>
+          </div>
+        `;
+      });
+      if (citasDelMes.length > 3) {
+        html += `<div style="text-align:center;color:var(--muted);font-size:.7rem;padding:4px;">+${citasDelMes.length - 3} más</div>`;
+      }
+    } else {
+      html = '<div style="color:var(--muted);padding:8px;text-align:center;font-size:.73rem;">No hay citas este mes</div>';
+    }
 
     listaDiv.innerHTML = html;
   } catch (e) {
