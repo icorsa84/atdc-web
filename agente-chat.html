@@ -1553,6 +1553,16 @@
              "Registrar nueva entrevista" sí usan el id real del
              participante. -->
         <button class="admin-validate-btn" id="adminValidateBtn" onclick="validarInformeAdmin()">✔ Validar y liberar</button>
+        <!-- NEW: Panel para Citas Pendientes -->
+        <button class="admin-validate-btn" id="adminCitasBtn" onclick="_toggleAdminCitas()" style="background:var(--amber);margin-left:8px;">📅 Citas Pendientes</button>
+      </div>
+
+      <!-- Panel de Citas Pendientes (Admin) -->
+      <div id="adminCitasPanel" style="display:none;margin-top:12px;padding:12px;background:var(--bg2);border-radius:8px;border:1px solid var(--border2);">
+        <div style="font-weight:700;margin-bottom:8px;color:var(--text);">📋 Solicitudes de Sesión Pendientes</div>
+        <div id="adminCitasLista" style="max-height:300px;overflow-y:auto;font-size:.78rem;">
+          <div style="color:var(--muted);padding:8px;text-align:center;">Cargando solicitudes...</div>
+        </div>
       </div>
       <!-- Barra de tabs dinámica -->
       <div class="inf-tabs-bar" id="infTabsBar" style="display:none"></div>
@@ -4568,6 +4578,158 @@ function cargarPlanOverride() {
       if (planBadge) planBadge.textContent = `Plan ${override}`;
     }
   } catch(e) {}
+}
+
+/* ================================================================
+   GESTIÓN DE CITAS PENDIENTES (Admin) - Funcionalidades 1, 2, 3
+   ================================================================ */
+
+/* Función 1: Toggle panel de citas pendientes */
+function _toggleAdminCitas() {
+  const panel = document.getElementById('adminCitasPanel');
+  if (!panel) return;
+  if (panel.style.display === 'none') {
+    panel.style.display = 'block';
+    _cargarCitasPendientes();
+  } else {
+    panel.style.display = 'none';
+  }
+}
+
+/* Función 2: Cargar citas pendientes desde el backend */
+async function _cargarCitasPendientes() {
+  const listaDiv = document.getElementById('adminCitasLista');
+  if (!listaDiv) return;
+
+  const claveAdmin = sessionStorage.getItem('atdc_admin_key');
+  if (!claveAdmin) {
+    listaDiv.innerHTML = '<div style="color:var(--red);padding:8px;">⚠️ No hay sesión de admin válida</div>';
+    return;
+  }
+
+  listaDiv.innerHTML = '<div style="color:var(--muted);padding:8px;text-align:center;">⏳ Cargando...</div>';
+
+  try {
+    const res = await fetch(`${_BACKEND}/api/admin/sesiones`, {
+      method: 'GET',
+      headers: { 'X-Admin-Key': claveAdmin }
+    });
+
+    if (!res.ok) {
+      throw new Error(`HTTP ${res.status}`);
+    }
+
+    const data = await res.json();
+    const sesiones = data.sesiones || [];
+
+    if (sesiones.length === 0) {
+      listaDiv.innerHTML = '<div style="color:var(--muted);padding:12px;text-align:center;">✓ No hay solicitudes pendientes</div>';
+      return;
+    }
+
+    let html = '';
+    sesiones.forEach(sesion => {
+      const fecha = new Date(sesion.fecha + ' ' + sesion.hora);
+      const fechaStr = fecha.toLocaleDateString('es-CL', { month: 'short', day: 'numeric', year: '2-digit', hour: '2-digit', minute: '2-digit' });
+
+      html += `
+        <div style="padding:10px;margin-bottom:8px;background:var(--bg3);border-radius:6px;border-left:3px solid var(--amber);">
+          <div style="font-weight:600;color:var(--text);margin-bottom:4px;">👤 ${escHtml(sesion.participante_nombre || 'Sin nombre')}</div>
+          <div style="font-size:.73rem;color:var(--muted);margin-bottom:6px;">
+            📅 ${fechaStr}
+            ${sesion.comentario ? `<br/>💬 ${escHtml(sesion.comentario)}` : ''}
+          </div>
+          <div style="display:flex;gap:6px;">
+            <button onclick="_aceptarCita('${sesion.id}')" style="flex:1;padding:6px;background:var(--green);color:white;border:none;border-radius:4px;font-size:.73rem;cursor:pointer;font-weight:600;">✓ Aceptar</button>
+            <button onclick="_rechazarCita('${sesion.id}')" style="flex:1;padding:6px;background:var(--red);color:white;border:none;border-radius:4px;font-size:.73rem;cursor:pointer;font-weight:600;">✕ Rechazar</button>
+            <button onclick="_abrirCalendarioGoogle('${sesion.fecha}', '${sesion.hora}')" style="flex:1;padding:6px;background:var(--cyan);color:white;border:none;border-radius:4px;font-size:.73rem;cursor:pointer;font-weight:600;">📆 Calendario</button>
+          </div>
+        </div>
+      `;
+    });
+
+    listaDiv.innerHTML = html;
+  } catch (e) {
+    listaDiv.innerHTML = `<div style="color:var(--red);padding:8px;">❌ Error: ${e.message}</div>`;
+  }
+}
+
+/* Función 3a: Aceptar una cita */
+async function _aceptarCita(citaId) {
+  const claveAdmin = sessionStorage.getItem('atdc_admin_key');
+  if (!claveAdmin) {
+    agentMsg('⚠️ No hay sesión de admin válida');
+    return;
+  }
+
+  try {
+    const res = await fetch(`${_BACKEND}/api/admin/sesiones/${citaId}/aceptar`, {
+      method: 'PATCH',
+      headers: { 'X-Admin-Key': claveAdmin }
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || `HTTP ${res.status}`);
+    }
+
+    agentMsg(`✅ **Cita aceptada**. Se envió confirmación al participante con el link de Google Calendar.`);
+    _cargarCitasPendientes();
+  } catch (e) {
+    agentMsg(`❌ **Error al aceptar cita**: ${e.message}`);
+  }
+}
+
+/* Función 3b: Rechazar una cita */
+async function _rechazarCita(citaId) {
+  const motivo = prompt('¿Por qué rechazas la cita? (opcional)');
+  if (motivo === null) return; // Usuario canceló
+
+  const claveAdmin = sessionStorage.getItem('atdc_admin_key');
+  if (!claveAdmin) {
+    agentMsg('⚠️ No hay sesión de admin válida');
+    return;
+  }
+
+  try {
+    const res = await fetch(`${_BACKEND}/api/admin/sesiones/${citaId}/rechazar`, {
+      method: 'PATCH',
+      headers: { 'X-Admin-Key': claveAdmin, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ motivo: motivo || '' })
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || `HTTP ${res.status}`);
+    }
+
+    agentMsg(`⚠️ **Cita rechazada**. Se notificó al participante.`);
+    _cargarCitasPendientes();
+  } catch (e) {
+    agentMsg(`❌ **Error al rechazar cita**: ${e.message}`);
+  }
+}
+
+/* Función 3c: Generar link de Google Calendar */
+function _abrirCalendarioGoogle(fecha, hora) {
+  try {
+    // Construir fecha en formato ISO para Google Calendar
+    const partes = fecha.split('-');
+    const horaPartes = hora.split(':');
+
+    const fechaStart = new Date(partes[0], parseInt(partes[1]) - 1, partes[2],
+                                parseInt(horaPartes[0]), parseInt(horaPartes[1]));
+    const fechaEnd = new Date(fechaStart.getTime() + 60 * 60 * 1000); // +1 hora
+
+    const startISO = fechaStart.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+    const endISO = fechaEnd.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+
+    const googleCalendarUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=Sesión+con+Consultor+ATDC&dates=${startISO}/${endISO}&details=Sesión+de+orientación+con+el+consultor+ATDC+Outplacement&location=Virtual&sf=true&output=xml`;
+
+    window.open(googleCalendarUrl, '_blank');
+  } catch (e) {
+    agentMsg(`❌ Error al generar link de calendario: ${e.message}`);
+  }
 }
 
 /* Renderer markdown simple para el informe */
