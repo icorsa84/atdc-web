@@ -1,0 +1,1069 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ATDC — Panel de Administración</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0A0F1C; --bg2: #111827; --bg3: #1A2332; --border: #1E2A3A; --border2: #243044;
+    --text: #F1F5F9; --text2: #CBD5E1; --muted: #94A3B8; --blue: #2563EB; --blue2: #3B82F6;
+    --green: #22C55E; --amber: #F59E0B; --red: #EF4444; --purple: #8B5CF6;
+  }
+  body {
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg); color: var(--text); min-height: 100vh;
+  }
+  .topbar {
+    display:flex; align-items:center; justify-content:space-between;
+    padding: 14px 24px; border-bottom: 1px solid var(--border); background: var(--bg2);
+    position: sticky; top: 0; z-index: 10;
+  }
+  .logo { display:flex; align-items:center; gap:10px; }
+  .logo-hex { width:32px;height:32px;border-radius:8px;background:linear-gradient(135deg,#2563EB,#7C3AED);
+    display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;color:#fff;flex-shrink:0; }
+  .logo-text { font-size:16px; font-weight:700; }
+  .logo-sub { font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; }
+  .btn-salir { background:none; border:1px solid var(--border2); color:var(--text2); border-radius:7px;
+    padding:7px 14px; font-size:13px; cursor:pointer; }
+  .btn-salir:hover { border-color:var(--red); color:var(--red); }
+  .wrap { max-width: 1240px; margin: 0 auto; padding: 24px; }
+  .toolbar { display:flex; gap:10px; align-items:center; margin-bottom:16px; flex-wrap:wrap; }
+  .toolbar input, .toolbar select {
+    background:var(--bg2); border:1px solid var(--border2); color:var(--text);
+    border-radius:8px; padding:9px 12px; font-size:13.5px; outline:none;
+  }
+  .stat-chip { background:var(--bg2); border:1px solid var(--border2); border-radius:8px;
+    padding:7px 12px; font-size:12.5px; color:var(--text2); }
+  .stat-chip b { color:var(--text); }
+  table { width:100%; border-collapse: collapse; background:var(--bg2); border-radius:12px; overflow:hidden; }
+  thead th { text-align:left; font-size:11.5px; text-transform:uppercase; letter-spacing:.03em;
+    color:var(--muted); padding:11px 14px; border-bottom:1px solid var(--border); white-space:nowrap; }
+  tbody td { padding:11px 14px; font-size:13.5px; border-bottom:1px solid var(--border); vertical-align:middle; }
+  tbody tr:hover { background: rgba(255,255,255,.02); }
+  tbody tr:last-child td { border-bottom:none; }
+  .badge { display:inline-block; padding:3px 9px; border-radius:999px; font-size:11px; font-weight:700; }
+  .badge-inicial { background:rgba(100,116,139,.18); color:#94A3B8; }
+  .badge-esencial { background:rgba(37,99,235,.18); color:#60A5FA; }
+  .badge-profesional { background:rgba(139,92,246,.18); color:#C4B5FD; }
+  .badge-premium { background:rgba(245,158,11,.18); color:#FBBF24; }
+  .badge-ok { background:rgba(34,197,94,.15); color:#4ADE80; }
+  .badge-pendiente { background:rgba(239,68,68,.18); color:#F87171; }
+  .badge-pago-pendiente { background:rgba(245,158,11,.18); color:#FBBF24; }
+  .badge-muted { background:rgba(100,116,139,.15); color:#64748B; }
+  .btn-ver { background:var(--blue); color:#fff; border:none; border-radius:7px; padding:7px 13px;
+    font-size:12.5px; font-weight:600; cursor:pointer; }
+  .btn-ver:hover { background:#1D4ED8; }
+  .empty { text-align:center; padding:50px 20px; color:var(--muted); font-size:14px; }
+
+  /* ===== RESUMEN (KPIs + gráfico de planes) ===== */
+  .resumen-grid { display:grid; grid-template-columns: repeat(4, 1fr); gap:14px; margin-bottom:18px; }
+  @media (max-width: 900px) { .resumen-grid { grid-template-columns: repeat(2, 1fr); } }
+  .kpi-card { background:var(--bg2); border:1px solid var(--border); border-radius:12px; padding:16px 18px; }
+  .kpi-label { font-size:11.5px; color:var(--muted); text-transform:uppercase; letter-spacing:.03em; margin-bottom:6px; }
+  .kpi-value { font-size:26px; font-weight:800; }
+  .kpi-sub { font-size:11.5px; color:var(--muted); margin-top:4px; }
+  .panel-section { background:var(--bg2); border:1px solid var(--border); border-radius:12px; padding:18px 20px; margin-bottom:18px; }
+  .panel-section h2 { font-size:14px; font-weight:700; margin-bottom:14px; display:flex; align-items:center; gap:8px; }
+  .donut-wrap { display:flex; align-items:center; gap:22px; }
+  .donut { width:118px; height:118px; border-radius:50%; flex-shrink:0; position:relative; }
+  .donut::after { content:''; position:absolute; inset:16px; border-radius:50%; background:var(--bg2); }
+  .donut-legend { font-size:12.5px; }
+  .donut-legend div { display:flex; align-items:center; gap:7px; margin-bottom:6px; }
+  .dot { width:9px; height:9px; border-radius:50%; flex-shrink:0; }
+
+  /* ===== TAREAS PENDIENTES (bandeja de pendientes, estilo HRIS) ===== */
+  .tareas-grid { display:grid; grid-template-columns: repeat(2, 1fr); gap:14px; }
+  @media (max-width: 900px) { .tareas-grid { grid-template-columns: 1fr; } }
+  .tarea-card { background:var(--bg); border:1px solid var(--border2); border-radius:10px; padding:14px 16px; }
+  .tarea-hdr { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
+  .tarea-hdr-title { font-size:13px; font-weight:700; display:flex; align-items:center; gap:7px; }
+  .tarea-count { font-size:12px; font-weight:800; padding:2px 9px; border-radius:999px; }
+  .tarea-lista { max-height:150px; overflow-y:auto; }
+  .tarea-item { display:flex; align-items:center; justify-content:space-between; gap:8px;
+    padding:7px 0; border-bottom:1px solid var(--border); font-size:12.5px; }
+  .tarea-item:last-child { border-bottom:none; }
+  .tarea-item a { color:var(--text2); text-decoration:none; cursor:pointer; }
+  .tarea-item a:hover { color:var(--blue2); text-decoration:underline; }
+  .tarea-vacio { color:var(--muted); font-size:12.5px; padding:6px 0; }
+  .overlay { position:fixed; inset:0; z-index:999; background:rgba(0,0,0,.65); backdrop-filter:blur(4px);
+    display:flex; align-items:flex-start; justify-content:center; padding:30px 16px; overflow-y:auto; }
+  .panel { background:var(--bg2); border:1px solid var(--border); border-radius:16px; width:100%;
+    max-width:720px; padding:28px; box-shadow:0 30px 70px rgba(0,0,0,.6); position:relative; margin-bottom:30px; }
+  .panel-close { position:absolute; top:18px; right:18px; background:none; border:none; color:var(--muted);
+    font-size:20px; cursor:pointer; }
+  .sec { margin-bottom:22px; padding-bottom:18px; border-bottom:1px solid var(--border); }
+  .sec:last-child { border-bottom:none; margin-bottom:0; padding-bottom:0; }
+  .sec-title { font-size:11.5px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted);
+    margin-bottom:10px; font-weight:700; }
+  .field-row { display:flex; gap:10px; margin-bottom:8px; flex-wrap:wrap; }
+  .field { flex:1; min-width:160px; }
+  .field label { display:block; font-size:11.5px; color:var(--muted); margin-bottom:4px; }
+  .field input, .field select, .field textarea {
+    width:100%; background:var(--bg); border:1px solid var(--border2); color:var(--text);
+    border-radius:7px; padding:8px 10px; font-size:13.5px; outline:none; box-sizing:border-box;
+  }
+  .btn-primary { background:var(--blue); color:#fff; border:none; border-radius:8px; padding:9px 16px;
+    font-size:13.5px; font-weight:700; cursor:pointer; }
+  .btn-secondary { background:transparent; border:1px solid var(--border2); color:var(--text2);
+    border-radius:8px; padding:9px 16px; font-size:13.5px; font-weight:600; cursor:pointer; }
+  .btn-danger { background:rgba(239,68,68,.1); border:1px solid rgba(239,68,68,.4); color:var(--red);
+    border-radius:8px; padding:9px 16px; font-size:13.5px; font-weight:700; cursor:pointer; }
+  .msg { font-size:12.5px; margin-top:8px; padding:8px 11px; border-radius:7px; display:none; }
+  .bar-row { display:flex; align-items:center; gap:8px; font-size:12.5px; margin-bottom:6px; }
+  .bar-track { flex:1; height:6px; background:var(--bg3); border-radius:4px; overflow:hidden; }
+  .bar-fill { height:100%; border-radius:4px; }
+  .foto-detalle { width:56px; height:56px; border-radius:50%; object-fit:cover; background:var(--bg3);
+    border:1px solid var(--border2); flex-shrink:0; }
+  .informe-sec { background:var(--bg); border:1px solid var(--border2); border-radius:9px; padding:12px 14px; margin-bottom:8px; }
+  .informe-sec h4 { font-size:13px; margin-bottom:6px; }
+  .informe-sec p { font-size:12.5px; color:var(--text2); line-height:1.6; white-space:pre-wrap; }
+  details summary { cursor:pointer; font-size:13px; color:var(--text2); margin-bottom:8px; }
+  .loading { text-align:center; padding:40px; color:var(--muted); }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo">
+    <div class="logo-hex">A</div>
+    <div>
+      <div class="logo-text">ATDC</div>
+      <div class="logo-sub">Panel Administrador</div>
+    </div>
+  </div>
+  <button class="btn-salir" onclick="_salir()">Cerrar sesión</button>
+</div>
+
+<div class="wrap">
+
+  <!-- ===== RESUMEN ===== -->
+  <div id="resumenGrid" class="resumen-grid"></div>
+
+  <div class="panel-section">
+    <h2>📊 Participantes por plan</h2>
+    <div id="donutWrap" class="donut-wrap"></div>
+  </div>
+
+  <div class="panel-section">
+    <h2>🔔 Tareas pendientes</h2>
+    <div id="tareasGrid" class="tareas-grid"></div>
+  </div>
+
+  <div class="panel-section" style="padding-bottom:4px;">
+  <h2>👥 Seleccionar participante</h2>
+  <div class="toolbar">
+    <input id="buscador" type="text" placeholder="Buscar por nombre…" oninput="renderTabla()" style="min-width:220px;">
+    <select id="filtroPlan" onchange="renderTabla()">
+      <option value="">Todos los planes</option>
+      <option value="Inicial">Inicial</option>
+      <option value="Esencial">Esencial</option>
+      <option value="Profesional">Profesional</option>
+      <option value="Premium">Premium</option>
+    </select>
+    <select id="filtroEliminacion" onchange="renderTabla()">
+      <option value="">Todas las solicitudes</option>
+      <option value="pendiente">Con eliminación pendiente</option>
+    </select>
+    <div class="stat-chip">Total: <b id="statTotal">—</b></div>
+    <div class="stat-chip">Eliminaciones pendientes: <b id="statPendientes" style="color:var(--red)">—</b></div>
+    <button class="btn-secondary" onclick="cargarListado()" style="margin-left:auto;">↻ Actualizar</button>
+  </div>
+
+  <div id="tablaWrap"><div class="loading">Cargando participantes…</div></div>
+  </div>
+
+  <div class="panel-section" style="padding-bottom:4px;">
+  <h2>🧾 Registro de auditoría</h2>
+  <div class="toolbar">
+    <input id="audBuscador" type="text" placeholder="Buscar por nombre, acción, detalle…" oninput="_auditoriaBuscarConDebounce()" style="min-width:260px;">
+    <select id="audAccion" onchange="cargarAuditoria(0)">
+      <option value="">Todas las acciones</option>
+    </select>
+    <div class="stat-chip">Total: <b id="audTotal">—</b></div>
+    <button class="btn-secondary" onclick="cargarAuditoria(audOffset)" style="margin-left:auto;">↻ Actualizar</button>
+  </div>
+  <div id="auditoriaWrap"><div class="loading">Cargando auditoría…</div></div>
+  <div id="auditoriaPaginador" style="display:flex;gap:8px;align-items:center;justify-content:flex-end;margin-top:10px;font-size:12.5px;color:var(--muted);"></div>
+  </div>
+
+  <div class="panel-section" style="padding-bottom:4px;">
+  <h2>✉️ Editor de correos</h2>
+  <div style="font-size:12.5px;color:var(--muted);margin-bottom:10px;">
+    Edita el asunto y el HTML de cada correo que el sistema envía a los participantes (datos bancarios, confirmación
+    de pago, bienvenida, recuperación de contraseña, sesión Premium). Mientras no edites una, se sigue usando el
+    texto de fábrica — nada cambia hasta que guardes.
+  </div>
+  <div id="plantillasWrap"><div class="loading">Cargando plantillas…</div></div>
+  </div>
+
+  <div class="panel-section" style="padding-bottom:4px;">
+  <h2>🌎 Estudios de mercado laboral (PDF)</h2>
+  <div style="font-size:12.5px;color:var(--muted);margin-bottom:10px;">
+    Carga aquí estudios de mercado laboral anuales (PDF) por país — y, si corresponde, por sector. Claude procesa el
+    documento una sola vez al subirlo y guarda un resumen estructurado (rangos de renta, tendencias de contratación,
+    perfiles más demandados) que queda disponible de inmediato como fuente real para todos los participantes que
+    consulten el módulo "Mercado laboral" de ese país, citada en un apartado de fuentes separado del análisis.
+  </div>
+  <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;margin-bottom:14px;">
+    <div>
+      <label style="display:block;font-size:11.5px;color:var(--muted);margin-bottom:3px;">País</label>
+      <select id="_em_pais" style="min-width:160px;"></select>
+    </div>
+    <div>
+      <label style="display:block;font-size:11.5px;color:var(--muted);margin-bottom:3px;">Año</label>
+      <input id="_em_anio" type="text" placeholder="2025" style="width:90px;">
+    </div>
+    <div>
+      <label style="display:block;font-size:11.5px;color:var(--muted);margin-bottom:3px;">Sector (opcional)</label>
+      <input id="_em_sector" type="text" placeholder="Ej: Retail / Logística" style="min-width:200px;">
+    </div>
+    <div>
+      <label style="display:block;font-size:11.5px;color:var(--muted);margin-bottom:3px;">Título (opcional)</label>
+      <input id="_em_titulo" type="text" placeholder="Ej: Estudio de remuneraciones 2025" style="min-width:220px;">
+    </div>
+    <div>
+      <label style="display:block;font-size:11.5px;color:var(--muted);margin-bottom:3px;">Archivo PDF</label>
+      <input id="_em_archivo" type="file" accept="application/pdf">
+    </div>
+    <button class="btn-primary" onclick="_subirEstudioMercado()">Subir y procesar</button>
+  </div>
+  <div id="_em_msg" class="msg"></div>
+  <div id="estudiosMercadoWrap"><div class="loading">Cargando estudios de mercado…</div></div>
+  </div>
+
+</div>
+
+<div id="detalleOverlay" class="overlay" style="display:none;"></div>
+<div id="plantillaOverlay" class="overlay" style="display:none;"></div>
+
+<script>
+const BACKEND = 'https://atdc-backend-ill4.onrender.com';
+let ADMIN_KEY = sessionStorage.getItem('atdc_admin_key') || '';
+let LISTADO = [];
+
+if (!ADMIN_KEY) {
+  window.location.replace('./index.html');
+}
+
+function _salir() {
+  sessionStorage.removeItem('atdc_admin_key');
+  sessionStorage.removeItem('atdc_admin_path');
+  window.location.replace('./index.html');
+}
+
+function _badgePlan(plan) {
+  const cls = { Inicial:'badge-inicial', Esencial:'badge-esencial', Profesional:'badge-profesional', Premium:'badge-premium' }[plan] || 'badge-muted';
+  return `<span class="badge ${cls}">${plan}</span>`;
+}
+
+async function _apiGet(path) {
+  const res = await fetch(`${BACKEND}${path}`, { headers: { 'X-Admin-Key': ADMIN_KEY } });
+  if (res.status === 401 || res.status === 403) { _salir(); throw new Error('Sesión admin inválida.'); }
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.detail || 'Error del servidor.');
+  return data;
+}
+async function _apiSend(method, path, body) {
+  const res = await fetch(`${BACKEND}${path}`, {
+    method, headers: { 'X-Admin-Key': ADMIN_KEY, 'Content-Type': 'application/json' },
+    body: body !== undefined ? JSON.stringify(body) : undefined
+  });
+  if (res.status === 401 || res.status === 403) { _salir(); throw new Error('Sesión admin inválida.'); }
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.detail || 'Error del servidor.');
+  return data;
+}
+
+async function cargarListado() {
+  document.getElementById('tablaWrap').innerHTML = '<div class="loading">Cargando participantes…</div>';
+  try {
+    const data = await _apiGet('/api/admin/participantes');
+    LISTADO = data.participantes || [];
+    renderTabla();
+    renderResumen();
+    renderTareas();
+  } catch (e) {
+    document.getElementById('tablaWrap').innerHTML = `<div class="empty">⚠️ ${e.message}</div>`;
+    document.getElementById('resumenGrid').innerHTML = '';
+    document.getElementById('donutWrap').innerHTML = `<div class="empty">⚠️ ${e.message}</div>`;
+    document.getElementById('tareasGrid').innerHTML = '';
+  }
+}
+
+/* ===== RESUMEN — KPIs + distribución por plan (estilo panel de un HRIS) ===== */
+const _PLAN_COLORES = { Inicial:'#64748B', Esencial:'#3B82F6', Profesional:'#8B5CF6', Premium:'#F59E0B' };
+
+function renderResumen() {
+  const total = LISTADO.length;
+  const conInforme = LISTADO.filter(p => p.tiene_informe_final).length;
+  const eliminacionesPendientes = LISTADO.filter(p => p.solicitud_eliminacion_estado === 'pendiente').length;
+  const pagosPendientes = LISTADO.filter(p => p.pago_estado === 'pendiente').length;
+  const atsPromedio = total ? Math.round(LISTADO.reduce((acc, p) => acc + (p.ats_score || 0), 0) / total) : 0;
+
+  document.getElementById('resumenGrid').innerHTML = `
+    <div class="kpi-card">
+      <div class="kpi-label">Participantes activos</div>
+      <div class="kpi-value">${total}</div>
+      <div class="kpi-sub">Todos los planes</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Puntaje ATS promedio</div>
+      <div class="kpi-value" style="color:${atsPromedio>=70?'var(--green)':atsPromedio>=40?'var(--amber)':'var(--red)'}">${atsPromedio}</div>
+      <div class="kpi-sub">de 100</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Informes Final generados</div>
+      <div class="kpi-value" style="color:var(--blue2)">${conInforme}</div>
+      <div class="kpi-sub">de ${total} participantes</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Pagos pendientes de confirmar</div>
+      <div class="kpi-value" style="color:${pagosPendientes>0?'var(--amber)':'var(--text)'}">${pagosPendientes}</div>
+      <div class="kpi-sub">Plan pedido, transferencia por confirmar</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Eliminaciones pendientes</div>
+      <div class="kpi-value" style="color:${eliminacionesPendientes>0?'var(--red)':'var(--text)'}">${eliminacionesPendientes}</div>
+      <div class="kpi-sub">Ley N.º 19.628</div>
+    </div>`;
+
+  // Donut de distribución por plan — conic-gradient simple, sin librerías externas
+  const planes = ['Inicial','Esencial','Profesional','Premium'];
+  const conteos = planes.map(pl => LISTADO.filter(p => p.plan === pl).length);
+  let acumulado = 0;
+  const segmentos = [];
+  planes.forEach((pl, i) => {
+    const pct = total ? (conteos[i] / total) * 100 : 0;
+    if (pct > 0) segmentos.push(`${_PLAN_COLORES[pl]} ${acumulado}% ${acumulado + pct}%`);
+    acumulado += pct;
+  });
+  const gradient = segmentos.length ? `conic-gradient(${segmentos.join(',')})` : 'var(--bg3)';
+
+  document.getElementById('donutWrap').innerHTML = `
+    <div class="donut" style="background:${gradient};"></div>
+    <div class="donut-legend">
+      ${planes.map((pl, i) => `
+        <div><span class="dot" style="background:${_PLAN_COLORES[pl]}"></span> ${pl} — <b>${conteos[i]}</b> (${total ? Math.round(conteos[i]/total*100) : 0}%)</div>
+      `).join('')}
+    </div>`;
+}
+
+/* ===== TAREAS PENDIENTES — bandeja de pendientes accionable ===== */
+function _listaTareas(items, render) {
+  if (!items.length) return '<div class="tarea-vacio">Nada pendiente aquí. ✓</div>';
+  return `<div class="tarea-lista">${items.map(render).join('')}</div>`;
+}
+
+function renderTareas() {
+  const pagosPendientes = LISTADO.filter(p => p.pago_estado === 'pendiente');
+  const eliminaciones = LISTADO.filter(p => p.solicitud_eliminacion_estado === 'pendiente');
+  const sesionesPremium = LISTADO.filter(p => p.sesion_premium_estado === 'solicitada');
+  const sinCv = LISTADO.filter(p => !p.cv_subido);
+  const porDefinir = LISTADO.filter(p => p.datos_por_definir);
+
+  const tarjeta = (titulo, color, items, render) => `
+    <div class="tarea-card">
+      <div class="tarea-hdr">
+        <div class="tarea-hdr-title">${titulo}</div>
+        <div class="tarea-count" style="background:${color}22;color:${color}">${items.length}</div>
+      </div>
+      ${_listaTareas(items, render)}
+    </div>`;
+
+  const itemParticipante = (p, extra) => `
+    <div class="tarea-item"><a onclick="abrirDetalle('${p.id}')">${p.nombre}</a><span style="color:var(--muted)">${extra || ''}</span></div>`;
+
+  document.getElementById('tareasGrid').innerHTML =
+    tarjeta('💳 Pagos pendientes de confirmar', '#F59E0B', pagosPendientes, p => itemParticipante(p, `pidió ${p.plan_solicitado || p.plan}`)) +
+    tarjeta('🗑 Solicitudes de eliminación de datos', '#EF4444', eliminaciones, p => itemParticipante(p, p.solicitud_eliminacion_estado)) +
+    tarjeta('📅 Sesiones Premium por confirmar', '#F59E0B', sesionesPremium, p => itemParticipante(p, 'Premium')) +
+    tarjeta('📎 Sin CV subido', '#64748B', sinCv, p => itemParticipante(p, p.plan)) +
+    tarjeta('✏️ Datos del perfil por completar', '#3B82F6', porDefinir, p => itemParticipante(p, p.plan));
+}
+
+function renderTabla() {
+  const q = (document.getElementById('buscador').value || '').toLowerCase();
+  const planFiltro = document.getElementById('filtroPlan').value;
+  const eliminacionFiltro = document.getElementById('filtroEliminacion').value;
+
+  let filas = LISTADO.filter(p => {
+    if (q && !p.nombre.toLowerCase().includes(q)) return false;
+    if (planFiltro && p.plan !== planFiltro) return false;
+    if (eliminacionFiltro && p.solicitud_eliminacion_estado !== eliminacionFiltro) return false;
+    return true;
+  });
+
+  document.getElementById('statTotal').textContent = LISTADO.length;
+  document.getElementById('statPendientes').textContent = LISTADO.filter(p => p.solicitud_eliminacion_estado === 'pendiente').length;
+
+  if (filas.length === 0) {
+    document.getElementById('tablaWrap').innerHTML = '<div class="empty">No hay participantes que coincidan con el filtro.</div>';
+    return;
+  }
+
+  const filasHtml = filas.map(p => `
+    <tr>
+      <td>${p.id}</td>
+      <td>${p.nombre}</td>
+      <td>${_badgePlan(p.plan)}</td>
+      <td>${p.pago_estado === 'pendiente' ? `<span class="badge badge-pago-pendiente">💳 Pendiente</span>` : '<span class="badge badge-ok">✓ Confirmado</span>'}</td>
+      <td>${p.cargo_objetivo}</td>
+      <td>${p.sector}</td>
+      <td>${p.ats_score}/100</td>
+      <td>Día ${p.proceso_dia}</td>
+      <td>${p.tiene_informe_final ? '<span class="badge badge-ok">✓ Informe</span>' : '<span class="badge badge-muted">—</span>'}</td>
+      <td>${p.solicitud_eliminacion_estado === 'pendiente' ? '<span class="badge badge-pendiente">⏳ Pendiente</span>' : (p.solicitud_eliminacion_estado === 'procesada' ? '<span class="badge badge-ok">Procesada</span>' : '<span class="badge badge-muted">—</span>')}</td>
+      <td><button class="btn-ver" onclick="abrirDetalle('${p.id}')">Ver detalle</button></td>
+    </tr>`).join('');
+
+  document.getElementById('tablaWrap').innerHTML = `
+    <table>
+      <thead><tr>
+        <th>ID</th><th>Nombre</th><th>Plan</th><th>Pago</th><th>Cargo objetivo</th><th>Sector</th>
+        <th>ATS</th><th>Proceso</th><th>Informe final</th><th>Eliminación</th><th></th>
+      </tr></thead>
+      <tbody>${filasHtml}</tbody>
+    </table>`;
+}
+
+/* ===== REGISTRO DE AUDITORÍA — solo lectura, con buscador y filtros ===== */
+const _ACCION_LABELS = {
+  registro: '🆕 Registro', login: '🔑 Login',
+  cambio_password: '🔒 Cambió contraseña', solicitud_recuperar_password: '✉️ Pidió recuperar contraseña',
+  restablecer_password: '🔓 Restableció contraseña',
+  subir_cv: '📎 Subió CV', guardar_disc: '🧩 Guardó DISC', guardar_kostick: '🧩 Guardó Kostick',
+  actualizar_mi_perfil: '✏️ Editó su perfil', subir_foto_perfil: '🖼 Subió foto', quitar_foto_perfil: '🖼 Quitó foto',
+  solicitar_eliminacion: '🗑 Solicitó eliminación de datos', resolver_solicitud_eliminacion: '🗑 Resolvió eliminación (Admin)',
+  agendar_sesion_premium: '📅 Agendó sesión Premium', generar_informe_final: '📄 Generó Informe Final',
+  cambio_plan: '💼 Cambió plan (Admin)', confirmar_pago: '💳 Confirmó pago (Admin)',
+  crear_participante: '👤 Creó participante (Admin)', editar_participante: '✏️ Editó participante (Admin)',
+  eliminar_participante: '🗑 Eliminó participante (Admin)',
+};
+let audOffset = 0;
+let _audDebounce = null;
+function _auditoriaBuscarConDebounce() {
+  clearTimeout(_audDebounce);
+  _audDebounce = setTimeout(() => cargarAuditoria(0), 350);
+}
+
+function _poblarFiltroAcciones() {
+  const sel = document.getElementById('audAccion');
+  if (sel.options.length > 1) return; // ya poblado
+  Object.keys(_ACCION_LABELS).forEach(k => {
+    const opt = document.createElement('option');
+    opt.value = k; opt.textContent = _ACCION_LABELS[k];
+    sel.appendChild(opt);
+  });
+}
+
+async function cargarAuditoria(offset) {
+  _poblarFiltroAcciones();
+  audOffset = offset || 0;
+  const q = (document.getElementById('audBuscador').value || '').trim();
+  const accion = document.getElementById('audAccion').value;
+  document.getElementById('auditoriaWrap').innerHTML = '<div class="loading">Cargando auditoría…</div>';
+  try {
+    const params = new URLSearchParams({ limit: '50', offset: String(audOffset) });
+    if (q) params.set('q', q);
+    if (accion) params.set('accion', accion);
+    const data = await _apiGet(`/api/admin/auditoria?${params.toString()}`);
+    document.getElementById('audTotal').textContent = data.total;
+    renderAuditoria(data.entradas || [], data.total, data.limit, data.offset);
+  } catch (e) {
+    document.getElementById('auditoriaWrap').innerHTML = `<div class="empty">⚠️ ${e.message}</div>`;
+  }
+}
+
+function renderAuditoria(entradas, total, limit, offset) {
+  if (!entradas.length) {
+    document.getElementById('auditoriaWrap').innerHTML = '<div class="empty">No hay entradas que coincidan con el filtro.</div>';
+    document.getElementById('auditoriaPaginador').innerHTML = '';
+    return;
+  }
+  const filas = entradas.map(e => {
+    const esAdmin = e.actor === 'admin';
+    const quien = esAdmin
+      ? `<span class="badge badge-muted">Admin</span>`
+      : (e.participante_id ? `<a onclick="abrirDetalle('${e.participante_id}')">${e.actor_nombre || e.participante_id}</a>` : (e.actor_nombre || e.actor));
+    const accionTxt = _ACCION_LABELS[e.accion] || e.accion;
+    return `<tr>
+      <td style="white-space:nowrap;color:var(--muted);">${e.fecha}</td>
+      <td>${quien}</td>
+      <td>${accionTxt}</td>
+      <td style="color:var(--text2);">${(e.detalle || '').replace(/</g,'&lt;')}</td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('auditoriaWrap').innerHTML = `
+    <table>
+      <thead><tr><th>Fecha</th><th>Quién</th><th>Acción</th><th>Detalle</th></tr></thead>
+      <tbody>${filas}</tbody>
+    </table>`;
+
+  const desde = offset + 1;
+  const hasta = Math.min(offset + entradas.length, total);
+  document.getElementById('auditoriaPaginador').innerHTML = `
+    <span>${desde}–${hasta} de ${total}</span>
+    <button class="btn-secondary" ${offset <= 0 ? 'disabled' : ''} onclick="cargarAuditoria(${Math.max(0, offset - limit)})">← Anterior</button>
+    <button class="btn-secondary" ${offset + limit >= total ? 'disabled' : ''} onclick="cargarAuditoria(${offset + limit})">Siguiente →</button>`;
+}
+
+// ── EDITOR DE CORREOS ────────────────────────────────────────────────────────
+let PLANTILLAS = [];
+
+async function cargarPlantillas() {
+  document.getElementById('plantillasWrap').innerHTML = '<div class="loading">Cargando plantillas…</div>';
+  try {
+    const data = await _apiGet('/api/admin/plantillas-correo');
+    PLANTILLAS = data.plantillas || [];
+    renderPlantillas();
+  } catch (e) {
+    document.getElementById('plantillasWrap').innerHTML = `<div class="empty">⚠️ ${e.message}</div>`;
+  }
+}
+
+function renderPlantillas() {
+  const filas = PLANTILLAS.map(t => `
+    <tr>
+      <td>
+        <div style="font-weight:600;">${t.nombre_visible}</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:2px;">${t.descripcion}</div>
+      </td>
+      <td>${t.personalizada
+        ? '<span class="badge" style="background:rgba(59,130,246,.18);color:#60a5fa;">✎ Personalizada</span>'
+        : '<span class="badge badge-ok">Default de fábrica</span>'}</td>
+      <td style="white-space:nowrap;">
+        <button class="btn-secondary" onclick="abrirEditorPlantilla('${t.clave}')">Editar</button>
+        ${t.personalizada ? `<button class="btn-secondary" onclick="_restablecerPlantilla('${t.clave}')">Restablecer</button>` : ''}
+      </td>
+    </tr>`).join('');
+
+  document.getElementById('plantillasWrap').innerHTML = `
+    <table>
+      <thead><tr><th>Correo</th><th>Estado</th><th></th></tr></thead>
+      <tbody>${filas}</tbody>
+    </table>`;
+}
+
+function abrirEditorPlantilla(clave) {
+  const t = PLANTILLAS.find(x => x.clave === clave);
+  if (!t) return;
+  const placeholdersTxt = (t.placeholders || []).join('  ');
+  document.getElementById('plantillaOverlay').style.display = 'flex';
+  document.getElementById('plantillaOverlay').innerHTML = `
+    <div class="panel" style="max-width:720px;">
+      <button class="panel-close" onclick="cerrarEditorPlantilla()" title="Cerrar">✕</button>
+      <div class="sec">
+        <div style="font-size:17px;font-weight:700;">${t.nombre_visible}</div>
+        <div style="font-size:12.5px;color:var(--muted);margin-top:4px;">${t.descripcion}</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:8px;">
+          Marcadores disponibles (se reemplazan automáticamente al enviar): <code>${placeholdersTxt}</code>
+        </div>
+      </div>
+      <div class="sec">
+        <label style="display:block;margin-bottom:4px;font-size:12.5px;">Asunto</label>
+        <input id="_pl_asunto" value="${(t.asunto_actual || '').replace(/"/g,'&quot;')}" style="width:100%;margin-bottom:12px;">
+        <label style="display:block;margin-bottom:4px;font-size:12.5px;">Cuerpo HTML</label>
+        <textarea id="_pl_html" style="width:100%;min-height:280px;font-family:monospace;font-size:12.5px;">${(t.cuerpo_html_actual || '').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</textarea>
+      </div>
+      <div class="sec" style="display:flex;gap:8px;">
+        <button class="btn-primary" onclick="_guardarPlantilla('${t.clave}')">Guardar plantilla</button>
+        ${t.personalizada ? `<button class="btn-secondary" onclick="_restablecerPlantilla('${t.clave}')">Restablecer a fábrica</button>` : ''}
+      </div>
+      <div id="_pl_msg" class="msg"></div>
+    </div>`;
+}
+
+function cerrarEditorPlantilla() {
+  document.getElementById('plantillaOverlay').style.display = 'none';
+  document.getElementById('plantillaOverlay').innerHTML = '';
+}
+
+function _desescaparHtml(s) {
+  const d = document.createElement('div');
+  d.innerHTML = s;
+  return d.textContent || '';
+}
+
+async function _guardarPlantilla(clave) {
+  try {
+    const asunto = document.getElementById('_pl_asunto').value;
+    const cuerpo_html = _desescaparHtml(document.getElementById('_pl_html').value);
+    const data = await _apiSend('PUT', `/api/admin/plantillas-correo/${clave}`, { asunto, cuerpo_html });
+    _mostrarMsg('_pl_msg', data.mensaje || 'Guardado.', false);
+    await cargarPlantillas();
+  } catch (e) { _mostrarMsg('_pl_msg', e.message, true); }
+}
+
+async function _restablecerPlantilla(clave) {
+  if (!confirm('¿Restablecer esta plantilla a su versión de fábrica? Se perderá la personalización.')) return;
+  try {
+    await _apiSend('DELETE', `/api/admin/plantillas-correo/${clave}`, undefined);
+    cerrarEditorPlantilla();
+    await cargarPlantillas();
+  } catch (e) { alert(e.message); }
+}
+
+/* ================================================================
+   ESTUDIOS DE MERCADO LABORAL (PDF) — carga manual del Admin.
+   Mismo orden norte → sur que usa agente-chat.html y el backend
+   (PAISES_LATAM en atdc_agent.py), Chile incluido como cualquier otro
+   (aquí no hay "país por defecto": el Admin elige explícitamente para
+   qué país sube cada estudio).
+   ================================================================ */
+const PAISES_LATAM_ADMIN = [
+  'México', 'Guatemala', 'Honduras', 'El Salvador', 'Nicaragua', 'Costa Rica',
+  'Panamá', 'Colombia', 'Venezuela', 'Ecuador', 'Perú', 'Brasil', 'Bolivia',
+  'Paraguay', 'Chile', 'Uruguay', 'Argentina',
+];
+let ESTUDIOS_MERCADO = [];
+
+function _pintarSelectPaisEstudioMercado() {
+  const sel = document.getElementById('_em_pais');
+  if (!sel) return;
+  sel.innerHTML = PAISES_LATAM_ADMIN.map(p => `<option value="${p}">${p}</option>`).join('');
+  sel.value = 'Chile';
+}
+
+async function cargarEstudiosMercado() {
+  _pintarSelectPaisEstudioMercado();
+  document.getElementById('estudiosMercadoWrap').innerHTML = '<div class="loading">Cargando estudios de mercado…</div>';
+  try {
+    const data = await _apiGet('/api/admin/estudios-mercado');
+    ESTUDIOS_MERCADO = data.estudios || [];
+    renderEstudiosMercado();
+  } catch (e) {
+    document.getElementById('estudiosMercadoWrap').innerHTML = `<div class="empty">⚠️ ${e.message}</div>`;
+  }
+}
+
+function renderEstudiosMercado() {
+  if (!ESTUDIOS_MERCADO.length) {
+    document.getElementById('estudiosMercadoWrap').innerHTML =
+      '<div class="empty">Todavía no se ha cargado ningún estudio de mercado.</div>';
+    return;
+  }
+  const filas = ESTUDIOS_MERCADO.map(e => `
+    <tr>
+      <td>
+        <div style="font-weight:600;">${e.titulo}</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:2px;">${e.nombre_archivo} · ${Math.round((e.tamano_bytes||0)/1024)} KB</div>
+      </td>
+      <td>${e.pais}</td>
+      <td>${e.sector || '<span style="color:var(--muted);">— (todos)</span>'}</td>
+      <td>${e.anio || '—'}</td>
+      <td style="white-space:nowrap;">
+        <button class="btn-secondary" onclick="_verResumenEstudioMercado('${e.id}')">Ver resumen</button>
+        <button class="btn-secondary" onclick="_eliminarEstudioMercado('${e.id}')">Eliminar</button>
+      </td>
+    </tr>`).join('');
+
+  document.getElementById('estudiosMercadoWrap').innerHTML = `
+    <table>
+      <thead><tr><th>Estudio</th><th>País</th><th>Sector</th><th>Año</th><th></th></tr></thead>
+      <tbody>${filas}</tbody>
+    </table>`;
+}
+
+function _verResumenEstudioMercado(id) {
+  const e = ESTUDIOS_MERCADO.find(x => x.id === id);
+  if (!e) return;
+  alert(`${e.titulo} (${e.pais}${e.sector ? ' · ' + e.sector : ''}, ${e.anio || 's/f'})\n\n${e.resumen_md}`);
+}
+
+async function _eliminarEstudioMercado(id) {
+  const e = ESTUDIOS_MERCADO.find(x => x.id === id);
+  if (!confirm(`¿Eliminar el estudio "${e ? e.titulo : id}"? Deja de citarse como fuente para los participantes.`)) return;
+  try {
+    await _apiSend('DELETE', `/api/admin/estudios-mercado/${id}`, undefined);
+    await cargarEstudiosMercado();
+  } catch (e) { alert(e.message); }
+}
+
+async function _subirEstudioMercado() {
+  const pais = document.getElementById('_em_pais').value;
+  const anio = document.getElementById('_em_anio').value.trim();
+  const sector = document.getElementById('_em_sector').value.trim();
+  const titulo = document.getElementById('_em_titulo').value.trim();
+  const archivoInput = document.getElementById('_em_archivo');
+  const archivo = archivoInput.files[0];
+
+  if (!archivo) { _mostrarMsg('_em_msg', 'Selecciona un archivo PDF.', true); return; }
+  if (!anio) { _mostrarMsg('_em_msg', 'Indica el año del estudio.', true); return; }
+
+  _mostrarMsg('_em_msg', 'Procesando documento con IA (puede tardar unos segundos)…', false);
+
+  const fd = new FormData();
+  fd.append('archivo', archivo);
+  fd.append('pais', pais);
+  fd.append('anio', anio);
+  fd.append('sector', sector);
+  fd.append('titulo', titulo);
+
+  try {
+    // Carga multipart: no se usa _apiSend porque este endpoint recibe
+    // FormData (el navegador fija el Content-Type con el boundary correcto;
+    // forzarlo a mano rompería la subida), pero sigue llevando el mismo
+    // header de autenticación X-Admin-Key que el resto del panel.
+    const res = await fetch(`${BACKEND}/api/admin/estudios-mercado/subir`, {
+      method: 'POST',
+      headers: { 'X-Admin-Key': ADMIN_KEY },
+      body: fd,
+    });
+    if (res.status === 401 || res.status === 403) { _salir(); return; }
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.detail || 'No se pudo procesar el documento.');
+
+    _mostrarMsg('_em_msg', `Estudio "${data.titulo}" procesado y disponible para ${data.pais}.`, false);
+    archivoInput.value = '';
+    document.getElementById('_em_anio').value = '';
+    document.getElementById('_em_sector').value = '';
+    document.getElementById('_em_titulo').value = '';
+    await cargarEstudiosMercado();
+  } catch (e) {
+    _mostrarMsg('_em_msg', e.message, true);
+  }
+}
+
+function _barraInterp(label, valor, max, interp) {
+  const pct = Math.max(0, Math.min(100, Math.round((valor / max) * 100)));
+  const color = pct >= 65 ? 'var(--green)' : pct >= 35 ? 'var(--amber)' : 'var(--muted)';
+  return `<div class="bar-row">
+    <span style="min-width:150px;">${label}</span>
+    <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${color}"></div></div>
+    <span style="min-width:90px;text-align:right;color:var(--muted);">${valor} · ${interp}</span>
+  </div>`;
+}
+
+async function abrirDetalle(id) {
+  document.getElementById('detalleOverlay').style.display = 'flex';
+  document.getElementById('detalleOverlay').innerHTML = '<div class="panel"><div class="loading">Cargando…</div></div>';
+  try {
+    const p = await _apiGet(`/api/admin/participantes/${id}`);
+    _renderDetalle(p);
+  } catch (e) {
+    document.getElementById('detalleOverlay').innerHTML = `<div class="panel">⚠️ ${e.message}
+      <div style="margin-top:14px;"><button class="btn-secondary" onclick="cerrarDetalle()">Cerrar</button></div></div>`;
+  }
+}
+
+function cerrarDetalle() {
+  document.getElementById('detalleOverlay').style.display = 'none';
+  document.getElementById('detalleOverlay').innerHTML = '';
+}
+
+function _renderDetalle(p) {
+  const fotoSrc = p.foto_b64 ? `data:${p.foto_mime};base64,${p.foto_b64}` : '';
+  const disc = p.disc || {};
+  const dims = disc.dimensiones || {};
+  const kostick = p.kostick || {};
+  const clusters = kostick.clusters || {};
+  const se = p.solicitud_eliminacion || { estado: 'ninguna' };
+  const informe = p.informe_final;
+
+  const html = `
+  <div class="panel">
+    <button class="panel-close" onclick="cerrarDetalle()" title="Cerrar">✕</button>
+
+    <div class="sec" style="display:flex;gap:14px;align-items:center;">
+      ${fotoSrc
+        ? `<img class="foto-detalle" src="${fotoSrc}" alt="">`
+        : `<div class="foto-detalle" style="display:flex;align-items:center;justify-content:center;font-size:1.6rem;">🙂</div>`}
+      <div>
+        <div style="font-size:17px;font-weight:700;">${p.nombre} <span style="font-size:12px;color:var(--muted)">(${p.id})</span></div>
+        <div style="font-size:12.5px;color:var(--muted);margin-top:2px;">${_badgePlan(p.plan)} · Día de proceso ${p.proceso_dia}</div>
+      </div>
+    </div>
+
+    ${p.pago_estado === 'pendiente' ? `
+    <div class="sec" style="background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.25);border-radius:8px;">
+      <div class="sec-title">💳 Pago pendiente de confirmar ${_badgeSlaVencida(p.pago_pendiente_desde)}</div>
+      <div style="font-size:13px;margin-bottom:10px;">
+        Pidió el plan <strong>${p.plan_solicitado || p.plan}</strong> al registrarse. Le mandamos los datos de
+        transferencia desde el correo corporativo (atdc.app) con el compromiso de activar el plan dentro de 1
+        hora desde que llegue el comprobante. Cuando confirmes el pago recibido, actívalo aquí — esto le envía el
+        correo real de bienvenida con el plan ya activo.
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
+        <button class="btn-primary" onclick="_confirmarPago('${p.id}')">✓ Confirmar pago recibido</button>
+        <button class="btn-secondary" onclick="_toggleReenviarDatos('${p.id}')">✉️ Reenviar datos bancarios (con nota)</button>
+      </div>
+      <div id="_d_reenviar_box" style="display:none;">
+        <textarea id="_d_reenviar_nota" placeholder="Nota opcional para el participante (ej. 'Ya vimos tu comprobante, estamos verificándolo')." style="width:100%;min-height:60px;margin-bottom:8px;"></textarea>
+        <button class="btn-primary" onclick="_reenviarDatosBancarios('${p.id}')">Enviar correo</button>
+        <div id="_d_reenviar_msg" class="msg"></div>
+      </div>
+    </div>` : ''}
+
+    <div class="sec">
+      <div class="sec-title">Datos del participante</div>
+      <div class="field-row">
+        <div class="field"><label>Nombre</label><input id="_d_nombre" value="${(p.nombre||'').replace(/"/g,'&quot;')}"></div>
+        <div class="field"><label>Cargo objetivo</label><input id="_d_cargo" value="${(p.cargo_objetivo||'').replace(/"/g,'&quot;')}"></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>Sector</label><input id="_d_sector" value="${(p.sector||'').replace(/"/g,'&quot;')}"></div>
+        <div class="field"><label>Renta objetivo</label><input id="_d_renta" value="${(p.renta_objetivo||'').replace(/"/g,'&quot;')}"></div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label>Plan contratado</label>
+          <select id="_d_plan">
+            ${['Inicial','Esencial','Profesional','Premium'].map(pl => `<option value="${pl}" ${pl===p.plan?'selected':''}>${pl}</option>`).join('')}
+          </select>
+        </div>
+        <div class="field" style="display:flex;align-items:flex-end;gap:8px;">
+          <button class="btn-primary" onclick="_guardarDatos('${p.id}')">Guardar datos</button>
+          <button class="btn-secondary" onclick="_aprobarPlan('${p.id}')">Aprobar plan</button>
+        </div>
+      </div>
+      <div id="_d_msg" class="msg"></div>
+    </div>
+
+    <div class="sec">
+      <div class="sec-title">CV / ATS</div>
+      <div class="bar-row">
+        <span style="min-width:150px;">Puntaje ATS</span>
+        <div class="bar-track"><div class="bar-fill" style="width:${p.cv?.ats_score||0}%;background:${(p.cv?.ats_score||0)>=70?'var(--green)':'var(--amber)'}"></div></div>
+        <span style="min-width:90px;text-align:right;color:var(--muted);">${p.cv?.ats_score||0}/100</span>
+      </div>
+      <div style="font-size:12.5px;color:var(--muted);">${p.cv?.cv_archivo_nombre ? `Archivo: ${p.cv.cv_archivo_nombre}` : 'Aún no ha subido CV.'}</div>
+    </div>
+
+    <div class="sec">
+      <div class="sec-title">DISC — ${disc.codigo || '—'} ${disc.patron ? '· ' + disc.patron : ''}</div>
+      ${Object.keys(dims).length ? Object.entries(dims).map(([k,v]) => _barraInterp(`${k} — ${v.label}`, v.seg, 28, v.interp)).join('') : '<div style="color:var(--muted);font-size:12.5px;">Sin evaluar.</div>'}
+    </div>
+
+    <div class="sec">
+      <div class="sec-title">Kostick — Clusters</div>
+      ${Object.keys(clusters).length ? Object.entries(clusters).map(([k,v]) => _barraInterp(`${k} — ${v.nombre}`, v.score, 9, v.interp)).join('') : '<div style="color:var(--muted);font-size:12.5px;">Sin evaluar.</div>'}
+    </div>
+
+    ${p.plan === 'Premium' ? `
+    <div class="sec">
+      <div class="sec-title">Sesión con el Consultor (Premium)</div>
+      <div style="font-size:13px;">
+        Estado: <strong>${p.premium?.sesion_consultor?.estado || 'sin_solicitar'}</strong>
+        ${p.premium?.sesion_consultor?.fecha ? ` · ${p.premium.sesion_consultor.fecha} ${p.premium.sesion_consultor.hora}` : ''}
+      </div>
+      ${p.premium?.sesion_consultor?.comentario ? `<div style="font-size:12.5px;color:var(--text2);margin-top:4px;">"${p.premium.sesion_consultor.comentario}"</div>` : ''}
+    </div>` : ''}
+
+    <div class="sec">
+      <div class="sec-title">Informe Final</div>
+      ${informe ? `
+        <div style="font-size:12.5px;color:var(--muted);margin-bottom:8px;">
+          Plan ${informe.plan} · generado el ${informe.fecha} (${informe.generado_en})
+        </div>
+        <details>
+          <summary>Ver las ${informe.secciones?.length || 0} secciones del informe</summary>
+          ${(informe.secciones || []).map(s => `
+            <div class="informe-sec">
+              <h4>${s.icono || '📄'} ${s.titulo}</h4>
+              <p>${(s.contenido || '').replace(/</g,'&lt;')}</p>
+            </div>`).join('')}
+        </details>
+      ` : '<div style="color:var(--muted);font-size:12.5px;">Este participante aún no ha generado su Informe Final.</div>'}
+    </div>
+
+    <div class="sec">
+      <div class="sec-title">Entrevistas por competencias analizadas</div>
+      ${p.plan === 'Premium' ? `
+      <div style="font-size:12.5px;color:var(--muted);margin-bottom:10px;">
+        ${(p.entrevistas && p.entrevistas.length)
+          ? '✅ Este participante ya tiene al menos un análisis guardado — su Informe Final Premium está habilitado.'
+          : '🔒 Sin ningún análisis guardado, el Informe Final Premium de este participante queda bloqueado para él (debe registrarse al menos uno).'}
+      </div>` : ''}
+      ${(p.entrevistas && p.entrevistas.length) ? p.entrevistas.slice().reverse().map(e => `
+        <details style="margin-bottom:8px;">
+          <summary>${e.fecha_entrevista || 'Sin fecha'} · ${e.modalidad || ''} ${e.duracion_minutos ? `· ${e.duracion_minutos} min` : ''} — generado el ${e.generado_en}</summary>
+          <div style="font-size:12.5px;color:var(--text2);margin:8px 0;"><strong>Opinión del Consultor:</strong> ${(e.opinion_consultor||'').replace(/</g,'&lt;')}</div>
+          <div class="informe-sec"><p>${(e.informe_md||'').replace(/</g,'&lt;')}</p></div>
+        </details>`).join('')
+        : '<div style="color:var(--muted);font-size:12.5px;">Aún no se ha analizado ninguna entrevista para este participante.</div>'}
+
+      <!-- Fix QA-PREMIUM-GATE-02: antes la ÚNICA pantalla que podía registrar
+           un análisis de entrevista (transcripción + opinión del Consultor)
+           vivía en agente-chat.html, bajo el modo admin — pero ese modo
+           SIEMPRE opera sobre el participante reservado "ADMIN"
+           (/api/auth/admin-token nunca devuelve otro), nunca sobre el
+           participante real que el Consultor está mirando aquí. En la
+           práctica, era IMPOSIBLE registrar la entrevista de un participante
+           real desde la interfaz — y con el gate nuevo del Informe Final
+           Premium (que exige al menos un análisis guardado en ESTE
+           participante), eso dejaba el Informe Premium bloqueado para
+           siempre. Este formulario reemplaza a ese panel: aquí sí se envía
+           con el id real del participante (${p.id}). -->
+      <details id="_entFormDetails" style="margin-top:10px;">
+        <summary>➕ Registrar nueva entrevista para ${p.nombre}</summary>
+        <div style="margin-top:10px;">
+          <div class="field" style="margin-bottom:8px;">
+            <label>Transcripción de la entrevista</label>
+            <textarea id="_ent_transcripcion" style="width:100%;min-height:120px;" placeholder="Pega aquí la transcripción completa.&#10;Formato sugerido:&#10;CONSULTOR: pregunta...&#10;CANDIDATO: respuesta..."></textarea>
+          </div>
+          <div class="field" style="margin-bottom:8px;">
+            <label>Opinión del Consultor</label>
+            <textarea id="_ent_opinion" style="width:100%;min-height:70px;" placeholder="Tus observaciones e impresiones cualitativas del candidato."></textarea>
+          </div>
+          <div class="field-row" style="margin-bottom:8px;">
+            <div class="field"><label>Fecha</label><input id="_ent_fecha" placeholder="2026-10-24"></div>
+            <div class="field"><label>Duración (min)</label><input id="_ent_duracion" type="number" min="10" max="180" placeholder="60"></div>
+            <div class="field">
+              <label>Modalidad</label>
+              <select id="_ent_modalidad">
+                <option value="videollamada" selected>Videollamada</option>
+                <option value="presencial">Presencial</option>
+                <option value="telefonica">Telefónica</option>
+              </select>
+            </div>
+          </div>
+          <button class="btn-primary" id="_ent_btn" onclick="_analizarEntrevistaAdmin('${p.id}')">⚡ Analizar entrevista</button>
+          <div id="_ent_msg" class="msg"></div>
+        </div>
+      </details>
+    </div>
+
+    <div class="sec">
+      <div class="sec-title">Privacidad — solicitud de eliminación de datos (Ley N.º 19.628)</div>
+      <div style="font-size:13px;margin-bottom:10px;">
+        Estado: <strong>${se.estado}</strong>
+        ${se.solicitado_en ? ` · solicitada el ${se.solicitado_en}` : ''}
+        ${se.resuelto_en ? ` · resuelta el ${se.resuelto_en}` : ''}
+      </div>
+      ${se.comentario ? `<div style="font-size:12.5px;color:var(--text2);margin-bottom:10px;">Comentario del participante: "${se.comentario}"</div>` : ''}
+      ${se.estado === 'pendiente' ? `
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="btn-secondary" onclick="_resolverEliminacion('${p.id}','rechazada')">Marcar rechazada</button>
+          <button class="btn-primary" onclick="_resolverEliminacion('${p.id}','procesada')">Marcar procesada (sin borrar)</button>
+          <button class="btn-danger" onclick="_eliminarDefinitivo('${p.id}')">🗑 Eliminar cuenta y datos ahora</button>
+        </div>` : `
+        <button class="btn-danger" onclick="_eliminarDefinitivo('${p.id}')">🗑 Eliminar cuenta y datos ahora</button>`}
+      <div id="_d_elim_msg" class="msg"></div>
+    </div>
+  </div>`;
+  document.getElementById('detalleOverlay').innerHTML = html;
+}
+
+function _mostrarMsg(elId, texto, esError) {
+  const el = document.getElementById(elId);
+  if (!el) return;
+  el.style.display = 'block';
+  el.textContent = texto;
+  el.style.background = esError ? 'rgba(239,68,68,.12)' : 'rgba(34,197,94,.12)';
+  el.style.color = esError ? 'var(--red)' : 'var(--green)';
+}
+
+async function _guardarDatos(id) {
+  try {
+    const body = {
+      nombre: document.getElementById('_d_nombre').value.trim(),
+      cargo_objetivo: document.getElementById('_d_cargo').value.trim(),
+      sector: document.getElementById('_d_sector').value.trim(),
+      renta_objetivo: document.getElementById('_d_renta').value.trim(),
+    };
+    await _apiSend('PUT', `/api/admin/participantes/${id}`, body);
+    _mostrarMsg('_d_msg', 'Datos guardados.', false);
+    cargarListado();
+  } catch (e) { _mostrarMsg('_d_msg', e.message, true); }
+}
+
+async function _aprobarPlan(id) {
+  try {
+    const plan = document.getElementById('_d_plan').value;
+    const data = await _apiSend('PATCH', `/api/admin/participantes/${id}/plan`, { plan });
+    _mostrarMsg('_d_msg', data.mensaje || 'Plan actualizado.', false);
+    cargarListado();
+  } catch (e) { _mostrarMsg('_d_msg', e.message, true); }
+}
+
+async function _confirmarPago(id) {
+  if (!confirm('¿Confirmas que recibiste la transferencia de este participante? Esto activará su plan y le enviará el correo de bienvenida.')) return;
+  try {
+    const data = await _apiSend('PATCH', `/api/admin/participantes/${id}/confirmar-pago`, {});
+    abrirDetalle(id);
+    cargarListado();
+  } catch (e) { alert(e.message); }
+}
+
+// Fix QA-PREMIUM-GATE-02: registra el análisis de entrevista para el
+// participante REAL (ver el comentario junto al formulario, más arriba).
+async function _analizarEntrevistaAdmin(id) {
+  const transcripcion = (document.getElementById('_ent_transcripcion')?.value || '').trim();
+  const opinion       = (document.getElementById('_ent_opinion')?.value || '').trim();
+  if (!transcripcion) { _mostrarMsg('_ent_msg', 'La transcripción no puede estar vacía.', true); return; }
+  if (!opinion)       { _mostrarMsg('_ent_msg', 'La opinión del Consultor no puede estar vacía.', true); return; }
+
+  const btn = document.getElementById('_ent_btn');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Analizando con IA… (puede tardar hasta 1 minuto)'; }
+
+  try {
+    const body = {
+      participante_id:  id,
+      transcripcion,
+      opinion_consultor: opinion,
+      fecha_entrevista:  document.getElementById('_ent_fecha')?.value || null,
+      duracion_minutos:  parseInt(document.getElementById('_ent_duracion')?.value) || null,
+      modalidad:         document.getElementById('_ent_modalidad')?.value || 'videollamada',
+      competencias: [],
+    };
+    await _apiSend('POST', '/api/entrevista', body);
+    abrirDetalle(id);   // recarga el detalle completo: muestra la entrevista nueva y desbloquea el gate Premium
+    cargarListado();
+  } catch (e) {
+    _mostrarMsg('_ent_msg', e.message, true);
+    if (btn) { btn.disabled = false; btn.textContent = '⚡ Analizar entrevista'; }
+  }
+}
+
+function _badgeSlaVencida(pagoPendienteDesde) {
+  if (!pagoPendienteDesde) return '';
+  const minutos = (Date.now() - new Date(pagoPendienteDesde).getTime()) / 60000;
+  if (minutos > 60) {
+    return `<span class="badge" style="background:rgba(239,68,68,.18);color:#f87171;margin-left:6px;">⏱ más de 1 hora esperando</span>`;
+  }
+  const restantes = Math.max(0, Math.round(60 - minutos));
+  return `<span class="badge" style="background:rgba(59,130,246,.15);color:#60a5fa;margin-left:6px;">⏱ quedan ~${restantes} min del compromiso</span>`;
+}
+
+function _toggleReenviarDatos(id) {
+  const box = document.getElementById('_d_reenviar_box');
+  if (box) box.style.display = box.style.display === 'none' ? 'block' : 'none';
+}
+
+async function _reenviarDatosBancarios(id) {
+  const nota = (document.getElementById('_d_reenviar_nota') || {}).value || '';
+  try {
+    const data = await _apiSend('POST', `/api/admin/participantes/${id}/reenviar-datos-bancarios`, { comentario: nota });
+    _mostrarMsg('_d_reenviar_msg', data.mensaje || 'Correo reenviado.', false);
+  } catch (e) { _mostrarMsg('_d_reenviar_msg', e.message, true); }
+}
+
+async function _resolverEliminacion(id, estado) {
+  try {
+    const data = await _apiSend('PATCH', `/api/admin/participantes/${id}/solicitud-eliminacion`, { estado });
+    _mostrarMsg('_d_elim_msg', data.mensaje || 'Actualizado.', false);
+    abrirDetalle(id);
+    cargarListado();
+  } catch (e) { _mostrarMsg('_d_elim_msg', e.message, true); }
+}
+
+async function _eliminarDefinitivo(id) {
+  if (!confirm('Esto eliminará al participante y TODOS sus datos de forma permanente, incluyendo su cuenta de acceso. ¿Confirmas?')) return;
+  if (!confirm('Esta acción no se puede deshacer. ¿Eliminar definitivamente?')) return;
+  try {
+    await _apiSend('DELETE', `/api/admin/participantes/${id}`);
+    cerrarDetalle();
+    cargarListado();
+  } catch (e) { alert(e.message); }
+}
+
+cargarListado();
+cargarAuditoria(0);
+cargarPlantillas();
+cargarEstudiosMercado();
+</script>
+</body>
+</html>
