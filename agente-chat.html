@@ -1595,6 +1595,12 @@
       <button id="btnMiCuenta" onclick="_abrirMiCuenta()" title="Ver y editar tus datos, tu foto de perfil y la privacidad de tus datos personales"
         style="margin-top:8px;width:100%;padding:7px 10px;border-radius:8px;border:1px solid var(--border2);
         background:transparent;color:var(--text2);font-weight:600;font-size:.75rem;cursor:pointer;">👤 Mi cuenta</button>
+      <!-- Fix QA-UX-LOGOUT-01: cerrarSesion() ya existía en el código pero
+           no tenía ningún botón que la llamara en ninguna parte de la UI —
+           el participante no tenía forma de cerrar sesión por su cuenta. -->
+      <button id="btnCerrarSesion" onclick="_confirmarCerrarSesion()" title="Cerrar tu sesión en este dispositivo"
+        style="margin-top:6px;width:100%;padding:7px 10px;border-radius:8px;border:1px solid var(--border2);
+        background:transparent;color:var(--muted);font-weight:600;font-size:.75rem;cursor:pointer;">🚪 Cerrar sesión</button>
     </div>
 
     <!-- CV / ATS -->
@@ -1816,6 +1822,14 @@ function _obtenerToken() {
 function cerrarSesion() {
   try { localStorage.removeItem(_SESION_KEY); } catch(e) {}
   window.location.href = window.location.pathname;
+}
+
+/* Fix QA-UX-LOGOUT-01: confirmación antes de cerrar sesión, para que un
+   clic accidental no deje a la persona fuera sin aviso. */
+function _confirmarCerrarSesion() {
+  if (confirm('¿Cerrar tu sesión en este dispositivo? Tendrás que volver a ingresar tu correo y contraseña.')) {
+    cerrarSesion();
+  }
 }
 
 /* ================================================================
@@ -4540,7 +4554,10 @@ async function _abrirMiCuenta() {
     <div style="font-size:.73rem;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;margin-bottom:8px;">Seguridad</div>
     <button onclick="document.getElementById('_miCuentaModal').remove();_abrirCambiarPassword();" style="
       width:100%;padding:10px;border-radius:8px;border:1px solid var(--border2);background:transparent;
-      color:var(--text2);font-weight:600;font-size:13px;cursor:pointer;margin-bottom:18px;">🔒 Cambiar mi contraseña</button>
+      color:var(--text2);font-weight:600;font-size:13px;cursor:pointer;margin-bottom:10px;">🔒 Cambiar mi contraseña</button>
+    <button onclick="document.getElementById('_miCuentaModal').remove();_confirmarCerrarSesion();" style="
+      width:100%;padding:10px;border-radius:8px;border:1px solid var(--border2);background:transparent;
+      color:var(--muted);font-weight:600;font-size:13px;cursor:pointer;margin-bottom:18px;">🚪 Cerrar sesión</button>
 
     <div style="font-size:.73rem;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;margin-bottom:8px;">Privacidad y datos personales</div>
     <p style="margin:0 0 10px 0;font-size:12.5px;color:var(--text2);line-height:1.5;">
