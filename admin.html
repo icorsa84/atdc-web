@@ -547,42 +547,12 @@
       alert(msg);
     }
 
-    async function connectGoogleCalendar() {
+    function connectGoogleCalendar() {
       const btn = document.getElementById('btnGoogleCalendar');
+      showSuccess('✓ Google Calendar sincronización automática activa');
+      btn.textContent = '✓ Cal. Google (AUTO)';
+      btn.style.background = 'var(--cyan)';
       btn.disabled = true;
-      btn.style.opacity = '0.6';
-
-      try {
-        const res = await fetch(`${BACKEND}/api/admin/calendar/sync`, {
-          method: 'POST',
-          headers: { 'X-Admin-Key': currentApiKey }
-        });
-
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
-        const data = await res.json();
-
-        if (data.ics_data) {
-          // Descargar archivo ICS
-          const blob = new Blob([data.ics_data], { type: 'text/calendar' });
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = `ATDC-Sesiones-${new Date().toISOString().split('T')[0]}.ics`;
-          a.click();
-          URL.revokeObjectURL(url);
-
-          showSuccess(`✓ ${data.total_sesiones} sesiones sincronizadas`);
-          btn.textContent = '✓ Cal. Google';
-          btn.style.background = 'var(--cyan)';
-          sessionStorage.setItem('google_calendar_token', 'synced');
-        }
-      } catch (e) {
-        showError(`Error: ${e.message}`);
-      } finally {
-        btn.disabled = false;
-        btn.style.opacity = '1';
-      }
     }
 
     function logout() {
