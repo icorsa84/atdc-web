@@ -1824,10 +1824,67 @@ const CATALOGO_SECTORES = [
   'Turismo / Hotelería / Gastronomía','Servicios profesionales / Consultoría',
   'Sector público / Gobierno','ONG / Sin fines de lucro',
 ];
+/* Task #297: catálogo expandido de ~150 cargos chilenos agrupados por área.
+   Isaac pidió "Catálogo de cargos ampliado y agrupado por área".
+   Usamos un array plano acá, pero en la UI de multi-select se pueden
+   mostrar por grupo si el frontend así lo requiere. */
 const CATALOGO_CARGOS = [
-  'Gerencia General','Gerencia de Área','Subgerencia / Jefatura',
-  'Coordinación / Supervisión','Analista Senior / Especialista',
-  'Analista / Ejecutivo','Asistente / Administrativo','Técnico / Operativo',
+  /* Gerencia (8 títulos) */
+  'Gerente General','Gerente / Director de Área','Subgerente','Jefe de Departamento',
+  'Coordinador / Supervisor de Equipo','Coordinador','Supervisor','Encargado',
+  /* Administración y RRHH (12) */
+  'Analista Administrativo','Especialista en Recursos Humanos','Coordinador RRHH',
+  'Asistente de RRHH','Especialista en Nómina','Analista de Organización',
+  'Especialista en Selección','Coordinador de Capacitación','Asistente Administrativo',
+  'Secretaria / Asistente Ejecutiva','Recepcionista','Auxiliar Administrativo',
+  /* Finanzas y Contabilidad (12) */
+  'Contabilista / Contador Senior','Contador','Analista Contable','Auxiliar Contable',
+  'Especialista en Finanzas','Analista Financiero','Tesorero','Especialista en Presupuestos',
+  'Analista de Costos','Auditor Interno','Asistente Financiero','Coordinador de Tesorería',
+  /* Ventas y Comercial (12) */
+  'Gerente Comercial','Gerente de Ventas','Jefe de Ventas','Ejecutivo de Ventas Senior',
+  'Ejecutivo de Ventas','Asesor Comercial','Ejecutivo de Cuenta','Especialista en Mercado',
+  'Ejecutivo de Negocios','Coordinador Comercial','Asistente Comercial','Teleoperador de Ventas',
+  /* Marketing y Comunicaciones (10) */
+  'Gerente de Marketing','Especialista en Marketing Digital','Coordinador de Marketing',
+  'Especialista en Publicidad','Especialista en Redes Sociales','Coordinador de Comunicaciones',
+  'Community Manager','Especialista en Contenidos','Asistente de Marketing','Diseñador Gráfico',
+  /* Tecnología e IT (15) */
+  'Gerente IT / CIO','Especialista en Sistemas','Analista de Sistemas','Desarrollador Senior',
+  'Desarrollador Full Stack','Desarrollador Backend','Desarrollador Frontend','Desarrollador Mobile',
+  'Especialista en Base de Datos','Administrador de Servidores','Especialista en Seguridad Informática',
+  'Técnico en Redes','Support IT / Help Desk','Coordinador IT','Asistente Técnico',
+  /* Logística y Operaciones (12) */
+  'Gerente de Logística','Gerente de Operaciones','Jefe de Almacén','Coordinador Logístico',
+  'Especialista en Supply Chain','Planificador de Demanda','Coordinador de Distribución',
+  'Especialista en Procesos','Coordinador de Calidad','Asistente de Almacén','Operario de Almacén',
+  'Conductor / Transportista',
+  /* Calidad y Aseguramiento (8) */
+  'Gerente de Calidad','Especialista en Calidad','Coordinador de Aseguramiento','Inspector de Calidad',
+  'Auditor Externo','Especialista en Mejora Continua','Coordinador de Estándares','Asistente de Calidad',
+  /* Producción y Manufactura (10) */
+  'Gerente de Producción','Jefe de Turno / Supervisor de Producción','Especialista en Mantenimiento',
+  'Técnico en Producción','Operario de Manufactura','Especialista en Seguridad Industrial',
+  'Coordinador de Mantenimiento','Electricista Industrial','Mecánico Industrial','Ayudante de Producción',
+  /* Proyectos (6) */
+  'Project Manager / Gestor de Proyectos','PMO Coordinator','Especialista en Metodología Ágil',
+  'Coordinador de Proyectos','Asistente de Proyectos','Especialista en Cambio Organizacional',
+  /* Servicio al Cliente (10) */
+  'Gerente de Atención al Cliente','Especialista en Servicio al Cliente','Coordinador de Servicio',
+  'Ejecutivo de Servicio al Cliente','Asesor de Servicio','Supervisor de Call Center',
+  'Agente de Servicio al Cliente','Especialista en Satisfacción del Cliente','Coordinador de Reclamos',
+  'Asistente de Atención al Cliente',
+  /* Recursos Especializados (15) */
+  'Abogado / Asesor Legal','Especialista en Asuntos Legales','Notario','Notario Público',
+  'Ingeniero / Especialista Técnico','Arquitecto','Analista de Datos / Data Scientist','Ingeniero de Datos',
+  'Especialista en BI (Business Intelligence)','Consultor','Asesor Empresarial','Analista de Negocio',
+  'Especialista en Sostenibilidad / ESG','Especialista Ambiental','Coach / Trainer',
+  /* Educación y Capacitación (6) */
+  'Docente / Instructor','Coordinador Académico','Especialista en Capacitación',
+  'Formador Corporativo','Orientador Educacional','Diseñador Instruccional',
+  /* Otros Profesionales (8) */
+  'Periodista / Comunicador','Traductor / Intérprete','Especialista en Compliance','Especialista en Riesgos',
+  'Analista de Inteligencia de Mercado','Especialista en Relaciones Públicas','Community Strategist','Especialista en Negocios Internacionales',
 ];
 const CATALOGO_RENTAS = [
   'Menos de $500.000','$500.000 - $800.000','$800.000 - $1.200.000',
@@ -1878,6 +1935,186 @@ function _valorSelectConOtro(idBase) {
   if (!sel) return '';
   if (sel.value === '__otro__') return (document.getElementById(idBase + '_otro')?.value || '').trim();
   return sel.value;
+}
+
+/* ================================================================
+   Task #296: Multi-select combobox con buscador y chips
+   ================================================================ */
+
+/* Arma un combobox multi-select con buscador, chips/tags, soporte
+   para "Otro (especificar)". Reemplaza _selectConOtro pero con
+   múltiples valores simultáneos. valorActual puede ser un array,
+   un string plano (backward compat), o vacío. */
+function _multiSelectConOtro(idBase, catalogo, valorActual) {
+  const valores = Array.isArray(valorActual) ? valorActual :
+                  (valorActual && typeof valorActual === 'string' && valorActual.trim() && valorActual !== 'Por definir' ? [valorActual] : []);
+
+  const tieneOtro = valores.some(v => v && !catalogo.includes(v) && v !== '__otro__');
+  const textoOtro = tieneOtro ? valores.find(v => !catalogo.includes(v)) : '';
+  const valoresFiltr = valores.filter(v => catalogo.includes(v) || !v);
+
+  const chipsHtml = valoresFiltr.map(v => `
+    <div class="multi-chip" data-value="${escHtml(v)}">
+      ${escHtml(v)} <button type="button" onclick="_quitarChip('${idBase}', '${escHtml(v).replace(/"/g, '&quot;')}', event)" style="border:none;background:none;color:inherit;cursor:pointer;padding:0;margin-left:4px;font-weight:bold;">×</button>
+    </div>
+  `).join('');
+
+  const chipsOtroHtml = tieneOtro ? `
+    <div class="multi-chip" data-value="__otro__" data-texto="${escHtml(textoOtro)}">
+      ${escHtml(textoOtro)} <button type="button" onclick="_quitarChip('${idBase}', '__otro__', event)" style="border:none;background:none;color:inherit;cursor:pointer;padding:0;margin-left:4px;font-weight:bold;">×</button>
+    </div>
+  ` : '';
+
+  const opcionesHtml = catalogo.map(op => `<div class="multi-option" data-value="${escHtml(op)}" onclick="_agregarChip('${idBase}', '${escHtml(op).replace(/"/g, '&quot;')}', event)">${escHtml(op)}</div>`).join('');
+
+  return `
+    <div class="multi-select-wrapper" id="${idBase}_wrapper">
+      <input type="hidden" id="${idBase}_values" value="${JSON.stringify(valoresFiltr)}">
+      <div class="multi-select-input" onclick="_abrirMultiSelect('${idBase}')" id="${idBase}_display">
+        <div style="display:flex;flex-wrap:wrap;gap:6px;">
+          ${chipsHtml}${chipsOtroHtml}
+          <input type="text" class="multi-search" id="${idBase}_search" placeholder="${valoresFiltr.length > 0 || tieneOtro ? 'Agregar más…' : 'Busca y selecciona…'}" oninput="_filtrarMultiSelect('${idBase}', event)" style="flex:1;min-width:80px;border:none;background:transparent;outline:none;color:var(--text);font-size:14px;">
+        </div>
+      </div>
+      <div class="multi-dropdown" id="${idBase}_dropdown" style="display:none;">
+        <div class="multi-options" id="${idBase}_options">
+          ${opcionesHtml}
+          <div class="multi-option" data-value="__otro__" onclick="_activarOtroMulti('${idBase}', event)">Otro (especificar)</div>
+        </div>
+        <input type="text" id="${idBase}_otro" class="multi-otro-input" placeholder="Especifica aquí…" style="display:none;" onkeydown="_onKeyOtroMulti('${idBase}', event)">
+      </div>
+    </div>
+    <style>
+      .multi-select-wrapper { position: relative; margin-bottom: 8px; }
+      .multi-select-input {
+        width: 100%; padding: 10px 12px; border-radius: 8px; background: var(--bg);
+        border: 1.5px solid var(--border); color: var(--text); font-size: 14px;
+        cursor: text; display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+      }
+      .multi-select-input:focus-within { border-color: var(--blue); }
+      .multi-chip {
+        background: rgba(59, 130, 246, 0.2); color: #93c5fd; padding: 3px 8px;
+        border-radius: 6px; font-size: 13px; display: inline-flex; align-items: center;
+        white-space: nowrap;
+      }
+      .multi-dropdown {
+        position: absolute; top: 100%; left: 0; right: 0; background: var(--bg2);
+        border: 1.5px solid var(--border); border-top: none; border-radius: 0 0 8px 8px;
+        max-height: 300px; overflow-y: auto; z-index: 1000; margin-top: -1px;
+      }
+      .multi-options { display: flex; flex-direction: column; }
+      .multi-option {
+        padding: 10px 12px; color: var(--text); cursor: pointer; border-bottom: 1px solid var(--border);
+        font-size: 14px; transition: background var(--t-fast);
+      }
+      .multi-option:hover { background: var(--bg3); }
+      .multi-option.hidden { display: none; }
+      .multi-otro-input {
+        width: 100%; padding: 10px 12px; border: none; border-top: 1px solid var(--border);
+        background: var(--bg); color: var(--text); font-size: 14px; outline: none;
+      }
+    </style>
+  `;
+}
+
+/* Abre el dropdown del multi-select */
+function _abrirMultiSelect(idBase) {
+  const dropdown = document.getElementById(idBase + '_dropdown');
+  if (dropdown) dropdown.style.display = dropdown.style.display === 'none' ? '' : 'none';
+  const search = document.getElementById(idBase + '_search');
+  if (search && dropdown && dropdown.style.display !== 'none') search.focus();
+}
+
+/* Agrega un chip al multi-select */
+function _agregarChip(idBase, valor, event) {
+  if (event) event.stopPropagation();
+  const values = JSON.parse(document.getElementById(idBase + '_values')?.value || '[]');
+  if (!values.includes(valor)) {
+    values.push(valor);
+    document.getElementById(idBase + '_values').value = JSON.stringify(values);
+    _reconstruirMultiSelect(idBase);
+  }
+  document.getElementById(idBase + '_search').value = '';
+  document.getElementById(idBase + '_search').focus();
+  _filtrarMultiSelect(idBase);
+}
+
+/* Quita un chip del multi-select */
+function _quitarChip(idBase, valor, event) {
+  if (event) event.preventDefault();
+  const values = JSON.parse(document.getElementById(idBase + '_values')?.value || '[]');
+  const idx = values.indexOf(valor);
+  if (idx >= 0) values.splice(idx, 1);
+  document.getElementById(idBase + '_values').value = JSON.stringify(values);
+  _reconstruirMultiSelect(idBase);
+  document.getElementById(idBase + '_search').focus();
+}
+
+/* Activa el campo "Otro" en el multi-select */
+function _activarOtroMulti(idBase, event) {
+  if (event) event.stopPropagation();
+  const otroInput = document.getElementById(idBase + '_otro');
+  if (otroInput) {
+    otroInput.style.display = '';
+    otroInput.focus();
+  }
+}
+
+/* Maneja Enter en el campo "Otro" del multi-select */
+function _onKeyOtroMulti(idBase, event) {
+  if (event.key === 'Enter') {
+    const otroInput = document.getElementById(idBase + '_otro');
+    const texto = (otroInput?.value || '').trim();
+    if (texto) {
+      const values = JSON.parse(document.getElementById(idBase + '_values')?.value || '[]');
+      values.push(texto);
+      document.getElementById(idBase + '_values').value = JSON.stringify(values);
+      otroInput.value = '';
+      otroInput.style.display = 'none';
+      _reconstruirMultiSelect(idBase);
+      _abrirMultiSelect(idBase);
+    }
+  }
+}
+
+/* Filtra las opciones del multi-select según el texto buscado */
+function _filtrarMultiSelect(idBase, event) {
+  const search = (document.getElementById(idBase + '_search')?.value || '').toLowerCase();
+  const options = document.querySelectorAll(`#${idBase}_options .multi-option`);
+  options.forEach(opt => {
+    const valor = opt.getAttribute('data-value');
+    const visible = valor === '__otro__' || valor.toLowerCase().includes(search);
+    opt.classList.toggle('hidden', !visible);
+  });
+}
+
+/* Reconstruye el display del multi-select tras cambios */
+function _reconstruirMultiSelect(idBase) {
+  const values = JSON.parse(document.getElementById(idBase + '_values')?.value || '[]');
+  const display = document.getElementById(idBase + '_display');
+  if (!display) return;
+
+  const chipsHtml = values.map(v => `
+    <div class="multi-chip" data-value="${escHtml(v)}">
+      ${escHtml(v)} <button type="button" onclick="_quitarChip('${idBase}', '${escHtml(v).replace(/"/g, '&quot;')}', event)" style="border:none;background:none;color:inherit;cursor:pointer;padding:0;margin-left:4px;font-weight:bold;">×</button>
+    </div>
+  `).join('');
+
+  const searchInput = document.getElementById(idBase + '_search');
+  const placeholder = values.length > 0 ? 'Agregar más…' : 'Busca y selecciona…';
+
+  display.innerHTML = `
+    <div style="display:flex;flex-wrap:wrap;gap:6px;width:100%;">
+      ${chipsHtml}
+      <input type="text" class="multi-search" id="${idBase}_search" placeholder="${placeholder}" oninput="_filtrarMultiSelect('${idBase}', event)" style="flex:1;min-width:80px;border:none;background:transparent;outline:none;color:var(--text);font-size:14px;">
+    </div>
+  `;
+}
+
+/* Lee los valores finales de un multi-select: array de strings */
+function _valorMultiSelectConOtro(idBase) {
+  const values = JSON.parse(document.getElementById(idBase + '_values')?.value || '[]');
+  return values.filter(v => v && v.trim());
 }
 
 const CONFIG = {
@@ -1949,6 +2186,12 @@ function _inicializarDesde(data) {
   PARTICIPANTE.id           = data.participante_id;
   PARTICIPANTE.nombre       = data.nombre;
   PARTICIPANTE.plan         = data.plan;
+
+  /* Task #298: Si datos_por_definir es true, mostrar modal obligatorio
+     al login para completar cargo/sector/renta faltantes */
+  if (data.datos_por_definir) {
+    window._mostrarModalDatosObligatorios = true;
+  }
 }
 
 /* Intento de recuperar sesión existente (usuario que ya inició sesión antes) */
@@ -2136,11 +2379,11 @@ function _mostrarOnboarding(planPreseleccionado) {
         <div style="margin-top:2px;padding-top:12px;border-top:1px solid var(--border);">
           <div style="font-size:11.5px;color:var(--muted);margin-bottom:8px;">Datos para tu proceso (obligatorios)</div>
           <label style="display:block;font-size:11.5px;color:var(--muted);margin-bottom:3px;">Cargo objetivo <span style="color:var(--red);">*</span></label>
-          <div style="margin-bottom:8px;">${_selectConOtro('_ob_cargo', CATALOGO_CARGOS, '')}</div>
+          <div style="margin-bottom:8px;">${_multiSelectConOtro('_ob_cargo', CATALOGO_CARGOS, [])}</div>
           <label style="display:block;font-size:11.5px;color:var(--muted);margin-bottom:3px;">Sector <span style="color:var(--red);">*</span></label>
-          <div style="margin-bottom:8px;">${_selectConOtro('_ob_sector', CATALOGO_SECTORES, '')}</div>
+          <div style="margin-bottom:8px;">${_multiSelectConOtro('_ob_sector', CATALOGO_SECTORES, [])}</div>
           <label style="display:block;font-size:11.5px;color:var(--muted);margin-bottom:3px;">Renta objetivo <span style="color:var(--red);">*</span></label>
-          <div>${_selectConOtro('_ob_renta', CATALOGO_RENTAS, '')}</div>
+          <div>${_multiSelectConOtro('_ob_renta', CATALOGO_RENTAS, [])}</div>
         </div>
       </div>
 
@@ -2256,9 +2499,9 @@ async function _registrarParticipante(plan) {
   const email    = (document.getElementById('_ob_email')?.value || '').trim();
   const password = (document.getElementById('_ob_password')?.value || '');
   const passwordConfirmar = (document.getElementById('_ob_password_confirmar')?.value || '');
-  const cargo_objetivo = _valorSelectConOtro('_ob_cargo');
-  const sector = _valorSelectConOtro('_ob_sector');
-  const renta_objetivo = _valorSelectConOtro('_ob_renta');
+  const cargo_objetivo = _valorMultiSelectConOtro('_ob_cargo');
+  const sector = _valorMultiSelectConOtro('_ob_sector');
+  const renta_objetivo = _valorMultiSelectConOtro('_ob_renta');
   const btn      = document.getElementById('_ob_btn');
 
   if (!nombre)    { _mostrarErrorAuth('Por favor ingresa tu nombre.'); document.getElementById('_ob_nombre')?.focus(); return; }
@@ -2266,12 +2509,11 @@ async function _registrarParticipante(plan) {
   if (!email || !email.includes('@')) { _mostrarErrorAuth('Ingresa un correo electrónico válido.'); document.getElementById('_ob_email')?.focus(); return; }
   if (!password || password.length < 8) { _mostrarErrorAuth('La contraseña debe tener al menos 8 caracteres.'); document.getElementById('_ob_password')?.focus(); return; }
   if (password !== passwordConfirmar) { _mostrarErrorAuth('Las contraseñas no coinciden.'); document.getElementById('_ob_password_confirmar')?.focus(); return; }
-  // Fix QA-UX-CATALOGO-02: Cargo/Sector/Renta ya no son opcionales — el
-  // backend también los exige (422 si faltan), pero validar acá evita el
-  // viaje redondo al servidor y señala exactamente cuál campo falta.
-  if (!cargo_objetivo) { _mostrarErrorAuth('Elige tu cargo objetivo (o "Otro" y especifícalo).'); document.getElementById('_ob_cargo')?.focus(); return; }
-  if (!sector)         { _mostrarErrorAuth('Elige tu sector (o "Otro" y especifícalo).'); document.getElementById('_ob_sector')?.focus(); return; }
-  if (!renta_objetivo) { _mostrarErrorAuth('Elige tu renta objetivo (o "Otro" y especifícala).'); document.getElementById('_ob_renta')?.focus(); return; }
+  // Fix QA-UX-CATALOGO-02: Cargo/Sector/Renta ahora son arrays obligatorios
+  // (el usuario puede elegir múltiples valores por campo)
+  if (cargo_objetivo.length < 1) { _mostrarErrorAuth('Elige al menos un cargo objetivo.'); document.getElementById('_ob_cargo')?.focus(); return; }
+  if (sector.length < 1)         { _mostrarErrorAuth('Elige al menos un sector.'); document.getElementById('_ob_sector')?.focus(); return; }
+  if (renta_objetivo.length < 1) { _mostrarErrorAuth('Elige al menos una renta objetivo.'); document.getElementById('_ob_renta')?.focus(); return; }
 
   document.getElementById('_ob_error').style.display = 'none';
   if (btn) { btn.textContent = 'Creando tu cuenta…'; btn.disabled = true; }
