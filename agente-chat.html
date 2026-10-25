@@ -1726,6 +1726,11 @@
       <button id="btnCerrarSesion" onclick="_confirmarCerrarSesion()" title="Cerrar tu sesión en este dispositivo"
         style="margin-top:6px;width:100%;padding:7px 10px;border-radius:8px;border:1px solid var(--border2);
         background:transparent;color:var(--muted);font-weight:600;font-size:.75rem;cursor:pointer;gap:6px;display:flex;align-items:center;justify-content:center;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h9"></path><polyline points="14 17 19 12 14 7"></polyline><line x1="19" y1="12" x2="8" y2="12"></line></svg> Cerrar sesión</button>
+
+      <!-- PRIVACIDAD Y DATOS PERSONALES -->
+      <button id="btnPrivacidad" onclick="_abrirPrivacidad()" title="Gestiona tus datos personales, consentimientos y privacidad"
+        style="margin-top:6px;width:100%;padding:7px 10px;border-radius:8px;border:1px solid var(--border2);
+        background:transparent;color:var(--muted);font-weight:600;font-size:.75rem;cursor:pointer;gap:6px;display:flex;align-items:center;justify-content:center;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg> Privacidad</button>
     </div>
 
     <!-- CV / ATS -->
@@ -5995,6 +6000,274 @@ async function _solicitarEliminacionMiCuenta() {
   } catch (e) {
     alert(e.message || 'Error de conexión. Intenta nuevamente.');
     btn.disabled = false; btn.innerHTML = `${icono('trash',14)} Solicitar eliminación de mis datos`;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   GESTIÓN DE PRIVACIDAD Y DATOS PERSONALES — Ley 19.628 y 21.719 (Chile)
+   ═══════════════════════════════════════════════════════════════════════ */
+
+async function _abrirPrivacidad() {
+  if (!_obtenerToken()) {
+    alert('Primero debes iniciar sesión para gestionar tu privacidad.');
+    return;
+  }
+
+  const overlay = _modalAncho('_privacidadModal', `${icono('shield',18)} Privacidad y Datos Personales`, `
+    <div style="background:var(--bg2);border-left:3px solid var(--blue);padding:12px;border-radius:8px;margin-bottom:16px;">
+      <p style="margin:0;font-size:13px;color:var(--text);">
+        <strong>Derechos ARSOPB — Ley N.º 21.719</strong><br>
+        Puedes acceder, rectificar, suprimir, oponerme al tratamiento, portabilidad y bloqueo de tus datos.
+      </p>
+    </div>
+
+    <div style="font-size:.73rem;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;margin-bottom:8px;margin-top:16px;">
+      📥 Mis datos personales
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:18px;">
+      <button onclick="_descargarDatosPersonales()" style="
+        flex:1;padding:10px;border-radius:8px;border:1px solid var(--blue);background:rgba(59,130,246,.1);
+        color:var(--blue);font-weight:700;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:6px;justify-content:center;">${icono('download',13)} Descargar mis datos (JSON)</button>
+      <button onclick="_solicitarAuditoria()" style="
+        flex:1;padding:10px;border-radius:8px;border:1px solid var(--amber);background:rgba(245,158,11,.1);
+        color:var(--amber);font-weight:700;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:6px;justify-content:center;">${icono('eye',13)} Auditoria de acceso</button>
+    </div>
+
+    <div style="font-size:.73rem;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;margin-bottom:8px;margin-top:16px;">
+      ✅ Consentimientos
+    </div>
+    <div id="_privacidad_consentimientos" style="margin-bottom:18px;">
+      <div style="padding:10px;background:var(--bg3);border-radius:8px;border:1px solid var(--border);margin-bottom:8px;">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:6px;">
+          <input type="checkbox" id="_consent_tratamiento" checked style="cursor:pointer;">
+          <span style="font-size:13px;">Tratamiento de datos para la prestación del servicio</span>
+        </label>
+        <p style="font-size:12px;color:var(--muted);margin:0;">Obligatorio para usar ATDC. Sin este consentimiento no podemos continuar.</p>
+      </div>
+
+      <div style="padding:10px;background:var(--bg3);border-radius:8px;border:1px solid var(--border);margin-bottom:8px;">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:6px;">
+          <input type="checkbox" id="_consent_marketing" style="cursor:pointer;">
+          <span style="font-size:13px;">Comunicaciones de marketing y mejora de servicio</span>
+        </label>
+        <p style="font-size:12px;color:var(--muted);margin:0;">Información sobre nuevas funciones, ofertas o estudios sobre el servicio.</p>
+      </div>
+
+      <div style="padding:10px;background:var(--bg3);border-radius:8px;border:1px solid var(--border);">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:6px;">
+          <input type="checkbox" id="_consent_analytics" checked style="cursor:pointer;">
+          <span style="font-size:13px;">Analytics e instrumentación (Microsoft Clarity)</span>
+        </label>
+        <p style="font-size:12px;color:var(--muted);margin:0;">Datos de uso anónimo para mejorar la experiencia.</p>
+      </div>
+    </div>
+
+    <button id="_privacidad_guardar_consentimientos" onclick="_guardarConsentimientos()" style="
+      width:100%;padding:10px;border-radius:8px;border:1px solid var(--green);background:rgba(34,197,94,.1);
+      color:var(--green);font-weight:700;font-size:13px;cursor:pointer;margin-bottom:18px;">${icono('check',13)} Guardar cambios</button>
+
+    <div style="font-size:.73rem;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;margin-bottom:8px;margin-top:16px;">
+      🔧 Derechos ARSOPB
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:18px;">
+      <button onclick="_solicitarRectificacion()" style="
+        padding:10px;border-radius:8px;border:1px solid var(--cyan);background:rgba(96,200,255,.1);
+        color:var(--cyan);font-weight:700;font-size:11px;cursor:pointer;text-align:center;">${icono('edit',12)} Rectificar</button>
+      <button onclick="_solicitarSupresion()" style="
+        padding:10px;border-radius:8px;border:1px solid var(--red);background:rgba(239,68,68,.1);
+        color:var(--red);font-weight:700;font-size:11px;cursor:pointer;text-align:center;">${icono('trash',12)} Suprimir</button>
+      <button onclick="_solicitarOposicion()" style="
+        padding:10px;border-radius:8px;border:1px solid var(--amber);background:rgba(245,158,11,.1);
+        color:var(--amber);font-weight:700;font-size:11px;cursor:pointer;text-align:center;">${icono('x-circle',12)} Oponerme</button>
+      <button onclick="_solicitarPortabilidad()" style="
+        padding:10px;border-radius:8px;border:1px solid var(--purple);background:rgba(167,139,250,.1);
+        color:var(--purple);font-weight:700;font-size:11px;cursor:pointer;text-align:center;">${icono('share',12)} Portabilidad</button>
+    </div>
+
+    <div style="font-size:.73rem;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;margin-bottom:8px;margin-top:16px;">
+      📋 Más información
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+      <a href="#modalPrivacidad" onclick="document.getElementById('modalPrivacidad').classList.add('open')" style="
+        padding:10px;border-radius:8px;border:1px solid var(--border2);background:transparent;
+        color:var(--text2);font-weight:700;font-size:12px;cursor:pointer;text-align:center;text-decoration:none;display:block;">📜 Política de Privacidad</a>
+      <a href="mailto:ico.icorsa84@gmail.com" style="
+        padding:10px;border-radius:8px;border:1px solid var(--border2);background:transparent;
+        color:var(--text2);font-weight:700;font-size:12px;cursor:pointer;text-align:center;text-decoration:none;display:block;">📧 Contactar DPO</a>
+    </div>
+  `);
+
+  _cargarConsentimientos();
+}
+
+async function _descargarDatosPersonales() {
+  const btn = event.target.closest('button');
+  btn.disabled = true;
+  btn.textContent = 'Descargando…';
+
+  try {
+    const res = await fetch(`${_BACKEND}/api/privacidad/mis-datos`, {
+      headers: { 'Authorization': `Bearer ${_obtenerToken()}` }
+    });
+
+    if (!res.ok) throw new Error('No se pudieron descargar tus datos.');
+
+    const datos = await res.json();
+    const json = JSON.stringify(datos, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `ATDC-mis-datos-${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  } catch (e) {
+    alert(e.message || 'Error al descargar datos.');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '📥 Descargar mis datos (JSON)';
+  }
+}
+
+async function _solicitarAuditoria() {
+  const btn = event.target.closest('button');
+  btn.disabled = true;
+  btn.textContent = 'Cargando…';
+
+  try {
+    const res = await fetch(`${_BACKEND}/api/privacidad/auditoria`, {
+      headers: { 'Authorization': `Bearer ${_obtenerToken()}` }
+    });
+
+    if (!res.ok) throw new Error('No se pudo cargar el registro de acceso.');
+
+    const auditoria = await res.json();
+    alert(`Registro de acceso a tus datos:\n\n${auditoria.eventos?.map(e =>
+      `${e.fecha}: ${e.tipo} por ${e.usuario}`
+    ).join('\n') || 'Sin accesos registrados'}\n\nPara reportes detallados, contacta a: ico.icorsa84@gmail.com`);
+  } catch (e) {
+    alert(e.message || 'Error al cargar auditoría.');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '👁️ Auditoria de acceso';
+  }
+}
+
+async function _cargarConsentimientos() {
+  try {
+    const res = await fetch(`${_BACKEND}/api/privacidad/consentimientos`, {
+      headers: { 'Authorization': `Bearer ${_obtenerToken()}` }
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      document.getElementById('_consent_tratamiento').checked = data.tratamiento !== false;
+      document.getElementById('_consent_marketing').checked = data.marketing === true;
+      document.getElementById('_consent_analytics').checked = data.analytics !== false;
+    }
+  } catch (e) {
+    console.error('Error cargando consentimientos:', e);
+  }
+}
+
+async function _guardarConsentimientos() {
+  const btn = document.getElementById('_privacidad_guardar_consentimientos');
+  btn.disabled = true;
+  btn.textContent = 'Guardando…';
+
+  try {
+    const res = await fetch(`${_BACKEND}/api/privacidad/consentimientos`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${_obtenerToken()}` },
+      body: JSON.stringify({
+        tratamiento: document.getElementById('_consent_tratamiento').checked,
+        marketing: document.getElementById('_consent_marketing').checked,
+        analytics: document.getElementById('_consent_analytics').checked
+      })
+    });
+
+    if (!res.ok) throw new Error('No se pudieron guardar tus preferencias.');
+
+    alert('✅ Consentimientos guardados correctamente.');
+  } catch (e) {
+    alert(e.message || 'Error al guardar consentimientos.');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '✅ Guardar cambios';
+  }
+}
+
+async function _solicitarRectificacion() {
+  const motivo = prompt('Describe qué datos necesitas rectificar o correo de contacto:');
+  if (!motivo) return;
+
+  try {
+    const res = await fetch(`${_BACKEND}/api/privacidad/solicitudes`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${_obtenerToken()}` },
+      body: JSON.stringify({ tipo: 'rectificacion', motivo })
+    });
+
+    if (!res.ok) throw new Error('No se pudo enviar tu solicitud.');
+    alert('✅ Solicitud de rectificación registrada.\nNos contactaremos en 5 días hábiles.');
+  } catch (e) {
+    alert(e.message || 'Error al enviar solicitud.');
+  }
+}
+
+async function _solicitarSupresion() {
+  const motivo = prompt('Motivo de la solicitud de supresión:');
+  if (!motivo) return;
+
+  try {
+    const res = await fetch(`${_BACKEND}/api/privacidad/solicitudes`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${_obtenerToken()}` },
+      body: JSON.stringify({ tipo: 'supresion', motivo })
+    });
+
+    if (!res.ok) throw new Error('No se pudo enviar tu solicitud.');
+    alert('✅ Solicitud de supresión registrada.\nNos contactaremos en 5 días hábiles para confirmar.');
+  } catch (e) {
+    alert(e.message || 'Error al enviar solicitud.');
+  }
+}
+
+async function _solicitarOposicion() {
+  const motivo = prompt('Motivo de tu oposición al tratamiento:');
+  if (!motivo) return;
+
+  try {
+    const res = await fetch(`${_BACKEND}/api/privacidad/solicitudes`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${_obtenerToken()}` },
+      body: JSON.stringify({ tipo: 'oposicion', motivo })
+    });
+
+    if (!res.ok) throw new Error('No se pudo enviar tu solicitud.');
+    alert('✅ Solicitud de oposición registrada.\nNos contactaremos en 5 días hábiles.');
+  } catch (e) {
+    alert(e.message || 'Error al enviar solicitud.');
+  }
+}
+
+async function _solicitarPortabilidad() {
+  const formato = prompt('¿En qué formato deseas tus datos? (JSON, CSV, Excel)');
+  if (!formato) return;
+
+  try {
+    const res = await fetch(`${_BACKEND}/api/privacidad/solicitudes`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${_obtenerToken()}` },
+      body: JSON.stringify({ tipo: 'portabilidad', formato })
+    });
+
+    if (!res.ok) throw new Error('No se pudo enviar tu solicitud.');
+    alert('✅ Solicitud de portabilidad registrada.\nTe enviaremos tus datos en ' + formato + ' en 5 días hábiles.');
+  } catch (e) {
+    alert(e.message || 'Error al enviar solicitud.');
   }
 }
 
