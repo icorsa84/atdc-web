@@ -854,8 +854,16 @@ function _renderDetalle(p) {
         </div>
         <div class="field" style="display:flex;align-items:flex-end;gap:8px;">
           <button class="btn-primary" onclick="_guardarDatos('${p.id}')">Guardar datos</button>
-          <button class="btn-secondary" onclick="_aprobarPlan('${p.id}')">Aprobar plan</button>
+          <button class="btn-secondary" id="_d_plan_btn" onclick="_aprobarPlan('${p.id}')" title="Activa el plan elegido de inmediato, sin pasar por el flujo de pago pendiente. Para confirmar un pago ya recibido, usa el botón 'Confirmar pago' más abajo en vez de este.">Asignar plan ahora (sin pago)</button>
         </div>
+      </div>
+      <!-- Fix QA-UX-ADMIN-PLAN-01: "Aprobar plan" cambiaba el plan al instante
+           con un solo clic, sin confirmación ni aviso de que salta el flujo
+           de pago — a diferencia de "Confirmar pago", que sí pregunta. Se
+           deja explícito con esta nota, además de pedir confirmación en
+           _aprobarPlan() antes de ejecutar el cambio. -->
+      <div style="font-size:11.5px;color:var(--muted);margin-top:-8px;margin-bottom:4px;">
+        "Asignar plan ahora" activa el plan elegido de inmediato — úsalo solo si no corresponde pago (ej. cortesía, corrección de un error). Si el participante ya transfirió, usa "Confirmar pago" más abajo.
       </div>
       <div id="_d_msg" class="msg"></div>
     </div>
@@ -1009,12 +1017,24 @@ async function _guardarDatos(id) {
 }
 
 async function _aprobarPlan(id) {
+  const plan = document.getElementById('_d_plan').value;
+  // Fix QA-UX-ADMIN-PLAN-01: antes esto cambiaba el plan al instante con un
+  // solo clic, sin confirmación — un mal clic (o un clic sobre el select
+  // equivocado) reasignaba el plan de un participante sin aviso. Ahora pide
+  // confirmación explícita, igual que ya hacía _confirmarPago().
+  if (!confirm(`¿Asignar el plan ${plan} a este participante AHORA MISMO, sin pasar por el flujo de pago pendiente?`)) return;
+
+  const btn = document.getElementById('_d_plan_btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Asignando…'; }
   try {
-    const plan = document.getElementById('_d_plan').value;
     const data = await _apiSend('PATCH', `/api/admin/participantes/${id}/plan`, { plan });
     _mostrarMsg('_d_msg', data.mensaje || 'Plan actualizado.', false);
     cargarListado();
-  } catch (e) { _mostrarMsg('_d_msg', e.message, true); }
+  } catch (e) {
+    _mostrarMsg('_d_msg', e.message, true);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Asignar plan ahora (sin pago)'; }
+  }
 }
 
 async function _confirmarPago(id) {
