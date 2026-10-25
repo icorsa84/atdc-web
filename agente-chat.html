@@ -3530,10 +3530,43 @@ function appendMsg(role, text, sugg, error=false) {
   // Fix QA5-CHAT-05: null-guard para nombres con una sola palabra
   const userInitials = PARTICIPANTE.nombre.split(' ').filter(Boolean).slice(0,2).map(n=>n[0]||'').join('').toUpperCase() || PARTICIPANTE.nombre[0].toUpperCase();
   const initials = role==='user'?userInitials:icono('robot',15), avClass=role==='user'?'us':'ag';
+
+  // LEARNING: Agregar botones de feedback para respuestas del agente
+  let feedbackHtml = '';
+  if (role === 'agent' && !error) {
+    const textForFeedback = text.replace(/'/g, "\\'").substring(0, 500);
+    feedbackHtml = `
+      <div class="feedback-buttons" style="display:flex;gap:8px;margin-top:8px;">
+        <button class="feedback-btn" data-score="1"
+          style="flex:1;padding:6px 8px;background:rgba(34,197,94,0.2);border:1px solid #22c55e;color:#22c55e;border-radius:6px;cursor:pointer;font-size:0.8rem;transition:all 0.2s;"
+          onmouseover="this.style.background='rgba(34,197,94,0.3)'"
+          onmouseout="this.style.background='rgba(34,197,94,0.2)'"
+          onclick="guardarFeedbackUI('${textForFeedback}', 1, this)">
+          👍 Útil
+        </button>
+        <button class="feedback-btn" data-score="-1"
+          style="flex:1;padding:6px 8px;background:rgba(239,68,68,0.2);border:1px solid #ef4444;color:#ef4444;border-radius:6px;cursor:pointer;font-size:0.8rem;transition:all 0.2s;"
+          onmouseover="this.style.background='rgba(239,68,68,0.3)'"
+          onmouseout="this.style.background='rgba(239,68,68,0.2)'"
+          onclick="guardarFeedbackUI('${textForFeedback}', -1, this)">
+          👎 Mejorable
+        </button>
+      </div>
+    `;
+  }
+
   w.innerHTML = `<div class="av ${avClass}">${initials}</div><div>
     <div class="bubble${error?' error':''}">${fmt(text)}</div>
-    <div class="btime">${now()}</div></div>`;
+    <div class="btime">${now()}</div>${feedbackHtml}</div>`;
   body.appendChild(w);
+
+  // LEARNING: Cargar respuestas similares cuando se recibe respuesta del agente
+  if (role === 'agent' && !error && historial.length >= 2) {
+    const ultimoUsuario = historial.filter(m => m.role === 'user').slice(-1)[0];
+    if (ultimoUsuario) {
+      setTimeout(() => cargarRespuestasSimilares(ultimoUsuario.content), 500);
+    }
+  }
   if (sugg && sugg.length) {
     // Soporte dual: strings simples (sugerencias de texto) u objetos {label, action} (chips de test)
     if (typeof sugg[0] === 'object' && sugg[0].label) {
@@ -3557,6 +3590,94 @@ function fmt(t) {
   return escHtml(t).replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>');
 }
 function now() { return new Date().toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'}); }
+
+/* ================================================================
+   LEARNING: Feedback y Aprendizaje del Agente
+   ================================================================ */
+
+// LEARNING-1: Guardar feedback en backend
+async function guardarFeedbackUI(respuesta, score, btn) {
+  // Deshabilitar botón
+  btn.disabled = true;
+  btn.style.opacity = '0.3';
+
+  try {
+    // Obtener último mensaje del usuario
+    const ultimoUsuario = historial.filter(m => m.role === 'user').slice(-1)[0];
+    if (!ultimoUsuario) return;
+
+    const res = await fetch(`${CONFIG.api_url.replace('/chat', '')}/chat/feedback`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${_obtenerToken()}`
+      },
+      body: JSON.stringify({
+        mensaje: ultimoUsuario.content,
+        respuesta: respuesta.substring(0, 500),
+        score: score
+      })
+    });
+
+    if (!res.ok) return;
+
+    // Mostrar confirmación
+    const data = await res.json();
+    btn.textContent = score > 0 ? '✅ Útil' : '✅ Registrado';
+    btn.style.opacity = '1';
+
+    // Después de 10 feedbacks, el sistema aprenderá automáticamente
+    if (data.total_feedbacks % 10 === 0) {
+      console.log(`🧠 Agente ha aprendido de ${data.total_feedbacks} interacciones`);
+    }
+  } catch(e) {
+    console.error('[Feedback error]', e);
+    btn.disabled = false;
+    btn.style.opacity = '0.6';
+  }
+}
+
+// LEARNING-2: Mostrar respuestas similares útiles (RAG)
+async function cargarRespuestasSimilares(pregunta) {
+  try {
+    const res = await fetch(`${CONFIG.api_url.replace('/chat', '')}/chat/similar-responses?pregunta=${encodeURIComponent(pregunta)}&limit=2`, {
+      headers: { 'Authorization': `Bearer ${_obtenerToken()}` }
+    });
+
+    if (!res.ok || res.status === 404) return;
+
+    const data = await res.json();
+    if (!data.respuestas_similares || data.respuestas_similares.length === 0) return;
+
+    // Mostrar respuestas similares que fueron útiles
+    const container = document.getElementById('chatBody');
+    const infoDiv = document.createElement('div');
+    infoDiv.className = 'similar-responses-info';
+    infoDiv.style.cssText = `
+      background: rgba(167, 139, 250, 0.1);
+      border-left: 3px solid #a78bfa;
+      padding: 12px;
+      margin: 12px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      color: #a78bfa;
+    `;
+
+    let html = '📚 <strong>Respuestas similares útiles del pasado:</strong><br>';
+    data.respuestas_similares.forEach(r => {
+      html += `<div style="margin-top:6px;padding:6px;background:rgba(167,139,250,0.05);border-radius:4px;">
+        💡 "${r.pregunta.substring(0, 50)}..." (${r.utilidad})<br>
+        <small style="color:#888;">Similitud: ${r.similitud}</small>
+      </div>`;
+    });
+
+    infoDiv.innerHTML = html;
+    container.appendChild(infoDiv);
+    container.scrollTop = container.scrollHeight;
+  } catch(e) {
+    console.debug('[RAG error]', e);  // Silencio si falla
+  }
+}
 
 function showTyping() {
   const body = document.getElementById('chatBody');
