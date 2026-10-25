@@ -3567,13 +3567,101 @@ function showTyping() {
 function hideTyping() { const el=document.getElementById('typing'); if(el) el.remove(); }
 
 /* ================================================================
+   OPTIMIZACIONES DE PERFORMANCE
+   ================================================================ */
+
+// OPTIMIZATION-2: Request debouncing — evitar clicks duplicados rápidos
+const _DEBOUNCE_STATE = {
+  lastMessageHash: null,
+  lastSendTime: 0,
+  debounceMs: 2000  // Bloquear mismo mensaje por 2 segundos
+};
+
+function calcularHashMensaje(texto) {
+  // Simple hash para detectar mensajes duplicados
+  let hash = 0;
+  for (let i = 0; i < texto.length; i++) {
+    const char = texto.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32-bit integer
+  }
+  return hash.toString(36);
+}
+
+function esMensajeDuplicado(texto) {
+  const ahora = Date.now();
+  const hash = calcularHashMensaje(texto);
+
+  // Si es el MISMO mensaje en menos de 2 segundos, es duplicado
+  if (hash === _DEBOUNCE_STATE.lastMessageHash &&
+      (ahora - _DEBOUNCE_STATE.lastSendTime) < _DEBOUNCE_STATE.debounceMs) {
+    return true;
+  }
+
+  _DEBOUNCE_STATE.lastMessageHash = hash;
+  _DEBOUNCE_STATE.lastSendTime = ahora;
+  return false;
+}
+
+// OPTIMIZATION-4: Predictive streaming — anticipar tipo de respuesta
+function anticiparTipoRespuesta(mensaje) {
+  const texto = mensaje.toLowerCase();
+
+  // Heurísticos para anticipar longitud de respuesta
+  if (texto.length < 20) return 'short';    // Pregunta muy corta
+  if (texto.includes('?') && texto.length > 100) return 'long';  // Pregunta larga = respuesta larga
+  if (texto.includes('ayuda') || texto.includes('cómo')) return 'long';  // Tipo de pregunta
+  if (texto.includes(',') && texto.length > 150) return 'very_long';  // Pregunta compleja
+
+  return 'medium';  // Por defecto, respuesta mediana
+}
+
+function mostrarIndicadorTipoRespuesta(tipo) {
+  // Mostrar hint sobre el tipo de respuesta esperada
+  const hint = document.querySelector('.input-hint');
+  if (!hint) return;
+
+  const tipoMap = {
+    'short': '⚡ Respuesta rápida',
+    'medium': '💬 Respuesta normal',
+    'long': '📖 Respuesta detallada',
+    'very_long': '📚 Análisis profundo'
+  };
+
+  const span = document.createElement('span');
+  span.className = 'prediction-hint';
+  span.style.cssText = 'color:#a78bfa;font-size:.75rem;font-weight:500;display:inline-flex;align-items:center;gap:4px;';
+  span.textContent = tipoMap[tipo] || tipoMap['medium'];
+  hint.appendChild(span);
+
+  // Desaparecer en 3 segundos
+  setTimeout(() => {
+    const existing = document.querySelector('.prediction-hint');
+    if (existing) existing.remove();
+  }, 3000);
+}
+
+/* ================================================================
    ENVÍO DE MENSAJES
    ================================================================ */
 function sendMsg() {
   const inp=document.getElementById('msgInput');
   const txt=inp.value.trim();
   if(!txt||isTyping) return;
-  inp.value=''; autoResize(inp); enviar(txt);
+
+  // OPTIMIZATION-2: Debouncing — evitar enviar el mismo mensaje 2 veces rápido
+  if (esMensajeDuplicado(txt)) {
+    console.warn('[Debounce] Mensaje duplicado bloqueado');
+    return;
+  }
+
+  inp.value=''; autoResize(inp);
+
+  // OPTIMIZATION-4: Mostrar predicción de tipo de respuesta
+  const tipoRespuesta = anticiparTipoRespuesta(txt);
+  mostrarIndicadorTipoRespuesta(tipoRespuesta);
+
+  enviar(txt);
 }
 
 function preguntar(txt) { if(!isTyping) enviar(txt); }
