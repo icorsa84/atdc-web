@@ -332,6 +332,22 @@
     box-shadow:0 0 20px rgba(139,92,246,.3);
     transform:translateY(-1px);
   }
+  /* Fix QA-PLANGATE-TABS-01: etapa no incluida en el plan actual —
+     se mantiene clickeable (lleva a un aviso de mejora de plan en vez de
+     bloquear la navegación) pero visualmente apagada, sin el brillo de
+     "listo"/"activo" que sugeriría que está disponible ahora mismo. */
+  .paso.bloqueada{
+    border-color:var(--border2);
+    color:var(--muted);
+    background:var(--bg3);
+    opacity:.55;
+    box-shadow:none;
+  }
+  .paso.bloqueada:hover{
+    filter:none;
+    transform:none;
+    opacity:.75;
+  }
 
   /* ================================================================
      LAYOUT
@@ -5676,15 +5692,34 @@ function _etapaCompletada(etapa) {
   return false;
 }
 
+/* Fix QA-PLANGATE-TABS-01: antes las 4 etapas se mostraban siempre
+   "disponibles" sin importar el plan — un participante Inicial veía
+   Diagnóstico IA e Informe final exactamente igual que uno Profesional,
+   aunque ninguno de los dos estuviera incluido en su plan. Centraliza
+   aquí qué etapas incluye cada plan, en el mismo criterio ya usado por
+   el resto de la app (chat, tests DISC/Kostick, Informe Final).
+   Perfil y CV+ATS están en todos los planes (el ATS es parte del Inicial). */
+function _etapaDisponible(etapa) {
+  if (etapa === 'perfil' || etapa === 'cv_ats') return true;
+  if (IS_ADMIN) return true;
+  const plan = getPlanActual();
+  const restriccion = PLAN_RESTRICCIONES[plan] || PLAN_RESTRICCIONES['Inicial'];
+  if (etapa === 'diagnostico') return !!restriccion.tests_psicometricos;
+  if (etapa === 'informe')     return plan !== 'Inicial';
+  return true;
+}
+
 function etapaActualizarProcesoBar() {
   Object.keys(ETAPAS).forEach(etapa => {
     const el = document.getElementById(ETAPA_IDS_PASO[etapa]);
     if (!el) return;
     const completada = _etapaCompletada(etapa);
     const esActual = etapaEstado.etapaActual === etapa;
-    el.classList.remove('ok', 'activo', 'listo');
+    const disponible = _etapaDisponible(etapa);
+    el.classList.remove('ok', 'activo', 'listo', 'bloqueada');
     let icono = ETAPA_ICONOS[etapa];
-    if (esActual)      { el.classList.add('activo'); icono = completada ? '✔' : '⟳'; }
+    if (!disponible)        { el.classList.add('bloqueada'); icono = '🔒'; el.title = `${ETAPAS[etapa].nombre} no está incluido en tu plan actual — actualiza tu plan para acceder.`; }
+    else if (esActual)      { el.classList.add('activo'); icono = completada ? '✔' : '⟳'; }
     else if (completada) { el.classList.add('ok');     icono = '✔'; }
     else                { el.classList.add('listo'); }
     el.textContent = `${icono} ${ETAPAS[etapa].nombre}`;
@@ -5716,17 +5751,20 @@ function etapaIrA(etapa) {
     _etapaResaltar(destino);
   }
 
+  // Fix QA-PLANGATE-TABS-01: si la etapa a la que se navegó no está
+  // incluida en el plan actual, avisar en vez de ofrecer la acción de esa
+  // etapa (abrir el test, generar el informe) — misma idea ya usada para
+  // "Diagnóstico IA", ahora también para "Informe final".
+  if (!_etapaDisponible(etapa)) {
+    const planGate = getPlanActual();
+    agentMsg(`🔒 **${ETAPAS[etapa].nombre}** no está incluido en tu plan **${planGate}**. Actualiza tu plan para acceder.`);
+    return;
+  }
+
   // Para "Diagnóstico IA": si el participante aún no completó un test,
   // abrirlo directamente en vez de solo mostrar el panel lateral.
-  // Fix QA-PLANGATE-DISC-01: no autodisparar el test si el plan actual no
-  // lo incluye — abrirTestDisc()/abrirTestKostick() ya lo bloquean, pero
-  // mejor ni ofrecerlo: se muestra un aviso de mejora de plan en su lugar.
   if (etapa === 'diagnostico') {
-    const planEtapaGate = getPlanActual();
-    const restriccionEtapaGate = PLAN_RESTRICCIONES[planEtapaGate] || PLAN_RESTRICCIONES['Inicial'];
-    if (!restriccionEtapaGate.tests_psicometricos && !IS_ADMIN) {
-      agentMsg(`🔒 El diagnóstico DISC + Kostick no está incluido en tu plan **${planEtapaGate}**. Actualiza a Profesional o Premium para acceder a esta evaluación.`);
-    } else if (!etapaEstado.hitos.disc) {
+    if (!etapaEstado.hitos.disc) {
       setTimeout(() => { try { abrirTestDisc(); } catch(e){} }, 450);
     } else if (!etapaEstado.hitos.kostick) {
       setTimeout(() => { try { abrirTestKostick(); } catch(e){} }, 450);
