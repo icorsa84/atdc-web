@@ -2802,8 +2802,28 @@ function _mostrarEncuestaAleatorio(callback) {
       allow="encrypted-media"></iframe>
   `;
 
+  // Footer con botón de salir
+  const footer = document.createElement('div');
+  footer.style.cssText = `
+    padding:14px 20px;border-top:1px solid var(--border2,#2e3550);
+    flex-shrink:0;display:flex;gap:10px;justify-content:flex-end;
+    background:var(--bg2,#12151f);
+  `;
+  const btnSalir = document.createElement('button');
+  btnSalir.textContent = 'Salir';
+  btnSalir.style.cssText = `
+    padding:8px 16px;border-radius:6px;border:1px solid var(--border2,#2e3550);
+    background:var(--red,#ef4444);color:#fff;font-weight:600;font-size:.8rem;
+    cursor:pointer;transition:opacity .2s;
+  `;
+  btnSalir.onmouseover = () => btnSalir.style.opacity = '0.9';
+  btnSalir.onmouseout = () => btnSalir.style.opacity = '1';
+  btnSalir.onclick = cerrarModal;
+  footer.appendChild(btnSalir);
+
   modal.appendChild(header);
   modal.appendChild(body);
+  modal.appendChild(footer);
   overlay.appendChild(modal);
   document.body.appendChild(overlay);
 
