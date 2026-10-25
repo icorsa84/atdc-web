@@ -5169,11 +5169,11 @@ async function _cargarMiPerfil() {
 
     const elNombre = document.getElementById('_mc_nombre'); if (elNombre) elNombre.value = d.nombre || '';
     const wrapCargo = document.getElementById('_mc_cargo_wrap');
-    if (wrapCargo) wrapCargo.innerHTML = _selectConOtro('_mc_cargo', CATALOGO_CARGOS, d.cargo_objetivo);
+    if (wrapCargo) wrapCargo.innerHTML = _multiSelectConOtro('_mc_cargo', CATALOGO_CARGOS, d.cargo_objetivo || []);
     const wrapSector = document.getElementById('_mc_sector_wrap');
-    if (wrapSector) wrapSector.innerHTML = _selectConOtro('_mc_sector', CATALOGO_SECTORES, d.sector);
+    if (wrapSector) wrapSector.innerHTML = _multiSelectConOtro('_mc_sector', CATALOGO_SECTORES, d.sector || []);
     const wrapRenta = document.getElementById('_mc_renta_wrap');
-    if (wrapRenta) wrapRenta.innerHTML = _selectConOtro('_mc_renta', CATALOGO_RENTAS, d.renta_objetivo);
+    if (wrapRenta) wrapRenta.innerHTML = _multiSelectConOtro('_mc_renta', CATALOGO_RENTAS, d.renta_objetivo || []);
     const elPlanNota = document.getElementById('_mc_plan_nota');
     const elPlanSelect = document.getElementById('_mc_plan_select');
     const elPlanBtn = document.getElementById('_mc_plan_btn');
@@ -5295,9 +5295,9 @@ async function _guardarMiPerfil() {
   const msgEl = document.getElementById('_mc_perfil_msg');
   const body = {
     nombre: document.getElementById('_mc_nombre')?.value?.trim() || undefined,
-    cargo_objetivo: _valorSelectConOtro('_mc_cargo'),
-    sector: _valorSelectConOtro('_mc_sector'),
-    renta_objetivo: _valorSelectConOtro('_mc_renta'),
+    cargo_objetivo: _valorMultiSelectConOtro('_mc_cargo'),
+    sector: _valorMultiSelectConOtro('_mc_sector'),
+    renta_objetivo: _valorMultiSelectConOtro('_mc_renta'),
   };
   btn.disabled = true; btn.textContent = 'Guardando…';
   try {

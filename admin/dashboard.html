@@ -331,9 +331,62 @@ const CATALOGO_SECTORES = [
   'Sector público / Gobierno','ONG / Sin fines de lucro',
 ];
 const CATALOGO_CARGOS = [
-  'Gerencia General','Gerencia de Área','Subgerencia / Jefatura',
-  'Coordinación / Supervisión','Analista Senior / Especialista',
-  'Analista / Ejecutivo','Asistente / Administrativo','Técnico / Operativo',
+  /* Gerencia (8 títulos) */
+  'Gerente General','Gerente / Director de Área','Subgerente','Jefe de Departamento',
+  'Coordinador / Supervisor de Equipo','Coordinador','Supervisor','Encargado',
+  /* Administración y RRHH (12) */
+  'Analista Administrativo','Especialista en Recursos Humanos','Coordinador RRHH',
+  'Asistente de RRHH','Especialista en Nómina','Analista de Organización',
+  'Especialista en Selección','Coordinador de Capacitación','Asistente Administrativo',
+  'Secretaria / Asistente Ejecutiva','Recepcionista','Auxiliar Administrativo',
+  /* Finanzas y Contabilidad (12) */
+  'Contabilista / Contador Senior','Contador','Analista Contable','Auxiliar Contable',
+  'Especialista en Finanzas','Analista Financiero','Tesorero','Especialista en Presupuestos',
+  'Analista de Costos','Auditor Interno','Asistente Financiero','Coordinador de Tesorería',
+  /* Ventas y Comercial (12) */
+  'Gerente Comercial','Gerente de Ventas','Jefe de Ventas','Ejecutivo de Ventas Senior',
+  'Ejecutivo de Ventas','Asesor Comercial','Ejecutivo de Cuenta','Especialista en Mercado',
+  'Ejecutivo de Negocios','Coordinador Comercial','Asistente Comercial','Teleoperador de Ventas',
+  /* Marketing y Comunicaciones (10) */
+  'Gerente de Marketing','Especialista en Marketing Digital','Coordinador de Marketing',
+  'Especialista en Publicidad','Especialista en Redes Sociales','Coordinador de Comunicaciones',
+  'Community Manager','Especialista en Contenidos','Asistente de Marketing','Diseñador Gráfico',
+  /* Tecnología e IT (15) */
+  'Gerente IT / CIO','Especialista en Sistemas','Analista de Sistemas','Desarrollador Senior',
+  'Desarrollador Full Stack','Desarrollador Backend','Desarrollador Frontend','Desarrollador Mobile',
+  'Especialista en Base de Datos','Administrador de Servidores','Especialista en Seguridad Informática',
+  'Técnico en Redes','Support IT / Help Desk','Coordinador IT','Asistente Técnico',
+  /* Logística y Operaciones (12) */
+  'Gerente de Logística','Gerente de Operaciones','Jefe de Almacén','Coordinador Logístico',
+  'Especialista en Supply Chain','Planificador de Demanda','Coordinador de Distribución',
+  'Especialista en Procesos','Coordinador de Calidad','Asistente de Almacén','Operario de Almacén',
+  'Conductor / Transportista',
+  /* Calidad y Aseguramiento (8) */
+  'Gerente de Calidad','Especialista en Calidad','Coordinador de Aseguramiento','Inspector de Calidad',
+  'Auditor Externo','Especialista en Mejora Continua','Coordinador de Estándares','Asistente de Calidad',
+  /* Producción y Manufactura (10) */
+  'Gerente de Producción','Jefe de Turno / Supervisor de Producción','Especialista en Mantenimiento',
+  'Técnico en Producción','Operario de Manufactura','Especialista en Seguridad Industrial',
+  'Coordinador de Mantenimiento','Electricista Industrial','Mecánico Industrial','Ayudante de Producción',
+  /* Proyectos (6) */
+  'Project Manager / Gestor de Proyectos','PMO Coordinator','Especialista en Metodología Ágil',
+  'Coordinador de Proyectos','Asistente de Proyectos','Especialista en Cambio Organizacional',
+  /* Servicio al Cliente (10) */
+  'Gerente de Atención al Cliente','Especialista en Servicio al Cliente','Coordinador de Servicio',
+  'Ejecutivo de Servicio al Cliente','Asesor de Servicio','Supervisor de Call Center',
+  'Agente de Servicio al Cliente','Especialista en Satisfacción del Cliente','Coordinador de Reclamos',
+  'Asistente de Atención al Cliente',
+  /* Recursos Especializados (15) */
+  'Abogado / Asesor Legal','Especialista en Asuntos Legales','Notario','Notario Público',
+  'Ingeniero / Especialista Técnico','Arquitecto','Analista de Datos / Data Scientist','Ingeniero de Datos',
+  'Especialista en BI (Business Intelligence)','Consultor','Asesor Empresarial','Analista de Negocio',
+  'Especialista en Sostenibilidad / ESG','Especialista Ambiental','Coach / Trainer',
+  /* Educación y Capacitación (6) */
+  'Docente / Instructor','Coordinador Académico','Especialista en Capacitación',
+  'Formador Corporativo','Orientador Educacional','Diseñador Instruccional',
+  /* Otros Profesionales (8) */
+  'Periodista / Comunicador','Traductor / Intérprete','Especialista en Compliance','Especialista en Riesgos',
+  'Analista de Inteligencia de Mercado','Especialista en Relaciones Públicas','Community Strategist','Especialista en Negocios Internacionales',
 ];
 const CATALOGO_RENTAS = [
   'Menos de $500.000','$500.000 - $800.000','$800.000 - $1.200.000',
@@ -378,6 +431,147 @@ function _valorSelectConOtro(idBase) {
   if (!sel) return '';
   if (sel.value === '__otro__') return (document.getElementById(idBase + '_otro')?.value || '').trim();
   return sel.value;
+}
+
+/* Task #296: Multi-select para admin panel (igual que en agente-chat.html) */
+function _multiSelectConOtro(idBase, catalogo, valorActual) {
+  const valores = Array.isArray(valorActual) ? valorActual :
+                  (valorActual && typeof valorActual === 'string' && valorActual.trim() && valorActual !== 'Por definir' ? [valorActual] : []);
+
+  const tieneOtro = valores.some(v => v && !catalogo.includes(v) && v !== '__otro__');
+  const textoOtro = tieneOtro ? valores.find(v => !catalogo.includes(v)) : '';
+  const valoresFiltr = valores.filter(v => catalogo.includes(v) || !v);
+
+  const chipsHtml = valoresFiltr.map(v => `
+    <div class="multi-chip" data-value="${escHtml(v)}">
+      ${escHtml(v)} <button type="button" onclick="_quitarChip('${idBase}', '${escHtml(v).replace(/"/g, '&quot;')}', event)" style="border:none;background:none;color:inherit;cursor:pointer;padding:0;margin-left:4px;font-weight:bold;">×</button>
+    </div>
+  `).join('');
+
+  const chipsOtroHtml = tieneOtro ? `
+    <div class="multi-chip" data-value="__otro__" data-texto="${escHtml(textoOtro)}">
+      ${escHtml(textoOtro)} <button type="button" onclick="_quitarChip('${idBase}', '__otro__', event)" style="border:none;background:none;color:inherit;cursor:pointer;padding:0;margin-left:4px;font-weight:bold;">×</button>
+    </div>
+  ` : '';
+
+  const opcionesHtml = catalogo.map(op => `<div class="multi-option" data-value="${escHtml(op)}" onclick="_agregarChip('${idBase}', '${escHtml(op).replace(/"/g, '&quot;')}', event)">${escHtml(op)}</div>`).join('');
+
+  return `
+    <div class="multi-select-wrapper" id="${idBase}_wrapper">
+      <input type="hidden" id="${idBase}_values" value="${JSON.stringify(valoresFiltr)}">
+      <div class="multi-select-input" onclick="_abrirMultiSelect('${idBase}')" id="${idBase}_display">
+        <div style="display:flex;flex-wrap:wrap;gap:6px;">
+          ${chipsHtml}${chipsOtroHtml}
+          <input type="text" class="multi-search" id="${idBase}_search" placeholder="${valoresFiltr.length > 0 || tieneOtro ? 'Agregar más…' : 'Busca y selecciona…'}" oninput="_filtrarMultiSelect('${idBase}', event)" style="flex:1;min-width:80px;border:none;background:transparent;outline:none;color:var(--text,#f1f5f9);font-size:13px;">
+        </div>
+      </div>
+      <div class="multi-dropdown" id="${idBase}_dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--bg2,#12151f);border:1px solid var(--border,#1e2a3a);border-top:none;border-radius:0 0 8px 8px;max-height:300px;overflow-y:auto;z-index:1000;margin-top:-1px;">
+        <div class="multi-options" id="${idBase}_options">
+          ${opcionesHtml}
+          <div class="multi-option" data-value="__otro__" onclick="_activarOtroMulti('${idBase}', event)" style="padding:10px 12px;color:var(--text,#f1f5f9);cursor:pointer;border-bottom:1px solid var(--border,#1e2a3a);font-size:13px;transition:background 120ms ease;">Otro (especificar)</div>
+        </div>
+        <input type="text" id="${idBase}_otro" class="multi-otro-input" placeholder="Especifica aquí…" style="display:none;width:100%;padding:10px 12px;border:none;border-top:1px solid var(--border,#1e2a3a);background:var(--bg,#0a0f1c);color:var(--text,#f1f5f9);font-size:13px;outline:none;" onkeydown="_onKeyOtroMulti('${idBase}', event)">
+      </div>
+    </div>
+    <style>
+      .multi-chip { background:rgba(59,130,246,.2);color:#93c5fd;padding:3px 8px;border-radius:6px;font-size:13px;display:inline-flex;align-items:center;white-space:nowrap; }
+      .multi-select-input { width:100%;padding:8px 10px;border-radius:7px;background:var(--bg,#0a0f1c);border:1px solid var(--border,#1e2a3a);color:var(--text,#f1f5f9);font-size:13px;cursor:text;display:flex;flex-wrap:wrap;align-items:center;gap:6px;position:relative; }
+      .multi-option { padding:10px 12px;color:var(--text,#f1f5f9);cursor:pointer;border-bottom:1px solid var(--border,#1e2a3a);font-size:13px;transition:background 120ms ease; }
+      .multi-option:hover { background:var(--bg3,#181c2a); }
+      .multi-option.hidden { display:none; }
+    </style>
+  `;
+}
+
+function _abrirMultiSelect(idBase) {
+  const dropdown = document.getElementById(idBase + '_dropdown');
+  if (dropdown) dropdown.style.display = dropdown.style.display === 'none' ? '' : 'none';
+  const search = document.getElementById(idBase + '_search');
+  if (search && dropdown && dropdown.style.display !== 'none') search.focus();
+}
+
+function _agregarChip(idBase, valor, event) {
+  if (event) event.stopPropagation();
+  const values = JSON.parse(document.getElementById(idBase + '_values')?.value || '[]');
+  if (!values.includes(valor)) {
+    values.push(valor);
+    document.getElementById(idBase + '_values').value = JSON.stringify(values);
+    _reconstruirMultiSelect(idBase);
+  }
+  document.getElementById(idBase + '_search').value = '';
+  document.getElementById(idBase + '_search').focus();
+  _filtrarMultiSelect(idBase);
+}
+
+function _quitarChip(idBase, valor, event) {
+  if (event) event.preventDefault();
+  const values = JSON.parse(document.getElementById(idBase + '_values')?.value || '[]');
+  const idx = values.indexOf(valor);
+  if (idx >= 0) values.splice(idx, 1);
+  document.getElementById(idBase + '_values').value = JSON.stringify(values);
+  _reconstruirMultiSelect(idBase);
+  document.getElementById(idBase + '_search').focus();
+}
+
+function _activarOtroMulti(idBase, event) {
+  if (event) event.stopPropagation();
+  const otroInput = document.getElementById(idBase + '_otro');
+  if (otroInput) {
+    otroInput.style.display = '';
+    otroInput.focus();
+  }
+}
+
+function _onKeyOtroMulti(idBase, event) {
+  if (event.key === 'Enter') {
+    const otroInput = document.getElementById(idBase + '_otro');
+    const texto = (otroInput?.value || '').trim();
+    if (texto) {
+      const values = JSON.parse(document.getElementById(idBase + '_values')?.value || '[]');
+      values.push(texto);
+      document.getElementById(idBase + '_values').value = JSON.stringify(values);
+      otroInput.value = '';
+      otroInput.style.display = 'none';
+      _reconstruirMultiSelect(idBase);
+      _abrirMultiSelect(idBase);
+    }
+  }
+}
+
+function _filtrarMultiSelect(idBase, event) {
+  const search = (document.getElementById(idBase + '_search')?.value || '').toLowerCase();
+  const options = document.querySelectorAll(`#${idBase}_options .multi-option`);
+  options.forEach(opt => {
+    const valor = opt.getAttribute('data-value');
+    const visible = valor === '__otro__' || valor.toLowerCase().includes(search);
+    opt.classList.toggle('hidden', !visible);
+  });
+}
+
+function _reconstruirMultiSelect(idBase) {
+  const values = JSON.parse(document.getElementById(idBase + '_values')?.value || '[]');
+  const display = document.getElementById(idBase + '_display');
+  if (!display) return;
+
+  const chipsHtml = values.map(v => `
+    <div class="multi-chip" data-value="${escHtml(v)}">
+      ${escHtml(v)} <button type="button" onclick="_quitarChip('${idBase}', '${escHtml(v).replace(/"/g, '&quot;')}', event)" style="border:none;background:none;color:inherit;cursor:pointer;padding:0;margin-left:4px;font-weight:bold;">×</button>
+    </div>
+  `).join('');
+
+  const placeholder = values.length > 0 ? 'Agregar más…' : 'Busca y selecciona…';
+
+  display.innerHTML = `
+    <div style="display:flex;flex-wrap:wrap;gap:6px;width:100%;">
+      ${chipsHtml}
+      <input type="text" class="multi-search" id="${idBase}_search" placeholder="${placeholder}" oninput="_filtrarMultiSelect('${idBase}', event)" style="flex:1;min-width:80px;border:none;background:transparent;outline:none;color:var(--text,#f1f5f9);font-size:13px;">
+    </div>
+  `;
+}
+
+function _valorMultiSelectConOtro(idBase) {
+  const values = JSON.parse(document.getElementById(idBase + '_values')?.value || '[]');
+  return values.filter(v => v && v.trim());
 }
 
 let ADMIN_KEY = sessionStorage.getItem('atdc_admin_key') || '';
@@ -949,11 +1143,11 @@ function _renderDetalle(p) {
              forma de distinguir de un vistazo "no lo sabemos" de "el
              participante escribió esto". Ahora lista desplegable con el
              mismo catálogo estándar usado en el registro y en "Mi cuenta". -->
-        <div class="field"><label>Cargo objetivo</label>${_selectConOtro('_d_cargo', CATALOGO_CARGOS, p.cargo_objetivo)}</div>
+        <div class="field"><label>Cargo objetivo</label>${_multiSelectConOtro('_d_cargo', CATALOGO_CARGOS, p.cargo_objetivo || [])}</div>
       </div>
       <div class="field-row">
-        <div class="field"><label>Sector</label>${_selectConOtro('_d_sector', CATALOGO_SECTORES, p.sector)}</div>
-        <div class="field"><label>Renta objetivo</label>${_selectConOtro('_d_renta', CATALOGO_RENTAS, p.renta_objetivo)}</div>
+        <div class="field"><label>Sector</label>${_multiSelectConOtro('_d_sector', CATALOGO_SECTORES, p.sector || [])}</div>
+        <div class="field"><label>Renta objetivo</label>${_multiSelectConOtro('_d_renta', CATALOGO_RENTAS, p.renta_objetivo || [])}</div>
       </div>
       <div class="field-row">
         <div class="field">
@@ -1116,9 +1310,9 @@ async function _guardarDatos(id) {
   try {
     const body = {
       nombre: document.getElementById('_d_nombre').value.trim(),
-      cargo_objetivo: _valorSelectConOtro('_d_cargo'),
-      sector: _valorSelectConOtro('_d_sector'),
-      renta_objetivo: _valorSelectConOtro('_d_renta'),
+      cargo_objetivo: _valorMultiSelectConOtro('_d_cargo'),
+      sector: _valorMultiSelectConOtro('_d_sector'),
+      renta_objetivo: _valorMultiSelectConOtro('_d_renta'),
     };
     await _apiSend('PUT', `/api/admin/participantes/${id}`, body);
     _mostrarMsg('_d_msg', 'Datos guardados.', false);
