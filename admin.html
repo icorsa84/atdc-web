@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin ATDC - Gestión de Participantes</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --bg: #0f1117;
+      --bg2: #161b22;
+      --bg3: #21262d;
+      --text: #e6edf3;
+      --muted: #8b949e;
+      --border: #30363d;
+      --green: #3fb950;
+      --red: #f85149;
+      --amber: #d29922;
+      --cyan: #58a6ff;
+    }
+
+    @media (prefers-color-scheme: light) {
+      :root {
+        --bg: #ffffff;
+        --bg2: #f6f8fa;
+        --bg3: #eaeef2;
+        --text: #24292f;
+        --muted: #57606a;
+        --border: #d0d7de;
+      }
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+
+    header {
+      background: var(--bg2);
+      padding: 20px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      border: 1px solid var(--border);
+    }
+
+    h1 {
+      font-size: 24px;
+      margin-bottom: 10px;
+    }
+
+    .auth-form {
+      background: var(--bg2);
+      padding: 20px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      margin-bottom: 20px;
+    }
+
+    .auth-form input {
+      width: 100%;
+      padding: 8px 12px;
+      background: var(--bg3);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      margin-bottom: 10px;
+      font-size: 14px;
+    }
+
+    .auth-form button {
+      width: 100%;
+      padding: 10px;
+      background: var(--cyan);
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: 600;
+    }
+
+    .auth-form button:hover {
+      opacity: 0.9;
+    }
+
+    .dashboard {
+      display: none;
+    }
+
+    .dashboard.active {
+      display: block;
+    }
+
+    .filters {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+
+    .filters input,
+    .filters select {
+      padding: 8px 12px;
+      background: var(--bg2);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      font-size: 14px;
+    }
+
+    .participants-grid {
+      display: grid;
+      gap: 12px;
+    }
+
+    .participant-card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 15px;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 15px;
+      align-items: start;
+    }
+
+    .participant-info h3 {
+      margin-bottom: 8px;
+      font-size: 16px;
+    }
+
+    .participant-details {
+      display: grid;
+      gap: 4px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .plan-badge {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 600;
+      margin-top: 8px;
+    }
+
+    .plan-inicial { background: rgba(139, 148, 158, 0.2); color: var(--muted); }
+    .plan-esencial { background: rgba(88, 166, 255, 0.2); color: var(--cyan); }
+    .plan-profesional { background: rgba(88, 166, 255, 0.3); color: var(--cyan); }
+    .plan-premium { background: rgba(210, 153, 34, 0.2); color: var(--amber); }
+
+    .actions {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      min-width: 150px;
+    }
+
+    .actions select,
+    .actions button {
+      padding: 6px 12px;
+      font-size: 12px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: all .2s;
+    }
+
+    .actions select {
+      background: var(--bg3);
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+
+    .btn-activar {
+      background: var(--green);
+      color: white;
+    }
+
+    .btn-activar:hover {
+      opacity: 0.9;
+    }
+
+    .btn-confirmar {
+      background: var(--cyan);
+      color: white;
+    }
+
+    .btn-confirmar:hover {
+      opacity: 0.9;
+    }
+
+    .status-pagado {
+      color: var(--green);
+      font-weight: 600;
+    }
+
+    .status-pendiente {
+      color: var(--red);
+      font-weight: 600;
+    }
+
+    .loading {
+      text-align: center;
+      padding: 40px;
+      color: var(--muted);
+    }
+
+    .error {
+      background: rgba(248, 81, 73, 0.1);
+      color: var(--red);
+      padding: 12px;
+      border-radius: 4px;
+      margin-bottom: 20px;
+      border: 1px solid var(--red);
+    }
+
+    @media (max-width: 640px) {
+      .participant-card {
+        grid-template-columns: 1fr;
+      }
+
+      .actions {
+        flex-direction: row;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>🔐 Admin ATDC</h1>
+      <p style="color: var(--muted);">Gestión de participantes y planes</p>
+      <button onclick="logout()" style="margin-top:10px;padding:6px 12px;background:var(--red);color:white;border:none;border-radius:4px;cursor:pointer;">Salir</button>
+    </header>
+
+    <div class="auth-form" id="authForm">
+      <h3 style="margin-bottom:15px;">Ingresa API Key de Admin</h3>
+      <input type="password" id="apiKeyInput" placeholder="X-Admin-Key" />
+      <button onclick="authenticate()">Autenticar</button>
+    </div>
+
+    <div class="dashboard" id="dashboard">
+      <div class="filters">
+        <input type="text" id="searchInput" placeholder="Buscar por nombre..." />
+        <select id="planFilter" onchange="filterParticipants()">
+          <option value="">Todos los planes</option>
+          <option value="Inicial">Inicial</option>
+          <option value="Esencial">Esencial</option>
+          <option value="Profesional">Profesional</option>
+          <option value="Premium">Premium</option>
+        </select>
+        <select id="statusFilter" onchange="filterParticipants()">
+          <option value="">Todos los estados</option>
+          <option value="confirmado">Pago confirmado</option>
+          <option value="pendiente">Pago pendiente</option>
+        </select>
+      </div>
+
+      <div id="errorMsg" class="error" style="display:none;"></div>
+      <div id="loadingMsg" class="loading" style="display:none;">⏳ Cargando participantes...</div>
+      <div class="participants-grid" id="participantsGrid"></div>
+    </div>
+  </div>
+
+  <script>
+    const BACKEND = 'https://atdc-backend-ill4.onrender.com';
+    let participants = [];
+    let filteredParticipants = [];
+    let currentApiKey = '';
+
+    function authenticate() {
+      const apiKey = document.getElementById('apiKeyInput').value.trim();
+      if (!apiKey) {
+        showError('Ingresa la API Key');
+        return;
+      }
+      currentApiKey = apiKey;
+      sessionStorage.setItem('atdc_admin_key', apiKey);
+      loadParticipants();
+      document.getElementById('authForm').style.display = 'none';
+      document.getElementById('dashboard').classList.add('active');
+    }
+
+    async function loadParticipants() {
+      const loading = document.getElementById('loadingMsg');
+      loading.style.display = 'block';
+
+      try {
+        const res = await fetch(`${BACKEND}/api/admin/participantes`, {
+          headers: { 'X-Admin-Key': currentApiKey }
+        });
+
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+        const data = await res.json();
+        participants = data.participantes || [];
+        filteredParticipants = participants;
+        renderParticipants();
+      } catch (e) {
+        showError(`Error: ${e.message}`);
+      } finally {
+        loading.style.display = 'none';
+      }
+    }
+
+    function filterParticipants() {
+      const search = document.getElementById('searchInput').value.toLowerCase();
+      const planFilter = document.getElementById('planFilter').value;
+      const statusFilter = document.getElementById('statusFilter').value;
+
+      filteredParticipants = participants.filter(p => {
+        const matchSearch = !search || p.nombre.toLowerCase().includes(search);
+        const matchPlan = !planFilter || p.plan === planFilter;
+        const matchStatus = !statusFilter || p.pago_estado === statusFilter;
+        return matchSearch && matchPlan && matchStatus;
+      });
+
+      renderParticipants();
+    }
+
+    function renderParticipants() {
+      const grid = document.getElementById('participantsGrid');
+
+      if (filteredParticipants.length === 0) {
+        grid.innerHTML = '<div style="padding:20px;color:var(--muted);text-align:center;">No hay participantes</div>';
+        return;
+      }
+
+      grid.innerHTML = filteredParticipants.map(p => `
+        <div class="participant-card">
+          <div class="participant-info">
+            <h3>${escapeHtml(p.nombre)}</h3>
+            <div class="participant-details">
+              <div>ID: ${escapeHtml(p.id)}</div>
+              <div>Email: ${escapeHtml(p.email || '—')}</div>
+              <div>Cargo: ${escapeHtml(p.cargo_objetivo || '—')}</div>
+              <div>Pago: <span class="${'status-' + (p.pago_estado || 'pendiente')}">${p.pago_estado === 'confirmado' ? '✓ Confirmado' : '⏳ Pendiente'}</span></div>
+              <div><span class="plan-badge plan-${p.plan.toLowerCase()}">Plan ${p.plan}</span></div>
+            </div>
+          </div>
+          <div class="actions">
+            <select id="plan_${p.id}" value="${p.plan}">
+              <option value="Inicial">Inicial</option>
+              <option value="Esencial">Esencial</option>
+              <option value="Profesional">Profesional</option>
+              <option value="Premium">Premium</option>
+            </select>
+            <button class="btn-activar" onclick="changePlan('${p.id}')">🎁 Activar</button>
+            ${p.pago_estado === 'pendiente' ? `<button class="btn-confirmar" onclick="confirmPayment('${p.id}')">✓ Confirmar Pago</button>` : ''}
+          </div>
+        </div>
+      `).join('');
+    }
+
+    async function changePlan(participantId) {
+      const select = document.getElementById(`plan_${participantId}`);
+      const newPlan = select.value;
+
+      try {
+        const res = await fetch(`${BACKEND}/api/admin/participantes/${participantId}/plan`, {
+          method: 'PATCH',
+          headers: {
+            'X-Admin-Key': currentApiKey,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ plan: newPlan })
+        });
+
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+        // Actualizar en memoria
+        const p = participants.find(x => x.id === participantId);
+        if (p) p.plan = newPlan;
+        filterParticipants();
+        showSuccess(`Plan cambiado a ${newPlan}`);
+      } catch (e) {
+        showError(`Error: ${e.message}`);
+      }
+    }
+
+    async function confirmPayment(participantId) {
+      try {
+        const res = await fetch(`${BACKEND}/api/admin/participantes/${participantId}/confirmar-pago`, {
+          method: 'PATCH',
+          headers: { 'X-Admin-Key': currentApiKey }
+        });
+
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+        // Actualizar en memoria
+        const p = participants.find(x => x.id === participantId);
+        if (p) p.pago_estado = 'confirmado';
+        filterParticipants();
+        showSuccess('Pago confirmado');
+      } catch (e) {
+        showError(`Error: ${e.message}`);
+      }
+    }
+
+    function showError(msg) {
+      const el = document.getElementById('errorMsg');
+      el.textContent = msg;
+      el.style.display = 'block';
+      setTimeout(() => { el.style.display = 'none'; }, 3000);
+    }
+
+    function showSuccess(msg) {
+      alert(msg);
+    }
+
+    function logout() {
+      sessionStorage.removeItem('atdc_admin_key');
+      currentApiKey = '';
+      participants = [];
+      filteredParticipants = [];
+      document.getElementById('authForm').style.display = 'block';
+      document.getElementById('dashboard').classList.remove('active');
+      document.getElementById('apiKeyInput').value = '';
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    document.getElementById('searchInput').addEventListener('input', filterParticipants);
+
+    // Cargar si hay key en sesión
+    const savedKey = sessionStorage.getItem('atdc_admin_key');
+    if (savedKey) {
+      document.getElementById('apiKeyInput').value = savedKey;
+      currentApiKey = savedKey;
+      document.getElementById('authForm').style.display = 'none';
+      document.getElementById('dashboard').classList.add('active');
+      loadParticipants();
+    }
+  </script>
+</body>
+</html>
