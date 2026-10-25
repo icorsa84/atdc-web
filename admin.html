@@ -293,6 +293,144 @@
       color: var(--cyan);
     }
 
+    /* ── MODAL Y SECCIONES COLAPSABLES ── */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.6);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal-overlay.active {
+      display: flex;
+    }
+
+    .modal-content {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      max-width: 900px;
+      width: 90%;
+      max-height: 90vh;
+      overflow-y: auto;
+      animation: slideIn 0.3s ease-out;
+    }
+
+    .modal-header {
+      padding: 20px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      sticky: top 0;
+      background: var(--bg2);
+    }
+
+    .modal-header h2 {
+      margin: 0;
+      font-size: 18px;
+    }
+
+    .modal-close {
+      background: none;
+      border: none;
+      color: var(--text);
+      cursor: pointer;
+      font-size: 20px;
+      padding: 0;
+      width: 24px;
+      height: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal-body {
+      padding: 20px;
+    }
+
+    .collapsible-section {
+      margin-bottom: 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+      background: var(--bg2);
+    }
+
+    .collapsible-header {
+      padding: 12px 16px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      user-select: none;
+      transition: background 0.2s;
+      font-weight: 600;
+      background: var(--bg3);
+    }
+
+    .collapsible-header:hover {
+      background: var(--border);
+    }
+
+    .collapsible-header .toggle {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 20px;
+      height: 20px;
+      transition: transform 0.2s;
+    }
+
+    .collapsible-section.open .collapsible-header .toggle {
+      transform: rotate(180deg);
+    }
+
+    .collapsible-body {
+      display: none;
+      padding: 16px;
+      border-top: 1px solid var(--border);
+    }
+
+    .collapsible-section.open .collapsible-body {
+      display: block;
+    }
+
+    .info-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 12px;
+    }
+
+    .info-item {
+      background: var(--bg);
+      padding: 12px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+    }
+
+    .info-label {
+      font-size: 12px;
+      color: var(--muted);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 4px;
+    }
+
+    .info-value {
+      font-size: 14px;
+      color: var(--text);
+      word-break: break-word;
+    }
+
     @media (max-width: 640px) {
       .participant-card {
         grid-template-columns: 1fr;
@@ -304,6 +442,15 @@
 
       .filters {
         grid-template-columns: 1fr !important;
+      }
+
+      .modal-content {
+        width: 95%;
+        max-height: 95vh;
+      }
+
+      .info-grid {
+        grid-template-columns: 1fr;
       }
     }
   </style>
@@ -392,6 +539,19 @@
       </div>
       <div class="participants-grid" id="participantsGrid"></div>
     </div>
+
+    <!-- Modal para ver resumen completo del participante -->
+    <div class="modal-overlay" id="modalResumen">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2 id="modalTitulo">Resumen Completo</h2>
+          <button class="modal-close" onclick="closeResumenModal()">✕</button>
+        </div>
+        <div class="modal-body" id="modalBody">
+          <!-- Se completa dinámicamente -->
+        </div>
+      </div>
+    </div>
   </div>
 
   <script>
@@ -478,6 +638,10 @@
             </div>
           </div>
           <div class="actions">
+            <button class="btn-ver" onclick="openResumenModal('${p.id}')" style="display:inline-flex;align-items:center;justify-content:center;gap:6px;background:var(--amber);color:white;">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+              Ver Todo
+            </button>
             <select id="plan_${p.id}" value="${p.plan}" style="padding:8px 10px;">
               <option value="Inicial">Inicial</option>
               <option value="Esencial">Esencial</option>
@@ -654,6 +818,268 @@
         }
       }, 30000);
     }
+
+    // ── FUNCIONES MODAL RESUMEN ──
+    async function openResumenModal(participantId) {
+      const modal = document.getElementById('modalResumen');
+      const modalBody = document.getElementById('modalBody');
+
+      // Mostrar estado de carga
+      modalBody.innerHTML = '<div style="text-align:center;padding:20px;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="animation:spin 1s linear infinite;"><circle cx="12" cy="12" r="10"></circle><path d="M12 6v6l4 2"></path></svg> Cargando...</div>';
+      modal.classList.add('active');
+
+      try {
+        const res = await fetch(`${BACKEND}/api/admin/participantes/${participantId}/resumen-completo`, {
+          headers: { 'X-Admin-Key': currentApiKey }
+        });
+
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const resumen = await res.json();
+
+        // Actualizar título
+        document.getElementById('modalTitulo').textContent = `📋 ${escapeHtml(resumen.datos_basicos.nombre)}`;
+
+        // Renderizar contenido
+        modalBody.innerHTML = _renderResumenModal(resumen);
+
+        // Agregar listeners a secciones colapsables
+        document.querySelectorAll('.collapsible-header').forEach(header => {
+          header.addEventListener('click', function() {
+            this.parentElement.classList.toggle('open');
+          });
+        });
+      } catch (e) {
+        modalBody.innerHTML = `<div style="color:var(--red);padding:20px;">❌ Error: ${e.message}</div>`;
+      }
+    }
+
+    function closeResumenModal() {
+      document.getElementById('modalResumen').classList.remove('active');
+    }
+
+    function _renderResumenModal(r) {
+      return `
+        <div>
+          <!-- Datos Básicos -->
+          <div class="collapsible-section open">
+            <div class="collapsible-header">
+              <span class="toggle">▼</span>
+              👤 Datos Básicos
+            </div>
+            <div class="collapsible-body">
+              <div class="info-grid">
+                <div class="info-item">
+                  <div class="info-label">Nombre</div>
+                  <div class="info-value">${escapeHtml(r.datos_basicos.nombre)}</div>
+                </div>
+                <div class="info-item">
+                  <div class="info-label">Email</div>
+                  <div class="info-value">${escapeHtml(r.datos_basicos.email)}</div>
+                </div>
+                <div class="info-item">
+                  <div class="info-label">ID</div>
+                  <div class="info-value">${escapeHtml(r.id)}</div>
+                </div>
+                <div class="info-item">
+                  <div class="info-label">Creado</div>
+                  <div class="info-value">${escapeHtml(r.datos_basicos.creado_en)}</div>
+                </div>
+                <div class="info-item">
+                  <div class="info-label">Cargo Objetivo</div>
+                  <div class="info-value">${Array.isArray(r.datos_basicos.cargo_objetivo) ? r.datos_basicos.cargo_objetivo.join(', ') : '—'}</div>
+                </div>
+                <div class="info-item">
+                  <div class="info-label">Sector</div>
+                  <div class="info-value">${Array.isArray(r.datos_basicos.sector) ? r.datos_basicos.sector.join(', ') : '—'}</div>
+                </div>
+                <div class="info-item">
+                  <div class="info-label">Renta Objetivo</div>
+                  <div class="info-value">${Array.isArray(r.datos_basicos.renta_objetivo) ? r.datos_basicos.renta_objetivo.join(', ') : '—'}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Plan y Pago -->
+          <div class="collapsible-section open">
+            <div class="collapsible-header">
+              <span class="toggle">▼</span>
+              💳 Plan y Pago
+            </div>
+            <div class="collapsible-body">
+              <div class="info-grid">
+                <div class="info-item">
+                  <div class="info-label">Plan Actual</div>
+                  <div class="info-value" style="font-weight:600;color:var(--cyan);">${escapeHtml(r.plan_y_pago.plan_actual)}</div>
+                </div>
+                <div class="info-item">
+                  <div class="info-label">Plan Solicitado</div>
+                  <div class="info-value">${escapeHtml(r.plan_y_pago.plan_solicitado)}</div>
+                </div>
+                <div class="info-item">
+                  <div class="info-label">Estado de Pago</div>
+                  <div class="info-value" style="color:${r.plan_y_pago.pago_estado === 'confirmado' ? 'var(--green)' : 'var(--red)'};font-weight:600;">${escapeHtml(r.plan_y_pago.pago_estado)}</div>
+                </div>
+                <div class="info-item">
+                  <div class="info-label">Plan Regalo</div>
+                  <div class="info-value">${r.plan_y_pago.plan_regalo ? '✓ Sí' : '—'}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- CV -->
+          <div class="collapsible-section">
+            <div class="collapsible-header">
+              <span class="toggle">▼</span>
+              📄 CV & ATS
+            </div>
+            <div class="collapsible-body">
+              <div class="info-grid">
+                <div class="info-item">
+                  <div class="info-label">ATS Score</div>
+                  <div class="info-value">${r.cv.ats_score || '—'}/100</div>
+                </div>
+                <div class="info-item">
+                  <div class="info-label">ATS Objetivo</div>
+                  <div class="info-value">${r.cv.ats_objetivo || '—'}</div>
+                </div>
+                <div class="info-item">
+                  <div class="info-label">CV Archivo</div>
+                  <div class="info-value">${r.cv.cv_archivo_nombre || '—'}</div>
+                </div>
+                <div class="info-item">
+                  <div class="info-label">Fortalezas</div>
+                  <div class="info-value">${Array.isArray(r.cv.fortalezas) && r.cv.fortalezas.length > 0 ? r.cv.fortalezas.join(', ') : '—'}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- DISC -->
+          <div class="collapsible-section">
+            <div class="collapsible-header">
+              <span class="toggle">▼</span>
+              🎯 DISC
+            </div>
+            <div class="collapsible-body">
+              <div class="info-grid">
+                <div class="info-item">
+                  <div class="info-label">Código</div>
+                  <div class="info-value" style="font-weight:600;font-size:16px;color:var(--cyan);">${escapeHtml(r.disc.codigo)}</div>
+                </div>
+                <div class="info-item">
+                  <div class="info-label">Patrón</div>
+                  <div class="info-value">${escapeHtml(r.disc.patron)}</div>
+                </div>
+                <div class="info-item">
+                  <div class="info-label">Máscara Laboral</div>
+                  <div class="info-value">${r.disc.mascara_laboral || '—'}</div>
+                </div>
+              </div>
+              <div style="margin-top:12px;padding:12px;background:var(--bg);border-radius:6px;border:1px solid var(--border);">
+                <div style="font-size:12px;color:var(--muted);font-weight:600;margin-bottom:4px;">RECOMENDACIÓN</div>
+                <div>${r.disc.recomendacion || '—'}</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Kostick -->
+          <div class="collapsible-section">
+            <div class="collapsible-header">
+              <span class="toggle">▼</span>
+              ⚡ Kostick
+            </div>
+            <div class="collapsible-body">
+              <div style="margin-bottom:12px;">
+                <div style="font-size:12px;color:var(--muted);font-weight:600;margin-bottom:6px;">TOP 3 FORTALEZAS</div>
+                <div>${r.kostick.top3.length > 0 ? r.kostick.top3.map(t => escapeHtml(t.nombre || t)).join(', ') : '—'}</div>
+              </div>
+              <div style="margin-bottom:12px;">
+                <div style="font-size:12px;color:var(--muted);font-weight:600;margin-bottom:6px;">TOP 3 A DESARROLLAR</div>
+                <div>${r.kostick.dev3.length > 0 ? r.kostick.dev3.map(d => escapeHtml(d.nombre || d)).join(', ') : '—'}</div>
+              </div>
+              <div style="padding:12px;background:var(--bg);border-radius:6px;border:1px solid var(--border);">
+                <div style="font-size:12px;color:var(--muted);font-weight:600;margin-bottom:4px;">SÍNTESIS</div>
+                <div>${r.kostick.sintesis || '—'}</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Mercado -->
+          <div class="collapsible-section">
+            <div class="collapsible-header">
+              <span class="toggle">▼</span>
+              🏢 Análisis de Mercado
+            </div>
+            <div class="collapsible-body">
+              <div class="info-grid">
+                <div class="info-item" style="grid-column:1/-1;">
+                  <div class="info-label">Empresas Target</div>
+                  <div class="info-value">${r.mercado.empresas_target && r.mercado.empresas_target.length > 0 ? r.mercado.empresas_target.join(', ') : '—'}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Chat -->
+          <div class="collapsible-section">
+            <div class="collapsible-header">
+              <span class="toggle">▼</span>
+              💬 Chat (${r.chat_historia.total_mensajes} mensajes)
+            </div>
+            <div class="collapsible-body">
+              ${r.chat_historia.ultimos_mensajes.length > 0 ? `<div style="padding:12px;background:var(--bg);border-radius:6px;border:1px solid var(--border);font-size:12px;max-height:200px;overflow-y:auto;"><div style="font-size:11px;color:var(--muted);margin-bottom:8px;">Últimos 3 mensajes:</div>${r.chat_historia.ultimos_mensajes.map(m => `<div style="padding:6px;border-left:2px solid var(--cyan);margin-bottom:6px;"><div style="color:var(--muted);font-size:11px;">${new Date(m.fecha || '').toLocaleString()}</div><div>${escapeHtml(typeof m === 'string' ? m : (m.contenido || JSON.stringify(m).substring(0, 100)))}</div></div>`).join('')}</div>` : '<div style="color:var(--muted);">—</div>'}
+            </div>
+          </div>
+
+          <!-- Informes -->
+          <div class="collapsible-section">
+            <div class="collapsible-header">
+              <span class="toggle">▼</span>
+              📋 Informes Generados
+            </div>
+            <div class="collapsible-body">
+              <div class="info-grid">
+                <div class="info-item">
+                  <div class="info-label">Informe Esencial</div>
+                  <div class="info-value" style="color:${r.informes.esencial ? 'var(--green)' : 'var(--muted)'};">${r.informes.esencial ? '✓ Generado' : '—'}</div>
+                </div>
+                <div class="info-item">
+                  <div class="info-label">Informe Profesional</div>
+                  <div class="info-value" style="color:${r.informes.profesional ? 'var(--green)' : 'var(--muted)'};">${r.informes.profesional ? '✓ Generado' : '—'}</div>
+                </div>
+                <div class="info-item">
+                  <div class="info-label">Informe Premium</div>
+                  <div class="info-value" style="color:${r.informes.premium ? 'var(--green)' : 'var(--muted)'};">${r.informes.premium ? '✓ Generado' : '—'}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Sesiones -->
+          <div class="collapsible-section">
+            <div class="collapsible-header">
+              <span class="toggle">▼</span>
+              📅 Sesiones
+            </div>
+            <div class="collapsible-body">
+              <div class="info-grid">
+                <div class="info-item" style="grid-column:1/-1;">
+                  <div class="info-label">Sesión Consultor</div>
+                  <div class="info-value" style="color:${r.sesiones.consultor.estado === 'realizada' ? 'var(--green)' : 'var(--muted)'};">${escapeHtml(r.sesiones.consultor.estado || 'Sin solicitar')}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    // Cerrar modal al hacer clic fuera
+    document.getElementById('modalResumen').addEventListener('click', function(e) {
+      if (e.target === this) closeResumenModal();
+    });
 
     // Cargar si hay key en sesión
     const savedKey = sessionStorage.getItem('atdc_admin_key');
