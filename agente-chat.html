@@ -2128,15 +2128,18 @@ function _mostrarOnboarding(planPreseleccionado) {
 
         <!-- Fix QA-UX-CATALOGO-01: antes estos tres nunca se preguntaban al
              registrarse y quedaban en "Por definir" hasta que el participante
-             (o el Admin) los completara a mano después. Opcionales — si se
-             dejan en "Sin definir" el backend sigue poniendo "Por definir". -->
+             (o el Admin) los completara a mano después.
+             Fix QA-UX-CATALOGO-02 (2026-10-25): Isaac pidió que dejaran de
+             ser opcionales — ahora son obligatorios para crear la cuenta,
+             con asterisco y validación tanto acá (_registrarParticipante)
+             como en el backend (auth_registro rechaza con 422 si faltan). -->
         <div style="margin-top:2px;padding-top:12px;border-top:1px solid var(--border);">
-          <div style="font-size:11.5px;color:var(--muted);margin-bottom:8px;">Datos para tu proceso (opcional, puedes completarlos después en "Mi cuenta")</div>
-          <label style="display:block;font-size:11.5px;color:var(--muted);margin-bottom:3px;">Cargo objetivo</label>
+          <div style="font-size:11.5px;color:var(--muted);margin-bottom:8px;">Datos para tu proceso (obligatorios)</div>
+          <label style="display:block;font-size:11.5px;color:var(--muted);margin-bottom:3px;">Cargo objetivo <span style="color:var(--red);">*</span></label>
           <div style="margin-bottom:8px;">${_selectConOtro('_ob_cargo', CATALOGO_CARGOS, '')}</div>
-          <label style="display:block;font-size:11.5px;color:var(--muted);margin-bottom:3px;">Sector</label>
+          <label style="display:block;font-size:11.5px;color:var(--muted);margin-bottom:3px;">Sector <span style="color:var(--red);">*</span></label>
           <div style="margin-bottom:8px;">${_selectConOtro('_ob_sector', CATALOGO_SECTORES, '')}</div>
-          <label style="display:block;font-size:11.5px;color:var(--muted);margin-bottom:3px;">Renta objetivo</label>
+          <label style="display:block;font-size:11.5px;color:var(--muted);margin-bottom:3px;">Renta objetivo <span style="color:var(--red);">*</span></label>
           <div>${_selectConOtro('_ob_renta', CATALOGO_RENTAS, '')}</div>
         </div>
       </div>
@@ -2263,6 +2266,12 @@ async function _registrarParticipante(plan) {
   if (!email || !email.includes('@')) { _mostrarErrorAuth('Ingresa un correo electrónico válido.'); document.getElementById('_ob_email')?.focus(); return; }
   if (!password || password.length < 8) { _mostrarErrorAuth('La contraseña debe tener al menos 8 caracteres.'); document.getElementById('_ob_password')?.focus(); return; }
   if (password !== passwordConfirmar) { _mostrarErrorAuth('Las contraseñas no coinciden.'); document.getElementById('_ob_password_confirmar')?.focus(); return; }
+  // Fix QA-UX-CATALOGO-02: Cargo/Sector/Renta ya no son opcionales — el
+  // backend también los exige (422 si faltan), pero validar acá evita el
+  // viaje redondo al servidor y señala exactamente cuál campo falta.
+  if (!cargo_objetivo) { _mostrarErrorAuth('Elige tu cargo objetivo (o "Otro" y especifícalo).'); document.getElementById('_ob_cargo')?.focus(); return; }
+  if (!sector)         { _mostrarErrorAuth('Elige tu sector (o "Otro" y especifícalo).'); document.getElementById('_ob_sector')?.focus(); return; }
+  if (!renta_objetivo) { _mostrarErrorAuth('Elige tu renta objetivo (o "Otro" y especifícala).'); document.getElementById('_ob_renta')?.focus(); return; }
 
   document.getElementById('_ob_error').style.display = 'none';
   if (btn) { btn.textContent = 'Creando tu cuenta…'; btn.disabled = true; }
@@ -4651,9 +4660,27 @@ async function _enviarCambiarPassword() {
   }
 }
 
-/* 2) Olvidé mi contraseña — desde la pestaña "Ya tengo cuenta" del onboarding */
+/* 2) Olvidé mi contraseña — desde la pestaña "Ya tengo cuenta" del onboarding.
+   Fix QA-SEC-LOGIN-01 (reportado por Isaac, 2026-10-25): esta función
+   eliminaba el modal de ingreso (#_onboardingModal) ANTES de que hubiera
+   una sesión real — la idea original era "despejar" la pantalla para el
+   modal de recuperación. El problema: si la persona cerraba después el
+   modal de recuperación con la ✕ (o haciendo clic afuera) SIN completar el
+   envío, no quedaba nada que restaurara el modal de ingreso. Como el shell
+   de la app (barra lateral, nombre "Carlos Mendoza Reyes", puntajes DISC/
+   Kostick de ejemplo, etc.) vive siempre en el HTML de la página —oculto
+   detrás del overlay de ingreso, nunca eliminado— cualquier visitante sin
+   sesión terminaba viendo esa pantalla de ejemplo con pinta de cuenta real
+   y activa, sin haber iniciado sesión. No era una filtración de datos
+   reales (ningún endpoint protegido responde sin un token válido — el
+   backend seguiría rechazando cualquier llamada), pero sí una falla de
+   confianza/UX grave: parecía una cuenta ajena abierta sin permiso.
+   Arreglo: ya NO se elimina #_onboardingModal aquí. El modal de
+   recuperación tiene z-index más alto (9999 vs 9998) así que igual queda
+   encima; al cerrarlo (✕ o clic afuera) el modal de ingreso sigue intacto
+   debajo, y la persona sigue viendo la pantalla de login, nunca el shell
+   de la app sin autenticar. */
 function _abrirRecuperarPassword() {
-  document.getElementById('_onboardingModal')?.remove();
   const overlay = _modalPassword('_pwModalRecuperar', '¿Olvidaste tu contraseña?', `
     <p style="margin:0 0 14px 0;font-size:13.5px;color:var(--text2);line-height:1.5;">
       Ingresa tu correo y, si está registrado, te enviaremos un enlace para crear una nueva contraseña.
