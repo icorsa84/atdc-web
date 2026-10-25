@@ -3641,6 +3641,70 @@ function mostrarIndicadorTipoRespuesta(tipo) {
   }, 3000);
 }
 
+// OPTIMIZATION-6: Cargar sugerencias prefetcheadas en background
+async function cargarSugerenciasEnBackground() {
+  try {
+    const res = await fetch(`${CONFIG.api_url.replace('/chat', '')}/chat/sugerencias/${CONFIG.participante_id}`, {
+      headers: { 'Authorization': `Bearer ${_obtenerToken()}` }
+    });
+
+    if (!res.ok) return;
+
+    const data = await res.json();
+    if (data.suggestions && data.suggestions.length > 0) {
+      mostrarSugerencias(data.suggestions);
+    }
+  } catch(e) {
+    // Silencioso si falla el prefetch
+    console.debug('[Prefetch] Error loading suggestions:', e);
+  }
+}
+
+function mostrarSugerencias(suggestions) {
+  // Mostrar sugerencias como chips debajo del input
+  const container = document.getElementById('msgInput')?.parentElement;
+  if (!container) return;
+
+  let suggestionsDiv = container.querySelector('.suggestions-row');
+  if (!suggestionsDiv) {
+    suggestionsDiv = document.createElement('div');
+    suggestionsDiv.className = 'suggestions-row';
+    suggestionsDiv.style.cssText = `
+      display: flex;
+      gap: 8px;
+      margin-top: 8px;
+      flex-wrap: wrap;
+      padding: 0 8px;
+    `;
+    container.appendChild(suggestionsDiv);
+  }
+
+  suggestionsDiv.innerHTML = '';
+  suggestions.forEach(suggestion => {
+    const chip = document.createElement('button');
+    chip.className = 'suggestion-chip';
+    chip.style.cssText = `
+      background: rgba(167, 139, 250, 0.1);
+      border: 1px solid rgba(167, 139, 250, 0.3);
+      color: #a78bfa;
+      padding: 6px 12px;
+      border-radius: 16px;
+      font-size: 0.8rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    `;
+    chip.onmouseover = () => chip.style.background = 'rgba(167, 139, 250, 0.2)';
+    chip.onmouseout = () => chip.style.background = 'rgba(167, 139, 250, 0.1)';
+    chip.onclick = () => {
+      document.getElementById('msgInput').value = suggestion;
+      suggestionsDiv.innerHTML = '';
+      sendMsg();
+    };
+    chip.textContent = '💡 ' + suggestion;
+    suggestionsDiv.appendChild(chip);
+  });
+}
+
 /* ================================================================
    ENVÍO DE MENSAJES
    ================================================================ */
@@ -3703,6 +3767,9 @@ async function enviar(txt) {
   // Solo agregar burbuja si SSE no la creó ya
   if (!esSSE) agentMsg(respuesta);
   isTyping=false; document.getElementById('btnSend').disabled=false;
+
+  // OPTIMIZATION-6: Cargar sugerencias prefetcheadas en background (non-blocking)
+  setTimeout(() => cargarSugerenciasEnBackground(), 100);
 }
 
 function handleKey(e) { if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMsg();} }
