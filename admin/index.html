@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ATDC — Panel de Administración</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    background: #0A0F1C;
+    color: #F1F5F9;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+  .card {
+    background: #111827;
+    border: 1px solid #1E2A3A;
+    border-radius: 16px;
+    padding: 40px;
+    width: 100%;
+    max-width: 420px;
+    box-shadow: 0 24px 60px rgba(0,0,0,.5);
+  }
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 32px;
+  }
+  .logo-hex {
+    width: 36px; height: 36px;
+    border-radius: 9px;
+    background: linear-gradient(135deg, #2563EB, #7C3AED);
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 800; font-size: 14px; color: #fff;
+    flex-shrink: 0;
+  }
+  .logo-text { font-size: 20px; font-weight: 700; letter-spacing: .02em; }
+  .logo-sub  { font-size: 11px; color: #94A3B8; letter-spacing: .04em; text-transform: uppercase; }
+  h1 { font-size: 22px; font-weight: 700; margin-bottom: 8px; }
+  .desc { color: #94A3B8; font-size: 14px; margin-bottom: 28px; line-height: 1.6; }
+  label { display: block; font-size: 13px; font-weight: 600; color: #94A3B8; margin-bottom: 6px; }
+  input[type="password"], input[type="text"] {
+    width: 100%;
+    padding: 12px 14px;
+    background: #0A0F1C;
+    border: 1px solid #243044;
+    border-radius: 8px;
+    color: #F1F5F9;
+    font-size: 15px;
+    outline: none;
+    transition: border-color .2s;
+    margin-bottom: 6px;
+  }
+  input:focus { border-color: #2563EB; }
+  .toggle-pass {
+    background: none; border: none; cursor: pointer;
+    color: #94A3B8; font-size: 12px;
+    margin-bottom: 24px; display: block;
+  }
+  .toggle-pass:hover { color: #94A3B8; }
+  .btn {
+    width: 100%;
+    padding: 13px;
+    background: #2563EB;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background .2s;
+  }
+  .btn:hover { background: #1D4ED8; }
+  .btn:disabled { background: #243044; cursor: not-allowed; }
+  .error {
+    display: none;
+    background: rgba(239,68,68,.1);
+    border: 1px solid rgba(239,68,68,.3);
+    border-radius: 8px;
+    padding: 10px 14px;
+    color: #FCA5A5;
+    font-size: 13px;
+    margin-bottom: 16px;
+  }
+  .error.visible { display: block; }
+  .hint {
+    margin-top: 20px;
+    padding: 12px 14px;
+    background: rgba(37,99,235,.08);
+    border: 1px solid rgba(37,99,235,.2);
+    border-radius: 8px;
+    font-size: 12px;
+    color: #93C5FD;
+    line-height: 1.5;
+  }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="logo">
+    <div class="logo-hex">A</div>
+    <div>
+      <div class="logo-text">ATDC</div>
+      <div class="logo-sub">Panel Administrador</div>
+    </div>
+  </div>
+
+  <h1>Acceso exclusivo</h1>
+  <p class="desc">Ingresa la clave de administrador para acceder al panel de gestión de participantes.</p>
+
+  <div class="error" id="errorMsg">Clave incorrecta. Inténtalo de nuevo.</div>
+
+  <label for="adminKey">Clave de administrador</label>
+  <input type="password" id="adminKey" placeholder="Ingresa la clave…" autocomplete="current-password">
+  <button class="toggle-pass" type="button" onclick="toggleVisibilidad()">👁 Mostrar / ocultar clave</button>
+
+  <button class="btn" id="btnAcceder" onclick="acceder()">Acceder al panel →</button>
+
+  <div class="hint">
+    ⚠️ Acceso restringido. Esta sección es solo para el Consultor de ATDC.<br>
+    Si olvidaste la clave, encuéntrala en el archivo <code>.env</code> del servidor (variable <code>ADMIN_API_KEY</code>).
+  </div>
+</div>
+
+<script>
+  const BACKEND = 'https://atdc-backend-ill4.onrender.com';
+
+  function toggleVisibilidad() {
+    const inp = document.getElementById('adminKey');
+    inp.type = inp.type === 'password' ? 'text' : 'password';
+  }
+
+  document.getElementById('adminKey').addEventListener('keydown', e => {
+    if (e.key === 'Enter') acceder();
+  });
+
+  async function acceder() {
+    const key = document.getElementById('adminKey').value.trim();
+    const err = document.getElementById('errorMsg');
+    const btn = document.getElementById('btnAcceder');
+
+    if (!key) {
+      err.textContent = 'Por favor ingresa la clave de administrador.';
+      err.classList.add('visible');
+      return;
+    }
+
+    err.classList.remove('visible');
+    btn.disabled = true;
+    btn.textContent = 'Verificando…';
+
+    try {
+      // Verificar la clave contra el backend antes de redirigir
+      const res = await fetch(`${BACKEND}/api/admin/status`, {
+        headers: { 'X-Admin-Key': key }
+      });
+
+      if (res.ok) {
+        // Clave válida → guardar en sessionStorage y pasar al panel de gestión
+        sessionStorage.setItem('atdc_admin_key', key);
+        sessionStorage.setItem('atdc_admin_path', '1');
+        window.location.replace('./dashboard.html');
+      } else {
+        err.textContent = 'Clave incorrecta. Revisa el archivo .env en tu servidor.';
+        err.classList.add('visible');
+        btn.disabled = false;
+        btn.textContent = 'Acceder al panel →';
+      }
+    } catch (e) {
+      // Si el servidor no responde (dormido en Render free plan)
+      // — igual guardamos y redirigimos; el chat mostrará el error de conexión
+      if (key.length >= 8) {
+        sessionStorage.setItem('atdc_admin_key', key);
+        sessionStorage.setItem('atdc_admin_path', '1');
+        window.location.replace('./dashboard.html');
+      } else {
+        err.textContent = 'No se pudo conectar al servidor. Intenta de nuevo en 30 segundos.';
+        err.classList.add('visible');
+        btn.disabled = false;
+        btn.textContent = 'Acceder al panel →';
+      }
+    }
+  }
+</script>
+</body>
+</html>
