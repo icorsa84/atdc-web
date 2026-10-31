@@ -1773,7 +1773,7 @@
     </div>
 
     <!-- KOSTICK -->
-    <div class="s-sec">
+    <div class="s-sec" id="secKostick">
       <div class="s-lbl">Kostick — Clusters</div>
       <div class="s-bar">
         <div class="s-bar-hdr"><span>Liderazgo (LD)</span><span id="skLD" style="color:var(--green);font-weight:700">7</span></div>
@@ -1810,7 +1810,7 @@
     </div>
 
     <!-- HISTORIAL CROSS-SESIÓN -->
-    <div class="s-sec">
+    <div class="s-sec" id="secHistorial">
       <div class="s-lbl">
         <span>Consultas recientes</span>
         <button onclick="limpiarHistorial()" title="Borra el historial de consultas guardado en este navegador. No afecta tus datos en el servidor." style="font-size:.65rem;background:none;border:none;
@@ -2427,6 +2427,10 @@ function _inicializarDesde(data) {
   PARTICIPANTE.id           = data.participante_id;
   PARTICIPANTE.nombre       = data.nombre;
   PARTICIPANTE.plan         = data.plan;
+  // REQ-PLAN-GATE-UI: la interfaz se arma con el plan que YA está pagado
+  // (plan_activo). 'plan' puede ser un plan pedido con pago pendiente.
+  PARTICIPANTE.plan_activo  = data.plan_activo || data.plan;
+  PARTICIPANTE.pago_estado  = data.pago_estado || 'confirmado';
 
   /* Task #298: Si datos_por_definir es true, mostrar modal obligatorio
      al login para completar cargo/sector/renta faltantes */
@@ -2910,6 +2914,10 @@ function _kostickDesdeBackend(k) {
 
 function _aplicarPerfilAlEstado(d) {
   if (!d) return;
+  // REQ-PLAN-GATE-UI: el servidor manda qué plan está activo de verdad
+  if (d.plan) PARTICIPANTE.plan = d.plan;
+  if (d.plan_activo) PARTICIPANTE.plan_activo = d.plan_activo;
+  if (d.pago_estado) PARTICIPANTE.pago_estado = d.pago_estado;
   PARTICIPANTE.cargo          = d.cargo_objetivo || 'Por definir';
   PARTICIPANTE.sector         = d.sector || 'Por definir';
   PARTICIPANTE.renta_objetivo = d.renta_objetivo || 'Por definir';
@@ -3541,11 +3549,19 @@ const PLAN_RESTRICCIONES = {
 };
 
 function getPlanActual() {
-  try {
-    const override = localStorage.getItem(CONFIG.plan_override_key);
-    if (override) return override;
-  } catch(e) {}
-  return PARTICIPANTE.plan || 'Inicial';
+  if (IS_ADMIN) {
+    try {
+      const override = localStorage.getItem(CONFIG.plan_override_key);
+      if (override) return override;
+    } catch(e) {}
+    return PARTICIPANTE.plan || 'Inicial';
+  }
+  // REQ-PLAN-GATE-UI: el participante ve SOLO lo que ya tiene activo. Un
+  // valor en localStorage o un plan con pago pendiente no habilitan nada.
+  return PARTICIPANTE.plan_activo || PARTICIPANTE.plan || 'Inicial';
+}
+function _pagoPendiente() {
+  return !IS_ADMIN && PARTICIPANTE.pago_estado === 'pendiente' && PARTICIPANTE.plan && PARTICIPANTE.plan !== getPlanActual();
 }
 
 function verificarRestriccionPlan() {
@@ -4189,7 +4205,7 @@ function abrirInforme() {
   if (informeGenerado) {
     renderInformeCompleto(informeGenerado); // renderInformeCompleto ya agrega clase 'open'
   } else {
-    const planClass = `inf-overlay-${PARTICIPANTE.plan.toLowerCase()}`;
+    const planClass = `inf-overlay-${getPlanActual().toLowerCase()}`;
     overlay.className = `informe-overlay open ${planClass}`;
     renderInformeVacio();
   }
@@ -4209,7 +4225,7 @@ function cerrarInforme() {
 
 /* ---- ESTADO VACÍO DEL PANEL ---- */
 function renderInformeVacio() {
-  const plan = PARTICIPANTE.plan;
+  const plan = getPlanActual();
   const infos = {
     Esencial: {
       badge:'badge-esencial', desc:'CV + Objetivo + ATS',
@@ -4415,7 +4431,7 @@ function cancelarTimersLoading() {
 
 function renderInformeLoading() {
   cancelarTimersLoading();
-  const plan = PARTICIPANTE.plan;
+  const plan = getPlanActual();
   const pasos = {
     Esencial: ['Analizando CV y puntaje ATS…','Identificando fortalezas y brechas…','Generando recomendaciones…'],
     Profesional: ['Procesando perfil DISC y Kostick…','Cruzando datos con mercado laboral…','Construyendo posicionamiento…','Generando informe integrado…'],
@@ -4448,7 +4464,7 @@ function renderInformeLoading() {
 async function llamarAPIInforme() {
   const payload = {
     participante_id: PARTICIPANTE.id,
-    plan: PARTICIPANTE.plan,
+    plan: getPlanActual(),
     datos: {
       nombre: PARTICIPANTE.nombre,
       cargo: PARTICIPANTE.cargo,
@@ -5737,6 +5753,28 @@ function _aplicarGateoPorPlan() {
     modeLabel.innerHTML = _planTieneMemoria() ? `${icono('brain',13)} Memoria activa` : `${icono('clock',13)} Sin memoria entre sesiones`;
   }
 
+  // REQ-PLAN-GATE-UI: lo que el plan no incluye no aparece (DISC y Kostick
+  // solo desde Profesional; el Informe Final no existe en el plan Inicial).
+  const _r = PLAN_RESTRICCIONES[plan] || PLAN_RESTRICCIONES['Inicial'];
+  const _tests = !!_r.tests_psicometricos || IS_ADMIN;
+  ['secDiagnostico', 'secKostick'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = _tests ? '' : 'none';
+  });
+  // Preguntas frecuentes: solo las que el plan puede responder. Sin chat
+  // (Inicial) queda solo "Empresas objetivo", que no usa la conversación.
+  const _chat = !!_r.chat || IS_ADMIN;
+  const _secHist = document.getElementById('secHistorial');
+  if (_secHist) _secHist.style.display = _chat ? '' : 'none';
+  document.querySelectorAll('.qt-btn[data-qt]').forEach(btn => {
+    const k = btn.getAttribute('data-qt');
+    const necesitaTests = (k === 'disc' || k === 'kostick' || k === 'fortalezas');
+    const visible = k === 'empresas' || (_chat && (!necesitaTests || _tests));
+    btn.style.display = visible ? '' : 'none';
+  });
+  const _wrapInf = document.getElementById('btnInformeWrap');
+  if (_wrapInf) _wrapInf.style.display = (plan === 'Inicial' && !IS_ADMIN) ? 'none' : '';
+
   // Sección "Sesión con el Consultor": solo visible para Plan Premium
   const premiumSec = document.getElementById('premiumSesionSec');
   if (premiumSec) {
@@ -6981,7 +7019,7 @@ async function init() {
     const elNombre = document.getElementById('sidePanelNombre');
     if (elNombre) elNombre.textContent = P.nombre;
     const elDiaPlan = document.getElementById('sidePanelDiaPlan');
-    if (elDiaPlan) elDiaPlan.textContent = `Proceso día ${P.dia_proceso} · Plan ${P.plan}`;
+    if (elDiaPlan) elDiaPlan.textContent = `Proceso día ${P.dia_proceso} · Plan ${IS_ADMIN ? P.plan : getPlanActual()}` + (_pagoPendiente() ? ` (${P.plan} por activar)` : '');
     const elCargo = document.getElementById('sidePanelCargo');
     if (elCargo) elCargo.textContent = P.cargo;
     const elSector = document.getElementById('sidePanelSector');
@@ -6992,7 +7030,7 @@ async function init() {
     if (!IS_ADMIN) _refrescarFotoSidebar();
     // --- Topbar badge plan ---
     const planBadgeTop = document.getElementById('planBadgeTop');
-    if (planBadgeTop && !IS_ADMIN) planBadgeTop.textContent = `✦ Plan ${P.plan}`;
+    if (planBadgeTop && !IS_ADMIN) planBadgeTop.textContent = `✦ Plan ${getPlanActual()}`;
     // --- ATS ---
     const score = P.ats_score || 0;
     const elAtsScore = document.getElementById('sidePanelAtsScore');
@@ -7093,9 +7131,15 @@ async function init() {
         ? `**Vista Consultor ICORSA** — Participante: **${PARTICIPANTE.nombre}** (Plan ${PARTICIPANTE.plan})\n\nPuedes revisar su informe final con el botón de arriba, validarlo y liberarlo al participante. El agente también responde preguntas sobre el perfil del participante.`
         : `**Vista Consultor ICORSA** — Modo local activo.\n\nParticipante: **${PARTICIPANTE.nombre}** · Plan ${PARTICIPANTE.plan}. Puedes generar el informe con datos locales o esperar conexión al servidor.`;
     } else {
-      bienvenida = online
-        ? `¡Bienvenido, **${PARTICIPANTE.nombre.split(' ')[0]}**! Soy tu agente ATDC con IA activa. Puedo responder cualquier pregunta sobre tu proceso de transición de carrera usando tus datos reales.\n\nCuando estés listo, también puedes generar tu **Informe Final ${PARTICIPANTE.plan}** con el botón de arriba. ¿Por dónde empezamos?`
-        : `Hola **${PARTICIPANTE.nombre.split(' ')[0]}**, soy tu agente ATDC. Estoy en modo local — las respuestas son más básicas que con IA completa.\n\nPuedes generar tu **Informe Final ${PARTICIPANTE.plan}** con el botón de arriba, o preguntarme sobre tu DISC, Kostick, CV o preparación de entrevista.`;
+      const _planB = getPlanActual();
+      const _avisoPago = _pagoPendiente()
+        ? `\n\n⏳ Pediste el plan **${PARTICIPANTE.plan}**: se activará cuando confirmemos tu pago. Mientras tanto ves lo incluido en tu plan **${_planB}**.`
+        : '';
+      bienvenida = (_planB === 'Inicial')
+        ? `¡Bienvenido, **${PARTICIPANTE.nombre.split(' ')[0]}**! Tu plan **Inicial** incluye **1 análisis ATS** (Sistema de Seguimiento de Candidatos) de tu CV: súbelo con el botón **Subir mi CV** del panel derecho y verás tu puntaje, tus categorías débiles y las mejoras sugeridas.${_avisoPago}`
+        : online
+        ? `¡Bienvenido, **${PARTICIPANTE.nombre.split(' ')[0]}**! Soy tu agente ATDC con IA activa. Puedo responder cualquier pregunta sobre tu proceso de transición de carrera usando tus datos reales.\n\nCuando estés listo, también puedes generar tu **Informe Final ${_planB}** con el botón de abajo. ¿Por dónde empezamos?${_avisoPago}`
+        : `Hola **${PARTICIPANTE.nombre.split(' ')[0]}**, soy tu agente ATDC. Estoy en modo local — las respuestas son más básicas que con IA completa.\n\nPuedes generar tu **Informe Final ${_planB}** con el botón de abajo.${_avisoPago}`;
     }
     agentMsg(bienvenida, IS_ADMIN ? [] : chips_bienvenida());
   }
