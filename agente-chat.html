@@ -1413,9 +1413,14 @@
   color:var(--text);transition:all .2s;margin:4px;box-shadow:var(--shadow-sm);
 }
 .test-start-chip:hover{border-color:#2563EB;background:rgba(37,99,235,.1);color:#93C5FD;transform:translateY(-1px);box-shadow:var(--shadow-md)}
+  /* Fix SEG-AUTH-01: sin sesión validada no se muestra el panel (ni siquiera
+     desenfocado detrás del ingreso). La clase se quita al arrancar init(). */
+  body.auth-pendiente > .topbar,
+  body.auth-pendiente > .proceso-bar,
+  body.auth-pendiente > .layout { visibility: hidden !important; }
 </style>
 </head>
-<body>
+<body class="auth-pendiente">
 
 <!-- TOPBAR -->
 <div class="topbar">
@@ -2868,6 +2873,15 @@ function _aplicarPerfilAlEstado(d) {
    recién creada sin token todavía, etc.) se ignora y init() sigue con lo que
    ya hubiera en PARTICIPANTE (demo, o lo recién calculado esta misma sesión). */
 async function _rehidratarPerfilCompleto() {
+  /* Si la validación de sesión al cargar ya trajo el perfil, se reutiliza
+     y no se repite la llamada. */
+  if (_PERFIL_VALIDADO) {
+    const d = _PERFIL_VALIDADO;
+    _PERFIL_VALIDADO = null;
+    try { _MI_PERFIL_CACHE = d; _aplicarPerfilAlEstado(d); }
+    catch (e) { console.warn('ATDC: no se pudo aplicar el perfil validado:', e); }
+    return;
+  }
   try {
     const res = await fetch(`${_BACKEND}/api/mi-perfil`, {
       headers: { 'Authorization': `Bearer ${_obtenerToken()}` }
@@ -2893,7 +2907,63 @@ async function _arrancarAppSiCorresponde() {
   if (typeof init !== 'function') return;  // init() aún no se ha definido
   _appIniciada = true;
   await _rehidratarPerfilCompleto();   // Fix QA-REHIDRATAR-01
+  /* Fix SEG-AUTH-01: el panel solo se muestra una vez autenticada la persona */
+  document.body.classList.remove('auth-pendiente');
   init();
+}
+
+/* ================================================================
+   Fix SEG-AUTH-01 — VALIDAR LA SESIÓN GUARDADA CONTRA EL SERVIDOR
+   Antes, cualquier sesión en localStorage (vencida, de otra persona o
+   escrita a mano) abría el panel sin preguntarle al servidor. Ahora se
+   comprueba con /api/mi-perfil:
+     'ok'       → la sesión es válida (el perfil queda precargado)
+     'invalida' → 401/403/404: se borra la sesión local y se pide ingreso
+     'red'      → no se pudo consultar: se pide ingreso SIN borrar la
+                  sesión, para que al recargar con conexión siga valiendo
+   ================================================================ */
+var _PERFIL_VALIDADO = null;
+async function _validarSesionEnServidor() {
+  const token = _obtenerToken();
+  if (!token) return 'invalida';
+  const ctrl = (typeof AbortController === 'function') ? new AbortController() : null;
+  // Render gratuito puede tardar ~1 min en despertar: margen amplio
+  const timer = ctrl ? setTimeout(() => ctrl.abort(), 75000) : null;
+  try {
+    const res = await fetch(`${_BACKEND}/api/mi-perfil`, {
+      headers: { 'Authorization': `Bearer ${token}` },
+      signal: ctrl ? ctrl.signal : undefined
+    });
+    if (res.status === 401 || res.status === 403 || res.status === 404) return 'invalida';
+    if (!res.ok) return 'red';
+    try { _PERFIL_VALIDADO = await res.json(); } catch (e) { _PERFIL_VALIDADO = null; }
+    return 'ok';
+  } catch (e) {
+    return 'red';
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+function _descartarSesionLocal() {
+  try { localStorage.removeItem(_SESION_KEY); } catch (e) {}
+  _TOKEN_SESION = null;
+  CONFIG.participante_id = null;
+  PARTICIPANTE.id = null;
+}
+
+function _mostrarVerificandoSesion(mostrar) {
+  let el = document.getElementById('_verificandoSesion');
+  if (!mostrar) { if (el) el.remove(); return; }
+  if (el) return;
+  el = document.createElement('div');
+  el.id = '_verificandoSesion';
+  el.setAttribute('role', 'status');
+  el.setAttribute('aria-live', 'polite');
+  el.style.cssText = 'position:fixed;inset:0;display:flex;align-items:center;justify-content:center;' +
+    'background:#0b1020;color:#e5e7eb;font:500 15px/1.4 system-ui,-apple-system,Segoe UI,sans-serif;z-index:99999';
+  el.textContent = 'Verificando tu sesión…';
+  document.body.appendChild(el);
 }
 
 function _mostrarEncuestaAleatorio(callback) {
@@ -3026,9 +3096,22 @@ async function _inicioOnboarding() {
     return;   // sesión ya quedó lista tras el callback de Google
   }
 
-  /* Intentar recuperar sesión existente */
+  /* Intentar recuperar sesión existente — Fix SEG-AUTH-01: solo vale si el
+     servidor la reconoce; si no, se pide ingreso como a cualquier visita. */
+  let _avisoSesion = '';
   if (_recuperarSesion()) {
-    return;
+    _mostrarVerificandoSesion(true);
+    const estado = await _validarSesionEnServidor();
+    _mostrarVerificandoSesion(false);
+    if (estado === 'ok') return;
+    if (estado === 'invalida') {
+      _descartarSesionLocal();
+      _avisoSesion = 'Tu sesión expiró o ya no es válida. Inicia sesión nuevamente.';
+    } else {
+      _TOKEN_SESION = null;
+      CONFIG.participante_id = null;
+      _avisoSesion = 'No pudimos verificar tu sesión con el servidor. Revisa tu conexión e inicia sesión.';
+    }
   }
 
   /* Sin sesión — bloquear el arranque normal del script y mostrar el ingreso.
@@ -3036,6 +3119,12 @@ async function _inicioOnboarding() {
   window._onboardingPendiente = true;
   const planURL = _planDesdeURL();
   _mostrarOnboarding(planURL);
+  if (_avisoSesion) {
+    setTimeout(() => {
+      try { _cambiarTabAuth('login'); } catch (e) {}
+      try { _mostrarErrorAuth(_avisoSesion); } catch (e) {}
+    }, 80);
+  }
 }
 
 /* Ejecutar la decisión de ingreso. Como ahora puede ser asíncrona (por el
