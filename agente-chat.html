@@ -1534,6 +1534,9 @@
           <button class="btn-export" id="btnExport" onclick="exportarInforme()" style="display:none">
             ⬇ Exportar TXT
           </button>
+          <button class="btn-export" id="btnExportPdf" onclick="exportarInformePDF()" style="display:none">
+            ⬇ Descargar PDF
+          </button>
           <button class="btn-ico" onclick="cerrarInforme()" title="Cerrar informe">✕</button>
         </div>
       </div>
@@ -4402,7 +4405,7 @@ async function generarInforme() {
   try { localStorage.removeItem(CONFIG.informe_key + '_validado'); } catch(e) {}
 
   renderInformeCompleto(informe);
-  document.getElementById('btnExport').style.display = informe.en_revision ? 'none' : 'flex';
+  _mostrarExportes(informe);
 
   if (btnPrincipal) {
     btnPrincipal.classList.remove('generando');
@@ -4768,7 +4771,7 @@ function renderInformeCompleto(informe) {
   badge.textContent = `Plan ${plan}`;
   overlay.className = `informe-overlay open inf-overlay-${plan.toLowerCase()}`;
   // REQ-PREMIUM-REVISION: no se exporta un informe que todavía está en revisión
-  document.getElementById('btnExport').style.display = informe.en_revision ? 'none' : 'flex';
+  _mostrarExportes(informe);
 
   // Mostrar strip de admin si corresponde
   if (IS_ADMIN) {
@@ -5522,6 +5525,49 @@ function renderMdInforme(md) {
 }
 
 /* ---- EXPORTAR INFORME ---- */
+/* Exportes del informe: TXT para los planes con informe; PDF ("Informe
+   premium descargable en PDF", landing) solo Premium. Nunca en revisión. */
+function _mostrarExportes(informe) {
+  document.getElementById('btnExport').style.display = informe.en_revision ? 'none' : 'flex';
+  const b = document.getElementById('btnExportPdf');
+  if (b) b.style.display = (!informe.en_revision && informe.plan === 'Premium' && (getPlanActual() === 'Premium' || IS_ADMIN)) ? 'flex' : 'none';
+}
+
+/* Informe premium descargable en PDF: se arma una página de impresión con el
+   informe aprobado y el navegador la guarda como PDF. */
+function exportarInformePDF() {
+  if (!informeGenerado || (getPlanActual() !== 'Premium' && !IS_ADMIN)) return;
+  const inf = informeGenerado, P = PARTICIPANTE;
+  const secs = (inf.secciones || []).map(sec => `
+    <section><h2>${escHtml(sec.titulo || '')}</h2><div>${renderMdInforme(sec.contenido || '')}</div></section>`).join('');
+  const html = `<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Informe Final ATDC — ${escHtml(inf.participante || P.nombre || '')}</title>
+    <style>
+      @page { size: A4; margin: 18mm 16mm; }
+      body { font-family: Arial, Helvetica, sans-serif; color: #1a2233; font-size: 10.5pt; line-height: 1.5; }
+      header { border-bottom: 2px solid #0e6e8c; padding-bottom: 8px; margin-bottom: 14px; }
+      header h1 { font-size: 17pt; margin: 0 0 4px; color: #0e4a6e; }
+      header p { margin: 0; color: #555; font-size: 9.5pt; }
+      h2 { font-size: 12.5pt; color: #0e4a6e; border-bottom: 1px solid #d5dde8; padding-bottom: 3px; margin: 18px 0 8px; page-break-after: avoid; }
+      h3, h4 { font-size: 11pt; margin: 12px 0 6px; }
+      table { border-collapse: collapse; width: 100%; margin: 8px 0; font-size: 9.5pt; }
+      th, td { border: 1px solid #c9d3e0; padding: 4px 6px; text-align: left; vertical-align: top; }
+      th { background: #eef3f8; }
+      blockquote { border-left: 3px solid #0e6e8c; margin: 8px 0; padding: 2px 10px; color: #333; }
+    </style></head><body>
+    <header><h1>Informe Final ATDC — Plan Premium</h1>
+      <p>${escHtml(inf.participante || P.nombre || '')} · Cargo objetivo: ${escHtml(String(inf.cargo || P.cargo || ''))} · ${escHtml(inf.fecha || new Date().toLocaleDateString('es-CL'))} · Revisado por el consultor</p></header>
+    ${secs}</body></html>`;
+  const fr = document.createElement('iframe');
+  fr.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;';
+  document.body.appendChild(fr);
+  fr.onload = () => {
+    try { fr.contentWindow.focus(); fr.contentWindow.print(); }
+    catch (e) { agentMsg('⚠️ No se pudo abrir la descarga en PDF. Intenta con Exportar TXT.'); }
+    setTimeout(() => fr.remove(), 60000);
+  };
+  fr.srcdoc = html;
+}
+
 function exportarInforme() {
   if (!informeGenerado) return;
   const inf = informeGenerado;
@@ -5645,16 +5691,20 @@ function _pintarSelectorPaisMercado() {
 }
 
 async function _abrirMercado(pais) {
+  const _planM = getPlanActual();
+  if (_planM === 'Inicial' && !IS_ADMIN) return;          // no incluido
+  const _soloPortales = (_planM === 'Esencial' && !IS_ADMIN);  // portales chilenos
+  if (_soloPortales) pais = 'Chile';
   if (pais) _mercadoPaisActual = pais;
   const paisSel = _mercadoPaisActual;
 
-  const overlay = _modalPassword('_mercadoModal', `${icono('building',18)} Mercado laboral para tu perfil`, `
-    <div style="margin-bottom:4px;font-weight:700;font-size:.74rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;">
+  const overlay = _modalPassword('_mercadoModal', `${icono('building',18)} ${_soloPortales ? 'Portales de empleo en Chile' : 'Mercado laboral para tu perfil'}`, `
+    ${_soloPortales ? '' : `<div style="margin-bottom:4px;font-weight:700;font-size:.74rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;">
       Elige el país donde quieres explorar oportunidades
     </div>
-    <div id="_mercadoSelectorPais" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;"></div>
+    <div id="_mercadoSelectorPais" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;"></div>`}
     <div id="_mercadoCuerpo" style="min-height:120px;display:flex;align-items:center;justify-content:center;">
-      <span style="color:var(--muted);font-size:.85rem;">Analizando tu perfil y el mercado de ${escHtml(paisSel)}…</span>
+      <span style="color:var(--muted);font-size:.85rem;">${_soloPortales ? 'Buscando los portales de empleo para tu perfil…' : `Analizando tu perfil y el mercado de ${escHtml(paisSel)}…`}</span>
     </div>
   `);
   // El modal de contraseñas es angosto (380px) — el de mercado necesita más
@@ -5662,13 +5712,13 @@ async function _abrirMercado(pais) {
   // de posicionamiento.
   const caja = overlay.querySelector('div');
   if (caja) { caja.style.maxWidth = '660px'; caja.style.maxHeight = '84vh'; caja.style.overflowY = 'auto'; }
-  _pintarSelectorPaisMercado();
+  if (!_soloPortales) _pintarSelectorPaisMercado();
 
   try {
     const res = await fetch(CONFIG.mercado_url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${_obtenerToken()}` },
-      body: JSON.stringify({ incluir_portales: true, incluir_posicionamiento: true, pais: paisSel }),
+      body: JSON.stringify({ incluir_portales: true, incluir_posicionamiento: !_soloPortales, pais: paisSel }),
       signal: AbortSignal.timeout(70000)
     });
     const data = await res.json().catch(() => ({}));
@@ -5764,14 +5814,24 @@ function _aplicarGateoPorPlan() {
   // Preguntas frecuentes: solo las que el plan puede responder. Sin chat
   // (Inicial) queda solo "Empresas objetivo", que no usa la conversación.
   const _chat = !!_r.chat || IS_ADMIN;
+  // "Consultas recientes" es memoria entre sesiones: solo Profesional y Premium.
   const _secHist = document.getElementById('secHistorial');
-  if (_secHist) _secHist.style.display = _chat ? '' : 'none';
+  if (_secHist) _secHist.style.display = (_chat && (!!_r.memoria || IS_ADMIN)) ? '' : 'none';
+  // Mercado: Inicial no lo tiene; Esencial ve portales de Chile;
+  // Profesional y Premium, el análisis extendido.
+  const _mercado = plan !== 'Inicial' || IS_ADMIN;
   document.querySelectorAll('.qt-btn[data-qt]').forEach(btn => {
     const k = btn.getAttribute('data-qt');
     const necesitaTests = (k === 'disc' || k === 'kostick' || k === 'fortalezas');
-    const visible = k === 'empresas' || (_chat && (!necesitaTests || _tests));
+    const visible = (k === 'empresas') ? _mercado : (_chat && (!necesitaTests || _tests));
     btn.style.display = visible ? '' : 'none';
+    if (k === 'empresas' && !btn.dataset.lblOrig) btn.dataset.lblOrig = btn.innerHTML;
+    if (k === 'empresas') btn.innerHTML = (plan === 'Esencial' && !IS_ADMIN)
+      ? btn.dataset.lblOrig.replace('Empresas objetivo', 'Portales de empleo en Chile')
+      : btn.dataset.lblOrig;
   });
+  const _qt = document.querySelector('.quick-topics');
+  if (_qt) _qt.style.display = [...document.querySelectorAll('.qt-btn[data-qt]')].some(b => b.style.display !== 'none') ? '' : 'none';
   const _wrapInf = document.getElementById('btnInformeWrap');
   if (_wrapInf) _wrapInf.style.display = (plan === 'Inicial' && !IS_ADMIN) ? 'none' : '';
 
