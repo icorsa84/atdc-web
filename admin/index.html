@@ -129,7 +129,13 @@
 </div>
 
 <script>
-  const BACKEND = 'https://atdc-backend-ill4.onrender.com';
+  /* ADM-QA-09: si el panel lo sirve el propio backend (outplacement.atdc.app,
+   Render o local), se usa el mismo origen: sin consulta CORS previa en cada
+   llamada y sin depender de un segundo dominio. Desde GitHub Pages (atdc.app)
+   se sigue usando la URL de Render. */
+const BACKEND = (/(^|\.)outplacement\.atdc\.app$|onrender\.com$|^localhost$|^127\.0\.0\.1$/.test(location.hostname))
+  ? location.origin
+  : 'https://atdc-backend-ill4.onrender.com';
 
   function toggleVisibilidad() {
     const inp = document.getElementById('adminKey');

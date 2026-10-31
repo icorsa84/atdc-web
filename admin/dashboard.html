@@ -141,6 +141,13 @@
   .bar-fill { height:100%; border-radius:4px; }
   .foto-detalle { width:56px; height:56px; border-radius:50%; object-fit:cover; background:var(--bg3);
     border:1px solid var(--border2); flex-shrink:0; }
+  .md-cuerpo { font-size:13.5px; line-height:1.65; color:var(--text2); max-height:60vh; overflow-y:auto; }
+  .md-cuerpo .md-h { color:var(--text); margin:14px 0 6px; font-size:14.5px; }
+  .md-cuerpo .md-h:first-child { margin-top:0; }
+  .md-cuerpo ul, .md-cuerpo ol { padding-left:20px; margin:4px 0 8px; }
+  .md-cuerpo li { margin:3px 0; }
+  .md-cuerpo p { margin:6px 0; }
+  .md-cuerpo strong { color:var(--text); }
   .informe-sec { background:var(--bg); border:1px solid var(--border2); border-radius:9px; padding:12px 14px; margin-bottom:8px; }
   .informe-sec h4 { font-size:13px; margin-bottom:6px; }
   .informe-sec p { font-size:12.5px; color:var(--text2); line-height:1.6; white-space:pre-wrap; }
@@ -250,11 +257,11 @@
     </div>
     <div>
       <label style="display:block;font-size:11.5px;color:var(--muted);margin-bottom:3px;">Año</label>
-      <input id="_em_anio" type="text" placeholder="2025" style="width:90px;">
+      <input id="_em_anio" type="text" inputmode="numeric" maxlength="4" placeholder="2026" style="width:90px;">
     </div>
     <div>
-      <label style="display:block;font-size:11.5px;color:var(--muted);margin-bottom:3px;">Sector (opcional)</label>
-      <input id="_em_sector" type="text" placeholder="Ej: Retail / Logística" style="min-width:200px;">
+      <label style="display:block;font-size:11.5px;color:var(--muted);margin-bottom:3px;">Sector (vacío o «General» = todos)</label>
+      <input id="_em_sector" type="text" list="_em_sectores" placeholder="Vacío = todos los sectores" style="min-width:200px;"><datalist id="_em_sectores"></datalist>
     </div>
     <div>
       <label style="display:block;font-size:11.5px;color:var(--muted);margin-bottom:3px;">Título (opcional)</label>
@@ -263,8 +270,9 @@
     <div>
       <label style="display:block;font-size:11.5px;color:var(--muted);margin-bottom:3px;">Archivo PDF</label>
       <input id="_em_archivo" type="file" accept="application/pdf" aria-label="Archivo PDF del estudio de mercado">
+      <div style="font-size:11px;color:var(--muted);margin-top:3px;">PDF con texto, máx. 15 MB</div>
     </div>
-    <button class="btn-primary" onclick="_subirEstudioMercado()">Subir y procesar</button>
+    <button class="btn-primary" id="_em_btn" onclick="_subirEstudioMercado()">Subir y procesar</button>
   </div>
   <div id="_em_msg" class="msg"></div>
   <div id="estudiosMercadoWrap"><div class="loading">Cargando estudios de mercado…</div></div>
@@ -276,7 +284,13 @@
 <div id="plantillaOverlay" class="overlay" style="display:none;"></div>
 
 <script>
-const BACKEND = 'https://atdc-backend-ill4.onrender.com';
+/* ADM-QA-09: si el panel lo sirve el propio backend (outplacement.atdc.app,
+   Render o local), se usa el mismo origen: sin consulta CORS previa en cada
+   llamada y sin depender de un segundo dominio. Desde GitHub Pages (atdc.app)
+   se sigue usando la URL de Render. */
+const BACKEND = (/(^|\.)outplacement\.atdc\.app$|onrender\.com$|^localhost$|^127\.0\.0\.1$/.test(location.hostname))
+  ? location.origin
+  : 'https://atdc-backend-ill4.onrender.com';
 
 /* Fix QA-UX-ICONOS-01 (panel Admin): mismo registro de íconos SVG que
    agente-chat.html — ver /icons/ en la raíz del repo para el catálogo
@@ -704,7 +718,9 @@ function renderResumen() {
   const conInforme = LISTADO.filter(p => p.tiene_informe_final).length;
   const eliminacionesPendientes = LISTADO.filter(p => p.solicitud_eliminacion_estado === 'pendiente').length;
   const pagosPendientes = LISTADO.filter(p => p.pago_estado === 'pendiente').length;
-  const atsPromedio = total ? Math.round(LISTADO.reduce((acc, p) => acc + (p.ats_score || 0), 0) / total) : 0;
+  // ADM-QA-03: antes promediaba también a quienes no han subido CV (contaban 0)
+  const conAts = LISTADO.filter(p => (p.ats_score || 0) > 0);
+  const atsPromedio = conAts.length ? Math.round(conAts.reduce((acc, p) => acc + p.ats_score, 0) / conAts.length) : null;
 
   document.getElementById('resumenGrid').innerHTML = `
     <div class="kpi-card">
@@ -714,11 +730,11 @@ function renderResumen() {
     </div>
     <div class="kpi-card">
       <div class="kpi-label">Puntaje ATS promedio</div>
-      <div class="kpi-value" style="color:${atsPromedio>=70?'var(--green)':atsPromedio>=40?'var(--amber)':'var(--red)'}">${atsPromedio}</div>
-      <div class="kpi-sub">de 100</div>
+      <div class="kpi-value" style="color:${atsPromedio===null?'var(--muted)':atsPromedio>=70?'var(--green)':atsPromedio>=40?'var(--amber)':'var(--red)'}">${atsPromedio===null?'—':atsPromedio}</div>
+      <div class="kpi-sub">${atsPromedio===null?'Aún nadie tiene CV evaluado':`de 100 · ${conAts.length} CV evaluado${conAts.length===1?'':'s'}`}</div>
     </div>
     <div class="kpi-card">
-      <div class="kpi-label">Informes Final generados</div>
+      <div class="kpi-label">Informes finales generados</div>
       <div class="kpi-value" style="color:var(--blue2)">${conInforme}</div>
       <div class="kpi-sub">de ${total} participantes</div>
     </div>
@@ -847,7 +863,40 @@ const _ACCION_LABELS = {
   cambio_plan: `${icono('credit-card',13)} Cambió plan (Admin)`, confirmar_pago: `${icono('credit-card',13)} Confirmó pago (Admin)`,
   crear_participante: `${icono('user',13)} Creó participante (Admin)`, editar_participante: `${icono('edit',13)} Editó participante (Admin)`,
   eliminar_participante: `${icono('trash',13)} Eliminó participante (Admin)`,
+  // ADM-QA-02: acciones que registraba el servidor y se veían como código interno
+  subir_cv_rechazado: `${icono('paperclip',13)} CV rechazado`,
+  actualizar_consentimientos: `${icono('lock',13)} Actualizó consentimientos`,
+  obtener_datos_personales: `${icono('document',13)} Descargó sus datos`,
+  admin_aceptar_sesion: `${icono('calendar',13)} Aceptó sesión Premium (Admin)`,
+  admin_rechazar_sesion: `${icono('calendar',13)} Rechazó sesión Premium (Admin)`,
+  sync_calendar_sesiones: `${icono('calendar',13)} Sincronizó calendario (Admin)`,
+  admin_reset_rechazos_ats: `${icono('paperclip',13)} Devolvió intentos de CV (Admin)`,
+  admin_reset_test: `${icono('puzzle',13)} Reinició un test (Admin)`,
+  analizar_entrevista: `${icono('document',13)} Analizó entrevista (Admin)`,
+  editar_plantilla_correo: `${icono('mail',13)} Editó plantilla de correo (Admin)`,
+  restablecer_plantilla_correo: `${icono('mail',13)} Restableció plantilla de correo (Admin)`,
+  reenviar_datos_bancarios: `${icono('mail',13)} Reenvió datos bancarios (Admin)`,
+  marcar_plan_regalo: `${icono('credit-card',13)} Regaló plan (Admin)`,
+  subir_estudio_mercado: `${icono('document',13)} Subió estudio de mercado (Admin)`,
+  eliminar_estudio_mercado: `${icono('trash',13)} Eliminó estudio de mercado (Admin)`,
+  solicitud_rectificacion: `${icono('lock',13)} Pidió rectificar datos`,
+  solicitud_supresion: `${icono('lock',13)} Pidió suprimir datos`,
+  solicitud_oposicion: `${icono('lock',13)} Se opuso a un tratamiento`,
+  solicitud_portabilidad: `${icono('lock',13)} Pidió portabilidad de datos`,
 };
+/* Texto sin íconos (para las opciones del filtro, que no admiten HTML). */
+function _accionTexto(k) {
+  const l = _ACCION_LABELS[k];
+  return l ? l.replace(/<[^>]*>/g, '').trim() : k;
+}
+/* Fecha ISO → "31-10-2026 17:35" en hora local. */
+function _fmtFecha(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return String(iso);
+  const z = n => String(n).padStart(2, '0');
+  return `${z(d.getDate())}-${z(d.getMonth()+1)}-${d.getFullYear()} ${z(d.getHours())}:${z(d.getMinutes())}`;
+}
 let audOffset = 0;
 let _audDebounce = null;
 function _auditoriaBuscarConDebounce() {
@@ -860,7 +909,7 @@ function _poblarFiltroAcciones() {
   if (sel.options.length > 1) return; // ya poblado
   Object.keys(_ACCION_LABELS).forEach(k => {
     const opt = document.createElement('option');
-    opt.value = k; opt.textContent = _ACCION_LABELS[k];
+    opt.value = k; opt.textContent = _accionTexto(k);   // ADM-QA-01: antes mostraba el código SVG
     sel.appendChild(opt);
   });
 }
@@ -894,9 +943,9 @@ function renderAuditoria(entradas, total, limit, offset) {
     const quien = esAdmin
       ? `<span class="badge badge-muted">Admin</span>`
       : (e.participante_id ? `<a onclick="abrirDetalle('${escHtml(e.participante_id)}')">${escHtml(e.actor_nombre || e.participante_id)}</a>` : escHtml(e.actor_nombre || e.actor));
-    const accionTxt = escHtml(_ACCION_LABELS[e.accion] || e.accion);
+    const accionTxt = _ACCION_LABELS[e.accion] || escHtml(e.accion);   // las etiquetas son HTML propio (ícono + texto)
     return `<tr>
-      <td style="white-space:nowrap;color:var(--muted);">${escHtml(e.fecha)}</td>
+      <td style="white-space:nowrap;color:var(--muted);" title="${escHtml(e.fecha)}">${_fmtFecha(e.fecha)}</td>
       <td>${quien}</td>
       <td>${accionTxt}</td>
       <td style="color:var(--text2);">${(e.detalle || '').replace(/</g,'&lt;')}</td>
@@ -977,10 +1026,30 @@ function abrirEditorPlantilla(clave) {
       </div>
       <div class="sec" style="display:flex;gap:8px;">
         <button class="btn-primary" onclick="_guardarPlantilla('${escHtml(t.clave)}')">Guardar plantilla</button>
+        <button class="btn-secondary" onclick="_previsualizarPlantilla()">${icono('mail',14)} Vista previa</button>
         ${t.personalizada ? `<button class="btn-secondary" onclick="_restablecerPlantilla('${escHtml(t.clave)}')">Restablecer a fábrica</button>` : ''}
       </div>
       <div id="_pl_msg" class="msg"></div>
+      <iframe id="_pl_preview" title="Vista previa del correo" sandbox="" style="display:none;width:100%;height:420px;border:1px solid var(--border2);border-radius:9px;background:#fff;margin-top:10px;"></iframe>
     </div>`;
+}
+
+/* ADM-QA-08: Escape cierra la ventana abierta (primero la de encima) */
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape') return;
+  const pl = document.getElementById('plantillaOverlay');
+  const de = document.getElementById('detalleOverlay');
+  if (pl && pl.style.display !== 'none') { cerrarEditorPlantilla(); return; }
+  if (de && de.style.display !== 'none') { cerrarDetalle(); }
+});
+
+/* Vista previa del correo tal como lo recibirá el participante */
+function _previsualizarPlantilla() {
+  const html = document.getElementById('_pl_html')?.value || '';
+  const fr = document.getElementById('_pl_preview');
+  if (!fr) return;
+  fr.style.display = 'block';
+  fr.srcdoc = html;   // iframe con sandbox: sin scripts ni acceso al panel
 }
 
 function cerrarEditorPlantilla() {
@@ -1030,8 +1099,16 @@ let ESTUDIOS_MERCADO = [];
 function _pintarSelectPaisEstudioMercado() {
   const sel = document.getElementById('_em_pais');
   if (!sel) return;
+  const previo = sel.value;
   sel.innerHTML = PAISES_LATAM_ADMIN.map(p => `<option value="${p}">${p}</option>`).join('');
-  sel.value = 'Chile';
+  sel.value = previo || 'Chile';
+  // Año por defecto y sugerencias de sector (catálogo estándar)
+  const anio = document.getElementById('_em_anio');
+  if (anio && !anio.value) anio.value = String(new Date().getFullYear());
+  const dl = document.getElementById('_em_sectores');
+  if (dl && !dl.options.length && typeof CATALOGO_SECTORES !== 'undefined') {
+    dl.innerHTML = CATALOGO_SECTORES.map(x => `<option value="${escHtml(x)}">`).join('');
+  }
 }
 
 async function cargarEstudiosMercado() {
@@ -1059,8 +1136,9 @@ function renderEstudiosMercado() {
         <div style="font-size:12px;color:var(--muted);margin-top:2px;">${escHtml(e.nombre_archivo)} · ${Math.round((e.tamano_bytes||0)/1024)} KB</div>
       </td>
       <td>${escHtml(e.pais)}</td>
-      <td>${e.sector ? escHtml(e.sector) : '<span style="color:var(--muted);">— (todos)</span>'}</td>
+      <td>${_sectorEsGeneral(e.sector) ? '<span style="color:var(--muted);">Todos los sectores</span>' : escHtml(e.sector)}</td>
       <td>${escHtml(e.anio || '—')}</td>
+      <td style="white-space:nowrap;color:var(--muted);">${_fmtFecha(e.subido_en)}</td>
       <td style="white-space:nowrap;">
         <button class="btn-secondary" onclick="_verResumenEstudioMercado('${escHtml(e.id)}')">Ver resumen</button>
         <button class="btn-secondary" onclick="_eliminarEstudioMercado('${escHtml(e.id)}')">Eliminar</button>
@@ -1069,15 +1147,68 @@ function renderEstudiosMercado() {
 
   document.getElementById('estudiosMercadoWrap').innerHTML = `
     <table>
-      <thead><tr><th>Estudio</th><th>País</th><th>Sector</th><th>Año</th><th></th></tr></thead>
+      <thead><tr><th>Estudio</th><th>País</th><th>Sector</th><th>Año</th><th>Cargado</th><th></th></tr></thead>
       <tbody>${filas}</tbody>
     </table>`;
+}
+
+/* ADM-QA-05: Markdown → HTML seguro (se escapa TODO primero y luego se
+   aplica un formato mínimo: títulos, negritas, listas y párrafos). */
+/* Igual que en el servidor: vacío, "General", "Todos"… = aplica a todos los sectores */
+function _sectorEsGeneral(v) {
+  const t = String(v || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim().replace(/^[-—\s]+|[-—\s]+$/g, '');
+  return !t || ['general','todos','todos los sectores','todas','transversal','multisector','multisectorial','n/a','na','general / todos'].includes(t);
+}
+
+function _mdAHtml(md) {
+  const lineas = escHtml(md || '').split(/\r?\n/);
+  const out = []; let lista = null;
+  const cerrar = () => { if (lista) { out.push(`</${lista}>`); lista = null; } };
+  const inline = t => t.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>').replace(/(^|[^*])\*([^*]+)\*/g, '$1<em>$2</em>');
+  for (const l of lineas) {
+    let m;
+    if ((m = l.match(/^\s*(#{1,4})\s+(.*)$/))) { cerrar(); const n = Math.min(6, m[1].length + 2); out.push(`<h${n} class="md-h">${inline(m[2])}</h${n}>`); }
+    else if ((m = l.match(/^\s*[-*•]\s+(.*)$/))) { if (lista !== 'ul') { cerrar(); out.push('<ul>'); lista = 'ul'; } out.push(`<li>${inline(m[1])}</li>`); }
+    else if ((m = l.match(/^\s*\d+[.)]\s+(.*)$/))) { if (lista !== 'ol') { cerrar(); out.push('<ol>'); lista = 'ol'; } out.push(`<li>${inline(m[1])}</li>`); }
+    else if (!l.trim()) { cerrar(); }
+    else { cerrar(); out.push(`<p>${inline(l)}</p>`); }
+  }
+  cerrar();
+  return out.join('');
 }
 
 function _verResumenEstudioMercado(id) {
   const e = ESTUDIOS_MERCADO.find(x => x.id === id);
   if (!e) return;
-  alert(`${e.titulo} (${e.pais}${e.sector ? ' · ' + e.sector : ''}, ${e.anio || 's/f'})\n\n${e.resumen_md}`);
+  const ov = document.getElementById('plantillaOverlay');
+  ov.style.display = 'flex';
+  ov.innerHTML = `
+    <div class="panel" style="max-width:760px;" role="dialog" aria-modal="true" aria-label="Resumen del estudio">
+      <button class="panel-close" onclick="cerrarEditorPlantilla()" title="Cerrar" style="display:flex;">${icono('close',16)}</button>
+      <div class="sec">
+        <div style="font-size:17px;font-weight:700;">${escHtml(e.titulo)}</div>
+        <div style="font-size:12.5px;color:var(--muted);margin-top:4px;">
+          ${escHtml(e.pais)} · ${_sectorEsGeneral(e.sector) ? 'todos los sectores' : escHtml(e.sector)} · año ${escHtml(e.anio || 's/f')}
+          · ${escHtml(e.nombre_archivo)} (${Math.round((e.tamano_bytes||0)/1024)} KB) · cargado ${_fmtFecha(e.subido_en)}
+        </div>
+        <div style="font-size:12px;color:var(--muted);margin-top:6px;">
+          Este es el resumen que Claude extrajo del PDF y que se cita como fuente a los participantes de ${escHtml(e.pais)}${_sectorEsGeneral(e.sector) ? ', de cualquier sector' : ' cuyo sector sea ' + escHtml(e.sector)}.
+        </div>
+      </div>
+      <div class="sec md-cuerpo">${_mdAHtml(e.resumen_md)}</div>
+      <div class="sec" style="display:flex;gap:8px;">
+        <button class="btn-secondary" onclick="_copiarResumenEstudio('${escHtml(e.id)}')">${icono('document',14)} Copiar texto</button>
+        <button class="btn-secondary" onclick="cerrarEditorPlantilla()">Cerrar</button>
+      </div>
+      <div id="_em_ver_msg" class="msg"></div>
+    </div>`;
+}
+
+async function _copiarResumenEstudio(id) {
+  const e = ESTUDIOS_MERCADO.find(x => x.id === id);
+  if (!e) return;
+  try { await navigator.clipboard.writeText(e.resumen_md || ''); _mostrarMsg('_em_ver_msg', 'Resumen copiado.', false); }
+  catch (err) { _mostrarMsg('_em_ver_msg', 'No se pudo copiar automáticamente; selecciona el texto y cópialo.', true); }
 }
 
 async function _eliminarEstudioMercado(id) {
@@ -1098,9 +1229,22 @@ async function _subirEstudioMercado() {
   const archivo = archivoInput.files[0];
 
   if (!archivo) { _mostrarMsg('_em_msg', 'Selecciona un archivo PDF.', true); return; }
-  if (!anio) { _mostrarMsg('_em_msg', 'Indica el año del estudio.', true); return; }
+  // ADM-QA-06: validaciones antes de gastar una llamada a Claude
+  if (!/\.pdf$/i.test(archivo.name)) { _mostrarMsg('_em_msg', 'El archivo debe ser PDF.', true); return; }
+  if (archivo.size > 15 * 1024 * 1024) { _mostrarMsg('_em_msg', `El PDF pesa ${(archivo.size/1048576).toFixed(1)} MB; el máximo es 15 MB.`, true); return; }
+  const anioNum = parseInt(anio, 10);
+  if (!/^\d{4}$/.test(anio) || anioNum < 2000 || anioNum > new Date().getFullYear() + 2) {
+    _mostrarMsg('_em_msg', 'Indica el año del estudio con 4 dígitos (por ejemplo 2026).', true); return;
+  }
+  const repetido = ESTUDIOS_MERCADO.find(x => x.nombre_archivo === archivo.name && x.pais === pais && String(x.anio) === anio);
+  if (repetido && !confirm(`Ya cargaste "${archivo.name}" para ${pais} ${anio}. ¿Subirlo de nuevo de todas formas?`)) return;
 
-  _mostrarMsg('_em_msg', 'Procesando documento con IA (puede tardar unos segundos)…', false);
+  const btn = document.getElementById('_em_btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Procesando…'; }
+  const t0 = Date.now();
+  const tick = () => _mostrarMsg('_em_msg', `Claude está leyendo el PDF… ${Math.round((Date.now()-t0)/1000)} s (suele tardar entre 20 y 60 s; no cierres esta pestaña).`, false);
+  tick();
+  const crono = setInterval(tick, 1000);
 
   const fd = new FormData();
   fd.append('archivo', archivo);
@@ -1123,15 +1267,33 @@ async function _subirEstudioMercado() {
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(_textoError(data.detail) || 'No se pudo procesar el documento.');
 
-    _mostrarMsg('_em_msg', `Estudio "${data.titulo}" procesado y disponible para ${data.pais}.`, false);
+    clearInterval(crono);
+    _mostrarMsg('_em_msg', `Estudio "${data.titulo}" procesado en ${Math.round((Date.now()-t0)/1000)} s y disponible para ${data.pais}. Revísalo con «Ver resumen».`, false);
     archivoInput.value = '';
-    document.getElementById('_em_anio').value = '';
     document.getElementById('_em_sector').value = '';
     document.getElementById('_em_titulo').value = '';
     await cargarEstudiosMercado();
   } catch (e) {
-    _mostrarMsg('_em_msg', e.message, true);
+    clearInterval(crono);
+    const txt = (e && e.message === 'Failed to fetch')
+      ? 'Se perdió la conexión con el servidor mientras se procesaba. Recarga la lista en un minuto: si el estudio no aparece, vuelve a subirlo.'
+      : e.message;
+    _mostrarMsg('_em_msg', txt, true);
+  } finally {
+    clearInterval(crono);
+    if (btn) { btn.disabled = false; btn.textContent = 'Subir y procesar'; }
   }
+}
+
+/* ADM-QA-07: antes 6–9 decía "Moderadamente presente" y 3–5 "Presente de
+   forma moderada" (sinónimos); ahora la escala es clara. Puntaje = cantidad
+   de veces que eligió esa dimensión como "más" sobre 28 grupos. */
+function _interpDisc(seg) {
+  const n = Number(seg) || 0;
+  if (n >= 10) return 'Alta (predominante)';
+  if (n >= 6)  return 'Media-alta';
+  if (n >= 3)  return 'Media-baja';
+  return 'Baja';
 }
 
 function _barraInterp(label, valor, max, interp) {
@@ -1254,7 +1416,7 @@ function _renderDetalle(p) {
 
     <div class="sec">
       <div class="sec-title">DISC — ${disc.codigo || '—'} ${disc.patron ? '· ' + disc.patron : ''}</div>
-      ${Object.keys(dims).length ? Object.entries(dims).map(([k,v]) => _barraInterp(`${k} — ${escHtml(v.label)}`, v.seg, 28, v.interp)).join('') : '<div style="color:var(--muted);font-size:12.5px;">Sin evaluar.</div>'}
+      ${Object.keys(dims).length ? Object.entries(dims).map(([k,v]) => _barraInterp(`${k} — ${escHtml(v.label)}`, v.seg, 28, _interpDisc(v.seg))).join('') : '<div style="color:var(--muted);font-size:12.5px;">Sin evaluar.</div>'}
     </div>
 
     <div class="sec">
@@ -1270,6 +1432,13 @@ function _renderDetalle(p) {
         ${p.premium?.sesion_consultor?.fecha ? ` · ${escHtml(p.premium.sesion_consultor.fecha)} ${escHtml(p.premium.sesion_consultor.hora)}` : ''}
       </div>
       ${p.premium?.sesion_consultor?.comentario ? `<div style="font-size:12.5px;color:var(--text2);margin-top:4px;">"${escHtml(p.premium.sesion_consultor.comentario)}"</div>` : ''}
+      ${p.premium?.sesion_consultor?.estado === 'solicitada' ? `
+      <!-- ADM-QA-04: antes no había cómo responder la solicitud desde el panel -->
+      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;">
+        <button class="btn-primary" onclick="_responderSesion('${escHtml(p.id)}','aceptar')">${icono('check',14)} Aceptar sesión</button>
+        <button class="btn-secondary" onclick="_responderSesion('${escHtml(p.id)}','rechazar')">Rechazar…</button>
+      </div>` : ''}
+      <div id="_ses_msg" class="msg"></div>
     </div>` : ''}
 
     <div class="sec">
@@ -1409,6 +1578,23 @@ async function _aprobarPlan(id) {
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = 'Asignar plan ahora (sin pago)'; }
   }
+}
+
+async function _responderSesion(id, accion) {
+  let body = {};
+  if (accion === 'aceptar') {
+    if (!confirm('¿Aceptar la sesión? Se le enviará al participante un correo de confirmación.')) return;
+  } else {
+    const motivo = prompt('Motivo del rechazo (se incluye en el correo al participante; opcional):', '');
+    if (motivo === null) return;
+    body = { motivo: motivo.trim() };
+  }
+  try {
+    const data = await _apiSend('PATCH', `/api/admin/sesiones/${id}/${accion}`, body);
+    await abrirDetalle(id);
+    _mostrarMsg('_ses_msg', data.mensaje || (accion === 'aceptar' ? 'Sesión aceptada.' : 'Sesión rechazada.'), false);
+    cargarListado();
+  } catch (e) { _mostrarMsg('_ses_msg', e.message, true); }
 }
 
 async function _confirmarPago(id) {
