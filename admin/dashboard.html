@@ -892,7 +892,11 @@ function _accionTexto(k) {
 /* Fecha ISO → "31-10-2026 17:35" en hora local. */
 function _fmtFecha(iso) {
   if (!iso) return '—';
-  const d = new Date(iso);
+  // El servidor (Render) guarda la hora en UTC sin indicar la zona: se marca
+  // como UTC para que el navegador la muestre en la hora local (Chile).
+  let t = String(iso);
+  if (/T\d{2}:\d{2}(:\d{2}(\.\d+)?)?$/.test(t)) t += 'Z';
+  const d = new Date(t);
   if (isNaN(d.getTime())) return String(iso);
   const z = n => String(n).padStart(2, '0');
   return `${z(d.getDate())}-${z(d.getMonth()+1)}-${d.getFullYear()} ${z(d.getHours())}:${z(d.getMinutes())}`;
