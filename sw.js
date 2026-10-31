@@ -1,10 +1,22 @@
 /**
  * ATDC Service Worker — PWA Cache
  * Dominio: outplacement.atdc.app
- * Estrategia: Cache-first para assets estáticos, Network-first para API.
+ *
+ * Fix SW-CACHE-01 (2026-10-31): antes TODO era cache-first sin revalidar, así
+ * que una página guardada (agente-chat.html, el panel admin) se servía para
+ * siempre aunque se publicara una versión nueva — los arreglos no llegaban.
+ * Estrategia actual:
+ *   - Páginas HTML / navegación → red primero; la copia guardada solo se usa
+ *     sin conexión.
+ *   - Panel de administración (/admin, /dashboard.html) → solo red, nunca se
+ *     guarda (datos sensibles y siempre debe ser la versión vigente).
+ *   - Otros archivos estáticos → copia guardada al instante y se actualiza en
+ *     segundo plano (stale-while-revalidate).
+ *   - API → no se intercepta.
+ * Cambiar CACHE_NAME borra las copias viejas al activarse.
  */
 
-const CACHE_NAME = 'atdc-v11';
+const CACHE_NAME = 'atdc-v12';
 const STATIC_ASSETS = [
   '/',
   '/agente-chat.html',
@@ -37,34 +49,51 @@ self.addEventListener('activate', event => {
 });
 
 // Estrategia de fetch
+function _esAdmin(url) {
+  return url.pathname === '/admin' || url.pathname.startsWith('/admin/') ||
+         url.pathname === '/dashboard.html';
+}
+function _esPagina(request, url) {
+  return request.mode === 'navigate' ||
+         (request.headers.get('accept') || '').includes('text/html') ||
+         url.pathname.endsWith('.html') || url.pathname === '/';
+}
+function _guardar(request, response) {
+  if (response && response.ok && response.type === 'basic') {
+    const copia = response.clone();
+    caches.open(CACHE_NAME).then(cache => cache.put(request, copia)).catch(() => {});
+  }
+  return response;
+}
+
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
 
-  // API calls: siempre network (no cachear respuestas de chat)
-  if (url.hostname.includes('onrender.com') || url.pathname.startsWith('/api/')) {
-    return; // dejar pasar sin interceptar
+  // API: siempre red, sin interceptar
+  if (url.hostname.includes('onrender.com') || url.pathname.startsWith('/api/')) return;
+  // Solo GET
+  if (event.request.method !== 'GET') return;
+  // Otros orígenes (fuentes, CDN): dejar al navegador
+  if (url.origin !== self.location.origin) return;
+  // Administración: nunca desde caché
+  if (_esAdmin(url)) return;
+
+  // Páginas: red primero, caché solo sin conexión
+  if (_esPagina(event.request, url)) {
+    event.respondWith(
+      fetch(event.request)
+        .then(resp => _guardar(event.request, resp))
+        .catch(() => caches.match(event.request)
+          .then(c => c || caches.match('/agente-chat.html')))
+    );
+    return;
   }
 
-  // POST requests: no cachear
-  if (event.request.method !== 'GET') return;
-
-  // Assets estáticos: cache-first
+  // Resto de archivos estáticos: stale-while-revalidate
   event.respondWith(
     caches.match(event.request).then(cached => {
-      if (cached) return cached;
-      return fetch(event.request).then(response => {
-        // Cachear solo respuestas válidas del mismo origen
-        if (response.ok && url.origin === self.location.origin) {
-          const clone = response.clone();
-          caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
-        }
-        return response;
-      }).catch(() => {
-        // Offline fallback para navegación
-        if (event.request.mode === 'navigate') {
-          return caches.match('/agente-chat.html');
-        }
-      });
+      const red = fetch(event.request).then(resp => _guardar(event.request, resp)).catch(() => cached);
+      return cached || red;
     })
   );
 });

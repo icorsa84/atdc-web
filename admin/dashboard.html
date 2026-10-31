@@ -440,7 +440,9 @@ function _multiSelectConOtro(idBase, catalogo, valorActual) {
 
   const tieneOtro = valores.some(v => v && !catalogo.includes(v) && v !== '__otro__');
   const textoOtro = tieneOtro ? valores.find(v => !catalogo.includes(v)) : '';
-  const valoresFiltr = valores.filter(v => catalogo.includes(v) || !v);
+  /* Fix UX-MULTI-02: los valores de "Otro" van junto a los del catálogo (antes
+     se perdían al guardar) y se descartan vacíos y marcadores. */
+  const valoresFiltr = valores.filter(v => v && typeof v === 'string' && v.trim() && v !== '__otro__' && v !== 'Por definir');
 
   const chipsHtml = valoresFiltr.map(v => `
     <div class="multi-chip" data-value="${escHtml(v)}">
@@ -448,7 +450,7 @@ function _multiSelectConOtro(idBase, catalogo, valorActual) {
     </div>
   `).join('');
 
-  const chipsOtroHtml = tieneOtro ? `
+  const chipsOtroHtml = false ? `
     <div class="multi-chip" data-value="__otro__" data-texto="${escHtml(textoOtro)}">
       ${escHtml(textoOtro)} <button type="button" onclick="_quitarChip('${idBase}', '__otro__', event)" style="border:none;background:none;color:inherit;cursor:pointer;padding:0;margin-left:4px;font-weight:bold;">×</button>
     </div>
@@ -458,14 +460,14 @@ function _multiSelectConOtro(idBase, catalogo, valorActual) {
 
   return `
     <div class="multi-select-wrapper" id="${idBase}_wrapper">
-      <input type="hidden" id="${idBase}_values" value="${JSON.stringify(valoresFiltr)}">
+      <input type="hidden" id="${idBase}_values" value="${escHtml(JSON.stringify(valoresFiltr))}">
       <div class="multi-select-input" onclick="_abrirMultiSelect('${idBase}')" id="${idBase}_display">
         <div style="display:flex;flex-wrap:wrap;gap:6px;">
           ${chipsHtml}${chipsOtroHtml}
           <input type="text" class="multi-search" id="${idBase}_search" placeholder="${valoresFiltr.length > 0 || tieneOtro ? 'Agregar más…' : 'Busca y selecciona…'}" oninput="_filtrarMultiSelect('${idBase}', event)" style="flex:1;min-width:80px;border:none;background:transparent;outline:none;color:var(--text,#f1f5f9);font-size:13px;">
         </div>
       </div>
-      <div class="multi-dropdown" id="${idBase}_dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--bg2,#12151f);border:1px solid var(--border,#1e2a3a);border-top:none;border-radius:0 0 8px 8px;max-height:300px;overflow-y:auto;z-index:1000;margin-top:-1px;">
+      <div class="multi-dropdown" id="${idBase}_dropdown" tabindex="-1" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--bg2,#12151f);border:1px solid var(--border,#1e2a3a);border-top:none;border-radius:0 0 8px 8px;max-height:300px;overflow-y:auto;z-index:1000;margin-top:-1px;">
         <div class="multi-options" id="${idBase}_options">
           ${opcionesHtml}
           <div class="multi-option" data-value="__otro__" onclick="_activarOtroMulti('${idBase}', event)" style="padding:10px 12px;color:var(--text,#f1f5f9);cursor:pointer;border-bottom:1px solid var(--border,#1e2a3a);font-size:13px;transition:background 120ms ease;">Otro (especificar)</div>
@@ -484,10 +486,54 @@ function _multiSelectConOtro(idBase, catalogo, valorActual) {
 }
 
 function _abrirMultiSelect(idBase) {
+  /* Fix UX-MULTI-01: antes el clic alternaba abrir/cerrar y no había forma
+     de salir de la lista (ni clic afuera, ni Escape, ni Tab). Ahora el clic
+     solo abre; se cierra con clic fuera, Escape o Tab al siguiente campo. */
+  _cerrarMultiSelects(idBase);
   const dropdown = document.getElementById(idBase + '_dropdown');
-  if (dropdown) dropdown.style.display = dropdown.style.display === 'none' ? '' : 'none';
+  if (dropdown) dropdown.style.display = '';
   const search = document.getElementById(idBase + '_search');
-  if (search && dropdown && dropdown.style.display !== 'none') search.focus();
+  if (search && document.activeElement !== search) search.focus();
+}
+
+/* Cierra todas las listas abiertas (salvo la indicada) */
+function _cerrarMultiSelects(exceptoIdBase) {
+  document.querySelectorAll('.multi-dropdown').forEach(dd => {
+    if (exceptoIdBase && dd.id === exceptoIdBase + '_dropdown') return;
+    if (dd.style.display !== 'none') {
+      dd.style.display = 'none';
+      const otro = dd.querySelector('.multi-otro-input');
+      if (otro && !otro.value.trim()) otro.style.display = 'none';
+    }
+  });
+}
+
+if (!window._multiSelectCierreInstalado) {
+  window._multiSelectCierreInstalado = true;
+  // Clic (o toque) fuera de la lista → cerrar
+  document.addEventListener('mousedown', e => {
+    if (!e.target.closest || !e.target.closest('.multi-select-wrapper')) _cerrarMultiSelects();
+  }, true);
+  document.addEventListener('touchstart', e => {
+    if (!e.target.closest || !e.target.closest('.multi-select-wrapper')) _cerrarMultiSelects();
+  }, { capture: true, passive: true });
+  // Escape → cerrar
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && document.querySelector('.multi-dropdown:not([style*="display: none"]):not([style*="display:none"])')) {
+      _cerrarMultiSelects();
+      e.stopPropagation();
+    }
+  }, true);
+  // Tab / foco que sale del componente → cerrar
+  document.addEventListener('focusout', e => {
+    const w = e.target.closest && e.target.closest('.multi-select-wrapper');
+    if (!w) return;
+    const destino = e.relatedTarget;
+    if (destino && w.contains(destino)) return;
+    if (!destino) return;   // clic dentro de la lista (opciones no enfocables): no cerrar
+    const dd = w.querySelector('.multi-dropdown');
+    if (dd) dd.style.display = 'none';
+  });
 }
 
 function _agregarChip(idBase, valor, event) {
