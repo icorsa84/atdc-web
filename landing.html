@@ -336,7 +336,7 @@ ul{list-style:none}
 .etapa:hover{border-color:var(--blue-600);box-shadow:0 8px 32px rgba(37,99,235,.12)}
 .etapa-num{
   font-family:'Sora',sans-serif;font-size:28px;font-weight:800;
-  color:rgba(255,255,255,.06);line-height:1;
+  color:rgba(255,255,255,.4);line-height:1; /* QA-A11Y-01: antes .06 (contraste 1.2:1) */
 }
 .etapa-title{font-size:15px;font-weight:700;color:var(--text-primary);line-height:1.3}
 .etapa-desc{font-size:13px;color:var(--text-secondary);line-height:1.6;flex:1}
@@ -344,8 +344,8 @@ ul{list-style:none}
   display:inline-block;padding:3px 10px;border-radius:100px;
   font-size:11px;font-weight:600;align-self:flex-start;
 }
-.tag-blue{background:rgba(37,99,235,.12);color:var(--blue-500)}
-.tag-esencial{background:rgba(59,130,246,.12);color:var(--esencial-color)}
+.tag-blue{background:rgba(37,99,235,.12);color:#60a5fa}
+.tag-esencial{background:rgba(59,130,246,.12);color:#60a5fa}
 .tag-profesional{background:rgba(167,139,250,.12);color:var(--profesional-color)}
 .tag-premium{background:rgba(245,158,11,.12);color:var(--premium-color)}
 
@@ -373,7 +373,7 @@ ul{list-style:none}
   padding:4px 14px;border-radius:100px;
   font-size:11px;font-weight:700;white-space:nowrap;
 }
-.badge-free{background:var(--green);color:#fff}
+.badge-free{background:#15803d;color:#fff}
 .badge-rec{background:linear-gradient(90deg,var(--blue-600),var(--violet-600));color:#fff}
 .plan-name{
   font-family:'Sora',sans-serif;font-size:17px;font-weight:700;
@@ -692,7 +692,7 @@ footer{
           <span>Puntaje ATS — análisis completado</span>
           <strong>72 / 100</strong>
         </div>
-        <div class="ats-track" aria-label="72 de 100 puntos ATS">
+        <div class="ats-track" role="img" aria-label="72 de 100 puntos ATS">
           <div class="ats-fill" style="width:72%"></div>
         </div>
       </div>

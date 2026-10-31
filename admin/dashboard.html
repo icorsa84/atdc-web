@@ -41,6 +41,12 @@
   .navbar::-webkit-scrollbar { height:4px; }
   .navbar::-webkit-scrollbar-thumb { background:var(--border2); border-radius:4px; }
   .navbar-inner { display:flex; gap:6px; padding:9px 20px; max-width:1240px; margin:0 auto; min-width:max-content; }
+  /* QA-UX-MOVIL-01: una lista con opciones largas (filtro de auditoría) medía
+     ~6.800 px y desbordaba toda la página en el teléfono. */
+  select { max-width:100%; text-overflow:ellipsis; }
+  #audAccion { min-width:0; width:100%; max-width:320px; }
+  /* Tablas anchas: se desplazan dentro de su caja en el teléfono, no la página entera */
+  [id$="Wrap"] { overflow-x:auto; -webkit-overflow-scrolling:touch; max-width:100%; }
   .nav-item { display:inline-flex; align-items:center; gap:6px; padding:7px 13px; border-radius:999px;
     font-size:12.5px; font-weight:600; color:var(--text2); text-decoration:none; white-space:nowrap;
     border:1px solid transparent; transition:background .15s,color .15s,border-color .15s; cursor:pointer; }
@@ -70,7 +76,7 @@
   .badge-ok { background:rgba(34,197,94,.15); color:#4ADE80; }
   .badge-pendiente { background:rgba(239,68,68,.18); color:#F87171; }
   .badge-pago-pendiente { background:rgba(245,158,11,.18); color:#FBBF24; }
-  .badge-muted { background:rgba(100,116,139,.15); color:#64748B; }
+  .badge-muted { background:rgba(100,116,139,.15); color:#94a3b8; /* QA-A11Y-03: antes #64748B (3,2:1) */ }
   .btn-ver { background:var(--blue); color:#fff; border:none; border-radius:7px; padding:7px 13px;
     font-size:12.5px; font-weight:600; cursor:pointer; }
   .btn-ver:hover { background:#1D4ED8; }
@@ -186,14 +192,14 @@
   <h2 style="display:flex;align-items:center;gap:8px;"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg> Seleccionar participante</h2>
   <div class="toolbar">
     <input id="buscador" type="text" placeholder="Buscar por nombre…" oninput="renderTabla()" style="min-width:220px;">
-    <select id="filtroPlan" onchange="renderTabla()">
+    <select id="filtroPlan" aria-label="Filtrar por plan" onchange="renderTabla()">
       <option value="">Todos los planes</option>
       <option value="Inicial">Inicial</option>
       <option value="Esencial">Esencial</option>
       <option value="Profesional">Profesional</option>
       <option value="Premium">Premium</option>
     </select>
-    <select id="filtroEliminacion" onchange="renderTabla()">
+    <select id="filtroEliminacion" aria-label="Filtrar por solicitud de eliminación" onchange="renderTabla()">
       <option value="">Todas las solicitudes</option>
       <option value="pendiente">Con eliminación pendiente</option>
     </select>
@@ -209,7 +215,7 @@
   <h2 style="display:flex;align-items:center;gap:8px;"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect><path d="M9 4H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-3"></path><line x1="8" y1="11" x2="16" y2="11"></line><line x1="8" y1="15" x2="16" y2="15"></line></svg> Registro de auditoría</h2>
   <div class="toolbar">
     <input id="audBuscador" type="text" placeholder="Buscar por nombre, acción, detalle…" oninput="_auditoriaBuscarConDebounce()" style="min-width:260px;">
-    <select id="audAccion" onchange="cargarAuditoria(0)">
+    <select id="audAccion" aria-label="Filtrar auditoría por acción" onchange="cargarAuditoria(0)">
       <option value="">Todas las acciones</option>
     </select>
     <div class="stat-chip">Total: <b id="audTotal">—</b></div>
@@ -240,7 +246,7 @@
   <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;margin-bottom:14px;">
     <div>
       <label style="display:block;font-size:11.5px;color:var(--muted);margin-bottom:3px;">País</label>
-      <select id="_em_pais" style="min-width:160px;"></select>
+      <select id="_em_pais" aria-label="País del estudio" style="min-width:160px;"></select>
     </div>
     <div>
       <label style="display:block;font-size:11.5px;color:var(--muted);margin-bottom:3px;">Año</label>
@@ -256,7 +262,7 @@
     </div>
     <div>
       <label style="display:block;font-size:11.5px;color:var(--muted);margin-bottom:3px;">Archivo PDF</label>
-      <input id="_em_archivo" type="file" accept="application/pdf">
+      <input id="_em_archivo" type="file" accept="application/pdf" aria-label="Archivo PDF del estudio de mercado">
     </div>
     <button class="btn-primary" onclick="_subirEstudioMercado()">Subir y procesar</button>
   </div>
@@ -683,9 +689,9 @@ async function cargarListado() {
     renderResumen();
     renderTareas();
   } catch (e) {
-    document.getElementById('tablaWrap').innerHTML = `<div class="empty">${icono('warning',14)} ${e.message}</div>`;
+    document.getElementById('tablaWrap').innerHTML = `<div class="empty">${icono('warning',14)} ${escHtml(e.message)}</div>`;
     document.getElementById('resumenGrid').innerHTML = '';
-    document.getElementById('donutWrap').innerHTML = `<div class="empty">${icono('warning',14)} ${e.message}</div>`;
+    document.getElementById('donutWrap').innerHTML = `<div class="empty">${icono('warning',14)} ${escHtml(e.message)}</div>`;
     document.getElementById('tareasGrid').innerHTML = '';
   }
 }
@@ -751,7 +757,7 @@ function renderResumen() {
 /* ===== TAREAS PENDIENTES — bandeja de pendientes accionable ===== */
 function _listaTareas(items, render) {
   if (!items.length) return `<div class="tarea-vacio">Nada pendiente aquí. ${icono('check',12)}</div>`;
-  return `<div class="tarea-lista">${items.map(render).join('')}</div>`;
+  return `<div class="tarea-lista" tabindex="0" role="region" aria-label="Lista de participantes">${items.map(render).join('')}</div>`;
 }
 
 function renderTareas() {
@@ -765,19 +771,19 @@ function renderTareas() {
     <div class="tarea-card">
       <div class="tarea-hdr">
         <div class="tarea-hdr-title">${titulo}</div>
-        <div class="tarea-count" style="background:${color}22;color:${color}">${items.length}</div>
+        <div class="tarea-count" style="background:${color}22;color:${color}">${escHtml(items.length)}</div>
       </div>
       ${_listaTareas(items, render)}
     </div>`;
 
   const itemParticipante = (p, extra) => `
-    <div class="tarea-item"><a onclick="abrirDetalle('${p.id}')">${p.nombre}</a><span style="color:var(--muted)">${extra || ''}</span></div>`;
+    <div class="tarea-item"><a onclick="abrirDetalle('${escHtml(p.id)}')">${escHtml(p.nombre)}</a><span style="color:var(--muted)">${extra || ''}</span></div>`;
 
   document.getElementById('tareasGrid').innerHTML =
     tarjeta(`${icono('credit-card',13)} Pagos pendientes de confirmar`, '#F59E0B', pagosPendientes, p => itemParticipante(p, `pidió ${p.plan_solicitado || p.plan}`)) +
     tarjeta(`${icono('trash',13)} Solicitudes de eliminación de datos`, '#EF4444', eliminaciones, p => itemParticipante(p, p.solicitud_eliminacion_estado)) +
     tarjeta(`${icono('calendar',13)} Sesiones Premium por confirmar`, '#F59E0B', sesionesPremium, p => itemParticipante(p, 'Premium')) +
-    tarjeta(`${icono('paperclip',13)} Sin CV subido`, '#64748B', sinCv, p => itemParticipante(p, p.plan)) +
+    tarjeta(`${icono('paperclip',13)} Sin CV subido`, '#94A3B8', sinCv, p => itemParticipante(p, p.plan)) +
     tarjeta(`${icono('edit',13)} Datos del perfil por completar`, '#3B82F6', porDefinir, p => itemParticipante(p, p.plan));
 }
 
@@ -803,17 +809,17 @@ function renderTabla() {
 
   const filasHtml = filas.map(p => `
     <tr>
-      <td>${p.id}</td>
-      <td>${p.nombre}</td>
+      <td>${escHtml(p.id)}</td>
+      <td>${escHtml(p.nombre)}</td>
       <td>${_badgePlan(p.plan)}</td>
       <td>${p.pago_estado === 'pendiente' ? `<span class="badge badge-pago-pendiente">${icono('credit-card',12)} Pendiente</span>` : `<span class="badge badge-ok">${icono('check',12)} Confirmado</span>`}</td>
-      <td>${p.cargo_objetivo}</td>
-      <td>${p.sector}</td>
-      <td>${p.ats_score}/100</td>
-      <td>Día ${p.proceso_dia}</td>
+      <td>${escHtml(p.cargo_objetivo)}</td>
+      <td>${escHtml(p.sector)}</td>
+      <td>${escHtml(p.ats_score)}/100</td>
+      <td>Día ${escHtml(p.proceso_dia)}</td>
       <td>${p.tiene_informe_final ? `<span class="badge badge-ok">${icono('check',12)} Informe</span>` : '<span class="badge badge-muted">—</span>'}</td>
       <td>${p.solicitud_eliminacion_estado === 'pendiente' ? '<span class="badge badge-pendiente">⏳ Pendiente</span>' : (p.solicitud_eliminacion_estado === 'procesada' ? '<span class="badge badge-ok">Procesada</span>' : '<span class="badge badge-muted">—</span>')}</td>
-      <td><button class="btn-ver" onclick="abrirDetalle('${p.id}')">Ver detalle</button></td>
+      <td><button class="btn-ver" onclick="abrirDetalle('${escHtml(p.id)}')">Ver detalle</button></td>
     </tr>`).join('');
 
   document.getElementById('tablaWrap').innerHTML = `
@@ -873,7 +879,7 @@ async function cargarAuditoria(offset) {
     document.getElementById('audTotal').textContent = data.total;
     renderAuditoria(data.entradas || [], data.total, data.limit, data.offset);
   } catch (e) {
-    document.getElementById('auditoriaWrap').innerHTML = `<div class="empty">${icono('warning',14)} ${e.message}</div>`;
+    document.getElementById('auditoriaWrap').innerHTML = `<div class="empty">${icono('warning',14)} ${escHtml(e.message)}</div>`;
   }
 }
 
@@ -887,10 +893,10 @@ function renderAuditoria(entradas, total, limit, offset) {
     const esAdmin = e.actor === 'admin';
     const quien = esAdmin
       ? `<span class="badge badge-muted">Admin</span>`
-      : (e.participante_id ? `<a onclick="abrirDetalle('${e.participante_id}')">${e.actor_nombre || e.participante_id}</a>` : (e.actor_nombre || e.actor));
-    const accionTxt = _ACCION_LABELS[e.accion] || e.accion;
+      : (e.participante_id ? `<a onclick="abrirDetalle('${escHtml(e.participante_id)}')">${escHtml(e.actor_nombre || e.participante_id)}</a>` : escHtml(e.actor_nombre || e.actor));
+    const accionTxt = escHtml(_ACCION_LABELS[e.accion] || e.accion);
     return `<tr>
-      <td style="white-space:nowrap;color:var(--muted);">${e.fecha}</td>
+      <td style="white-space:nowrap;color:var(--muted);">${escHtml(e.fecha)}</td>
       <td>${quien}</td>
       <td>${accionTxt}</td>
       <td style="color:var(--text2);">${(e.detalle || '').replace(/</g,'&lt;')}</td>
@@ -921,7 +927,7 @@ async function cargarPlantillas() {
     PLANTILLAS = data.plantillas || [];
     renderPlantillas();
   } catch (e) {
-    document.getElementById('plantillasWrap').innerHTML = `<div class="empty">${icono('warning',14)} ${e.message}</div>`;
+    document.getElementById('plantillasWrap').innerHTML = `<div class="empty">${icono('warning',14)} ${escHtml(e.message)}</div>`;
   }
 }
 
@@ -929,15 +935,15 @@ function renderPlantillas() {
   const filas = PLANTILLAS.map(t => `
     <tr>
       <td>
-        <div style="font-weight:600;">${t.nombre_visible}</div>
-        <div style="font-size:12px;color:var(--muted);margin-top:2px;">${t.descripcion}</div>
+        <div style="font-weight:600;">${escHtml(t.nombre_visible)}</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:2px;">${escHtml(t.descripcion)}</div>
       </td>
       <td>${t.personalizada
         ? `<span class="badge" style="background:rgba(59,130,246,.18);color:#60a5fa;">${icono('edit',12)} Personalizada</span>`
         : '<span class="badge badge-ok">Default de fábrica</span>'}</td>
       <td style="white-space:nowrap;">
-        <button class="btn-secondary" onclick="abrirEditorPlantilla('${t.clave}')">Editar</button>
-        ${t.personalizada ? `<button class="btn-secondary" onclick="_restablecerPlantilla('${t.clave}')">Restablecer</button>` : ''}
+        <button class="btn-secondary" onclick="abrirEditorPlantilla('${escHtml(t.clave)}')">Editar</button>
+        ${t.personalizada ? `<button class="btn-secondary" onclick="_restablecerPlantilla('${escHtml(t.clave)}')">Restablecer</button>` : ''}
       </td>
     </tr>`).join('');
 
@@ -957,8 +963,8 @@ function abrirEditorPlantilla(clave) {
     <div class="panel" style="max-width:720px;">
       <button class="panel-close" onclick="cerrarEditorPlantilla()" title="Cerrar" style="display:flex;">${icono('close',16)}</button>
       <div class="sec">
-        <div style="font-size:17px;font-weight:700;">${t.nombre_visible}</div>
-        <div style="font-size:12.5px;color:var(--muted);margin-top:4px;">${t.descripcion}</div>
+        <div style="font-size:17px;font-weight:700;">${escHtml(t.nombre_visible)}</div>
+        <div style="font-size:12.5px;color:var(--muted);margin-top:4px;">${escHtml(t.descripcion)}</div>
         <div style="font-size:12px;color:var(--muted);margin-top:8px;">
           Marcadores disponibles (se reemplazan automáticamente al enviar): <code>${placeholdersTxt}</code>
         </div>
@@ -970,8 +976,8 @@ function abrirEditorPlantilla(clave) {
         <textarea id="_pl_html" style="width:100%;min-height:280px;font-family:monospace;font-size:12.5px;">${(t.cuerpo_html_actual || '').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</textarea>
       </div>
       <div class="sec" style="display:flex;gap:8px;">
-        <button class="btn-primary" onclick="_guardarPlantilla('${t.clave}')">Guardar plantilla</button>
-        ${t.personalizada ? `<button class="btn-secondary" onclick="_restablecerPlantilla('${t.clave}')">Restablecer a fábrica</button>` : ''}
+        <button class="btn-primary" onclick="_guardarPlantilla('${escHtml(t.clave)}')">Guardar plantilla</button>
+        ${t.personalizada ? `<button class="btn-secondary" onclick="_restablecerPlantilla('${escHtml(t.clave)}')">Restablecer a fábrica</button>` : ''}
       </div>
       <div id="_pl_msg" class="msg"></div>
     </div>`;
@@ -1036,7 +1042,7 @@ async function cargarEstudiosMercado() {
     ESTUDIOS_MERCADO = data.estudios || [];
     renderEstudiosMercado();
   } catch (e) {
-    document.getElementById('estudiosMercadoWrap').innerHTML = `<div class="empty">${icono('warning',14)} ${e.message}</div>`;
+    document.getElementById('estudiosMercadoWrap').innerHTML = `<div class="empty">${icono('warning',14)} ${escHtml(e.message)}</div>`;
   }
 }
 
@@ -1049,15 +1055,15 @@ function renderEstudiosMercado() {
   const filas = ESTUDIOS_MERCADO.map(e => `
     <tr>
       <td>
-        <div style="font-weight:600;">${e.titulo}</div>
-        <div style="font-size:12px;color:var(--muted);margin-top:2px;">${e.nombre_archivo} · ${Math.round((e.tamano_bytes||0)/1024)} KB</div>
+        <div style="font-weight:600;">${escHtml(e.titulo)}</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:2px;">${escHtml(e.nombre_archivo)} · ${Math.round((e.tamano_bytes||0)/1024)} KB</div>
       </td>
-      <td>${e.pais}</td>
-      <td>${e.sector || '<span style="color:var(--muted);">— (todos)</span>'}</td>
-      <td>${e.anio || '—'}</td>
+      <td>${escHtml(e.pais)}</td>
+      <td>${e.sector ? escHtml(e.sector) : '<span style="color:var(--muted);">— (todos)</span>'}</td>
+      <td>${escHtml(e.anio || '—')}</td>
       <td style="white-space:nowrap;">
-        <button class="btn-secondary" onclick="_verResumenEstudioMercado('${e.id}')">Ver resumen</button>
-        <button class="btn-secondary" onclick="_eliminarEstudioMercado('${e.id}')">Eliminar</button>
+        <button class="btn-secondary" onclick="_verResumenEstudioMercado('${escHtml(e.id)}')">Ver resumen</button>
+        <button class="btn-secondary" onclick="_eliminarEstudioMercado('${escHtml(e.id)}')">Eliminar</button>
       </td>
     </tr>`).join('');
 
@@ -1145,7 +1151,7 @@ async function abrirDetalle(id) {
     const p = await _apiGet(`/api/admin/participantes/${id}`);
     _renderDetalle(p);
   } catch (e) {
-    document.getElementById('detalleOverlay').innerHTML = `<div class="panel">${icono('warning',14)} ${e.message}
+    document.getElementById('detalleOverlay').innerHTML = `<div class="panel">${icono('warning',14)} ${escHtml(e.message)}
       <div style="margin-top:14px;"><button class="btn-secondary" onclick="cerrarDetalle()">Cerrar</button></div></div>`;
   }
 }
@@ -1156,7 +1162,7 @@ function cerrarDetalle() {
 }
 
 function _renderDetalle(p) {
-  const fotoSrc = p.foto_b64 ? `data:${p.foto_mime};base64,${p.foto_b64}` : '';
+  const fotoSrc = p.foto_b64 ? `data:${escHtml(p.foto_mime)};base64,${escHtml(p.foto_b64)}` : '';
   const disc = p.disc || {};
   const dims = disc.dimensiones || {};
   const kostick = p.kostick || {};
@@ -1173,8 +1179,8 @@ function _renderDetalle(p) {
         ? `<img class="foto-detalle" src="${fotoSrc}" alt="">`
         : `<div class="foto-detalle" style="display:flex;align-items:center;justify-content:center;">${icono('smile',24)}</div>`}
       <div>
-        <div style="font-size:17px;font-weight:700;">${p.nombre} <span style="font-size:12px;color:var(--muted)">(${p.id})</span></div>
-        <div style="font-size:12.5px;color:var(--muted);margin-top:2px;">${_badgePlan(p.plan)} · Día de proceso ${p.proceso_dia}</div>
+        <div style="font-size:17px;font-weight:700;">${escHtml(p.nombre)} <span style="font-size:12px;color:var(--muted)">(${escHtml(p.id)})</span></div>
+        <div style="font-size:12.5px;color:var(--muted);margin-top:2px;">${_badgePlan(p.plan)} · Día de proceso ${escHtml(p.proceso_dia)}</div>
       </div>
     </div>
 
@@ -1188,12 +1194,12 @@ function _renderDetalle(p) {
         correo real de bienvenida con el plan ya activo.
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
-        <button class="btn-primary" onclick="_confirmarPago('${p.id}')">${icono('check',14)} Confirmar pago recibido</button>
-        <button class="btn-secondary" onclick="_toggleReenviarDatos('${p.id}')">${icono('mail',14)} Reenviar datos bancarios (con nota)</button>
+        <button class="btn-primary" onclick="_confirmarPago('${escHtml(p.id)}')">${icono('check',14)} Confirmar pago recibido</button>
+        <button class="btn-secondary" onclick="_toggleReenviarDatos('${escHtml(p.id)}')">${icono('mail',14)} Reenviar datos bancarios (con nota)</button>
       </div>
       <div id="_d_reenviar_box" style="display:none;">
         <textarea id="_d_reenviar_nota" placeholder="Nota opcional para el participante (ej. 'Ya vimos tu comprobante, estamos verificándolo')." style="width:100%;min-height:60px;margin-bottom:8px;"></textarea>
-        <button class="btn-primary" onclick="_reenviarDatosBancarios('${p.id}')">Enviar correo</button>
+        <button class="btn-primary" onclick="_reenviarDatosBancarios('${escHtml(p.id)}')">Enviar correo</button>
         <div id="_d_reenviar_msg" class="msg"></div>
       </div>
     </div>` : ''}
@@ -1221,8 +1227,8 @@ function _renderDetalle(p) {
           </select>
         </div>
         <div class="field" style="display:flex;align-items:flex-end;gap:8px;">
-          <button class="btn-primary" onclick="_guardarDatos('${p.id}')">Guardar datos</button>
-          <button class="btn-secondary" id="_d_plan_btn" onclick="_aprobarPlan('${p.id}')" title="Activa el plan elegido de inmediato, sin pasar por el flujo de pago pendiente. Para confirmar un pago ya recibido, usa el botón 'Confirmar pago' más abajo en vez de este.">Asignar plan ahora (sin pago)</button>
+          <button class="btn-primary" onclick="_guardarDatos('${escHtml(p.id)}')">Guardar datos</button>
+          <button class="btn-secondary" id="_d_plan_btn" onclick="_aprobarPlan('${escHtml(p.id)}')" title="Activa el plan elegido de inmediato, sin pasar por el flujo de pago pendiente. Para confirmar un pago ya recibido, usa el botón 'Confirmar pago' más abajo en vez de este.">Asignar plan ahora (sin pago)</button>
         </div>
       </div>
       <!-- Fix QA-UX-ADMIN-PLAN-01: "Aprobar plan" cambiaba el plan al instante
@@ -1243,17 +1249,17 @@ function _renderDetalle(p) {
         <div class="bar-track"><div class="bar-fill" style="width:${p.cv?.ats_score||0}%;background:${(p.cv?.ats_score||0)>=70?'var(--green)':'var(--amber)'}"></div></div>
         <span style="min-width:90px;text-align:right;color:var(--muted);">${p.cv?.ats_score||0}/100</span>
       </div>
-      <div style="font-size:12.5px;color:var(--muted);">${p.cv?.cv_archivo_nombre ? `Archivo: ${p.cv.cv_archivo_nombre}` : 'Aún no ha subido CV.'}</div>
+      <div style="font-size:12.5px;color:var(--muted);">${p.cv?.cv_archivo_nombre ? `Archivo: ${escHtml(p.cv.cv_archivo_nombre)}` : 'Aún no ha subido CV.'}</div>
     </div>
 
     <div class="sec">
       <div class="sec-title">DISC — ${disc.codigo || '—'} ${disc.patron ? '· ' + disc.patron : ''}</div>
-      ${Object.keys(dims).length ? Object.entries(dims).map(([k,v]) => _barraInterp(`${k} — ${v.label}`, v.seg, 28, v.interp)).join('') : '<div style="color:var(--muted);font-size:12.5px;">Sin evaluar.</div>'}
+      ${Object.keys(dims).length ? Object.entries(dims).map(([k,v]) => _barraInterp(`${k} — ${escHtml(v.label)}`, v.seg, 28, v.interp)).join('') : '<div style="color:var(--muted);font-size:12.5px;">Sin evaluar.</div>'}
     </div>
 
     <div class="sec">
       <div class="sec-title">Kostick — Clusters</div>
-      ${Object.keys(clusters).length ? Object.entries(clusters).map(([k,v]) => _barraInterp(`${k} — ${v.nombre}`, v.score, 9, v.interp)).join('') : '<div style="color:var(--muted);font-size:12.5px;">Sin evaluar.</div>'}
+      ${Object.keys(clusters).length ? Object.entries(clusters).map(([k,v]) => _barraInterp(`${k} — ${escHtml(v.nombre)}`, v.score, 9, v.interp)).join('') : '<div style="color:var(--muted);font-size:12.5px;">Sin evaluar.</div>'}
     </div>
 
     ${p.plan === 'Premium' ? `
@@ -1261,22 +1267,22 @@ function _renderDetalle(p) {
       <div class="sec-title">Sesión con el Consultor (Premium)</div>
       <div style="font-size:13px;">
         Estado: <strong>${p.premium?.sesion_consultor?.estado || 'sin_solicitar'}</strong>
-        ${p.premium?.sesion_consultor?.fecha ? ` · ${p.premium.sesion_consultor.fecha} ${p.premium.sesion_consultor.hora}` : ''}
+        ${p.premium?.sesion_consultor?.fecha ? ` · ${escHtml(p.premium.sesion_consultor.fecha)} ${escHtml(p.premium.sesion_consultor.hora)}` : ''}
       </div>
-      ${p.premium?.sesion_consultor?.comentario ? `<div style="font-size:12.5px;color:var(--text2);margin-top:4px;">"${p.premium.sesion_consultor.comentario}"</div>` : ''}
+      ${p.premium?.sesion_consultor?.comentario ? `<div style="font-size:12.5px;color:var(--text2);margin-top:4px;">"${escHtml(p.premium.sesion_consultor.comentario)}"</div>` : ''}
     </div>` : ''}
 
     <div class="sec">
       <div class="sec-title">Informe Final</div>
       ${informe ? `
         <div style="font-size:12.5px;color:var(--muted);margin-bottom:8px;">
-          Plan ${informe.plan} · generado el ${informe.fecha} (${informe.generado_en})
+          Plan ${escHtml(informe.plan)} · generado el ${escHtml(informe.fecha)} (${escHtml(informe.generado_en)})
         </div>
         <details>
           <summary>Ver las ${informe.secciones?.length || 0} secciones del informe</summary>
           ${(informe.secciones || []).map(s => `
             <div class="informe-sec">
-              <h4>${s.icono || '📄'} ${s.titulo}</h4>
+              <h4>${s.icono || '📄'} ${escHtml(s.titulo)}</h4>
               <p>${(s.contenido || '').replace(/</g,'&lt;')}</p>
             </div>`).join('')}
         </details>
@@ -1293,7 +1299,7 @@ function _renderDetalle(p) {
       </div>` : ''}
       ${(p.entrevistas && p.entrevistas.length) ? p.entrevistas.slice().reverse().map(e => `
         <details style="margin-bottom:8px;">
-          <summary>${e.fecha_entrevista || 'Sin fecha'} · ${e.modalidad || ''} ${e.duracion_minutos ? `· ${e.duracion_minutos} min` : ''} — generado el ${e.generado_en}</summary>
+          <summary>${e.fecha_entrevista || 'Sin fecha'} · ${e.modalidad || ''} ${e.duracion_minutos ? `· ${escHtml(e.duracion_minutos)} min` : ''} — generado el ${escHtml(e.generado_en)}</summary>
           <div style="font-size:12.5px;color:var(--text2);margin:8px 0;"><strong>Opinión del Consultor:</strong> ${(e.opinion_consultor||'').replace(/</g,'&lt;')}</div>
           <div class="informe-sec"><p>${(e.informe_md||'').replace(/</g,'&lt;')}</p></div>
         </details>`).join('')
@@ -1310,9 +1316,9 @@ function _renderDetalle(p) {
            Premium (que exige al menos un análisis guardado en ESTE
            participante), eso dejaba el Informe Premium bloqueado para
            siempre. Este formulario reemplaza a ese panel: aquí sí se envía
-           con el id real del participante (${p.id}). -->
+           con el id real del participante (${escHtml(p.id)}). -->
       <details id="_entFormDetails" style="margin-top:10px;">
-        <summary style="display:flex;align-items:center;gap:6px;">${icono('document',13)} Registrar nueva entrevista para ${p.nombre}</summary>
+        <summary style="display:flex;align-items:center;gap:6px;">${icono('document',13)} Registrar nueva entrevista para ${escHtml(p.nombre)}</summary>
         <div style="margin-top:10px;">
           <div class="field" style="margin-bottom:8px;">
             <label>Transcripción de la entrevista</label>
@@ -1334,7 +1340,7 @@ function _renderDetalle(p) {
               </select>
             </div>
           </div>
-          <button class="btn-primary" id="_ent_btn" onclick="_analizarEntrevistaAdmin('${p.id}')">${icono('lightning',14)} Analizar entrevista</button>
+          <button class="btn-primary" id="_ent_btn" onclick="_analizarEntrevistaAdmin('${escHtml(p.id)}')">${icono('lightning',14)} Analizar entrevista</button>
           <div id="_ent_msg" class="msg"></div>
         </div>
       </details>
@@ -1343,18 +1349,18 @@ function _renderDetalle(p) {
     <div class="sec">
       <div class="sec-title">Privacidad — solicitud de eliminación de datos (Ley N.º 19.628)</div>
       <div style="font-size:13px;margin-bottom:10px;">
-        Estado: <strong>${se.estado}</strong>
-        ${se.solicitado_en ? ` · solicitada el ${se.solicitado_en}` : ''}
-        ${se.resuelto_en ? ` · resuelta el ${se.resuelto_en}` : ''}
+        Estado: <strong>${escHtml(se.estado)}</strong>
+        ${se.solicitado_en ? ` · solicitada el ${escHtml(se.solicitado_en)}` : ''}
+        ${se.resuelto_en ? ` · resuelta el ${escHtml(se.resuelto_en)}` : ''}
       </div>
-      ${se.comentario ? `<div style="font-size:12.5px;color:var(--text2);margin-bottom:10px;">Comentario del participante: "${se.comentario}"</div>` : ''}
+      ${se.comentario ? `<div style="font-size:12.5px;color:var(--text2);margin-bottom:10px;">Comentario del participante: "${escHtml(se.comentario)}"</div>` : ''}
       ${se.estado === 'pendiente' ? `
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
-          <button class="btn-secondary" onclick="_resolverEliminacion('${p.id}','rechazada')">Marcar rechazada</button>
-          <button class="btn-primary" onclick="_resolverEliminacion('${p.id}','procesada')">Marcar procesada (sin borrar)</button>
-          <button class="btn-danger" onclick="_eliminarDefinitivo('${p.id}')">${icono('trash',14)} Eliminar cuenta y datos ahora</button>
+          <button class="btn-secondary" onclick="_resolverEliminacion('${escHtml(p.id)}','rechazada')">Marcar rechazada</button>
+          <button class="btn-primary" onclick="_resolverEliminacion('${escHtml(p.id)}','procesada')">Marcar procesada (sin borrar)</button>
+          <button class="btn-danger" onclick="_eliminarDefinitivo('${escHtml(p.id)}')">${icono('trash',14)} Eliminar cuenta y datos ahora</button>
         </div>` : `
-        <button class="btn-danger" onclick="_eliminarDefinitivo('${p.id}')">${icono('trash',14)} Eliminar cuenta y datos ahora</button>`}
+        <button class="btn-danger" onclick="_eliminarDefinitivo('${escHtml(p.id)}')">${icono('trash',14)} Eliminar cuenta y datos ahora</button>`}
       <div id="_d_elim_msg" class="msg"></div>
     </div>
   </div>`;

@@ -2383,6 +2383,25 @@ const PARTICIPANTE = {
    ================================================================ */
 const _SESION_KEY = 'atdc_sesion_v1';   // localStorage key para sesión activa
 
+/* QA-UX-ERR-01: convierte el "detail" de un error de la API en texto legible.
+   FastAPI devuelve una LISTA de objetos cuando falla la validación (422);
+   sin esto la persona veía "[object Object],[object Object]". */
+function _textoErrorApi(detail) {
+  if (typeof detail === 'string') return detail.trim();
+  if (Array.isArray(detail) && detail.length) {
+    const trad = { 'Field required': 'es obligatorio', 'Input should be a valid list': 'debe ser una lista',
+                   'Input should be a valid string': 'debe ser texto', 'value is not a valid email address': 'no es un correo válido' };
+    return detail.map(d => {
+      const campo = d && Array.isArray(d.loc) ? d.loc.filter(x => x !== 'body').join('.') : '';
+      let msg = (d && d.msg) ? String(d.msg) : 'dato no válido';
+      Object.keys(trad).forEach(k => { if (msg.indexOf(k) !== -1) msg = trad[k]; });
+      return campo ? `${campo}: ${msg}` : msg;
+    }).join(' · ');
+  }
+  if (detail && typeof detail === 'object' && detail.mensaje) return String(detail.mensaje);
+  return '';
+}
+
 function _planDesdeURL() {
   const p = new URLSearchParams(window.location.search).get('plan') || '';
   const mapa = { inicial:'Inicial', esencial:'Esencial', profesional:'Profesional', premium:'Premium' };
@@ -2523,8 +2542,8 @@ function _mostrarOnboarding(planPreseleccionado) {
         display:inline-flex;align-items:center;flex-wrap:wrap;gap:4px 6px;
         background:var(--bg3);border:1px solid var(--border);
         border-radius:8px;padding:6px 12px;margin-bottom:18px;
-        font-size:13px;font-weight:600;color:${pl.color};
-      "><span style="white-space:nowrap;display:inline-flex;align-items:center;gap:6px;"><span style="width:8px;height:8px;border-radius:50%;background:${pl.color};display:inline-block;flex-shrink:0;"></span>Plan ${planPreseleccionado} —</span> <span style="color:var(--muted);font-weight:400">${pl.desc}</span></div>
+        font-size:13px;font-weight:600;color:var(--text); /* QA-A11Y-02: el color del plan queda solo en el punto */
+      "><span style="white-space:nowrap;display:inline-flex;align-items:center;gap:6px;"><span style="width:8px;height:8px;border-radius:50%;background:${pl.color};display:inline-block;flex-shrink:0;"></span>Plan ${planPreseleccionado} —</span> <span style="color:var(--text2);font-weight:400">${pl.desc}</span></div>
 
       <!-- Pestañas Registro / Ingresar -->
       <div style="display:flex;gap:4px;background:var(--bg);border-radius:10px;padding:4px;margin-bottom:20px;">
@@ -2748,7 +2767,7 @@ async function _registrarParticipante(plan) {
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
       if (res.status === 409) throw new Error('Ya existe una cuenta con ese correo. Usa "Ya tengo cuenta" para ingresar.');
-      throw new Error(err.detail || `Error ${res.status}`);
+      throw new Error(_textoErrorApi(err.detail) || `Error ${res.status}`);
     }
 
     const data = await res.json();   // { ok, token, participante_id, nombre, plan }
@@ -2785,7 +2804,7 @@ async function _iniciarSesionConCorreo() {
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(err.detail || 'Correo o contraseña incorrectos.');
+      throw new Error(_textoErrorApi(err.detail) || 'Correo o contraseña incorrectos.');
     }
 
     const data = await res.json();
@@ -2813,7 +2832,7 @@ async function _iniciarGoogleOAuth(plan) {
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(err.detail || 'El inicio de sesión con Google no está disponible todavía.');
+      throw new Error(_textoErrorApi(err.detail) || 'El inicio de sesión con Google no está disponible todavía.');
     }
     const data = await res.json();   // { url }
     /* Guardamos qué plan eligió para recuperarlo cuando Google nos devuelva al sitio */
@@ -2841,7 +2860,7 @@ async function _procesarRetornoGoogle() {
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(err.detail || 'No se pudo validar tu cuenta de Google.');
+      throw new Error(_textoErrorApi(err.detail) || 'No se pudo validar tu cuenta de Google.');
     }
     const data = await res.json();
     _inicializarDesde(data);
@@ -3563,7 +3582,7 @@ async function llamarAPI(mensaje) {
 
   if (!r.ok) {
     const err = await r.json().catch(()=>({}));
-    throw new Error(err.detail || `Error ${r.status}`);
+    throw new Error(_textoErrorApi(err.detail) || `Error ${r.status}`);
   }
 
   // Determinar si el backend envía SSE (text/event-stream) o JSON plano (fallback)
@@ -4417,7 +4436,7 @@ async function llamarAPIInforme() {
     // entrevista analizada por el Consultor) de una falla transitoria de la
     // IA (500, timeout). Se adjunta el status para que generarInforme()
     // pueda tratarlos distinto.
-    const e = new Error(err.detail||`Error ${r.status}`);
+    const e = new Error(_textoErrorApi(err.detail) ||`Error ${r.status}`);
     e.status = r.status;
     throw e;
   }
@@ -4886,7 +4905,7 @@ async function enviarEntrevistaAdmin() {
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(err.detail || `HTTP ${res.status}`);
+      throw new Error(_textoErrorApi(err.detail) || `HTTP ${res.status}`);
     }
     const data = await res.json();
     // Mostrar resultado en el chat como mensaje del agente
@@ -4963,7 +4982,7 @@ async function activarPlanAdmin() {
     });
     if (!resPlan.ok) {
       const err = await resPlan.json().catch(() => ({}));
-      throw new Error(err.detail || `No se pudo cambiar el plan (HTTP ${resPlan.status}).`);
+      throw new Error(_textoErrorApi(err.detail) || `No se pudo cambiar el plan (HTTP ${resPlan.status}).`);
     }
     try {
       await fetch(`${_BACKEND}/api/admin/participantes/${PARTICIPANTE.id}/confirmar-pago`, {
@@ -5314,7 +5333,7 @@ async function _aceptarCita(citaId) {
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(err.detail || `HTTP ${res.status}`);
+      throw new Error(_textoErrorApi(err.detail) || `HTTP ${res.status}`);
     }
 
     agentMsg(`✅ **Cita aceptada**. Se envió confirmación al participante con el link de Google Calendar.`);
@@ -5344,7 +5363,7 @@ async function _rechazarCita(citaId) {
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(err.detail || `HTTP ${res.status}`);
+      throw new Error(_textoErrorApi(err.detail) || `HTTP ${res.status}`);
     }
 
     agentMsg(`⚠️ **Cita rechazada**. Se notificó al participante.`);
@@ -5591,7 +5610,7 @@ async function _abrirMercado(pais) {
       signal: AbortSignal.timeout(70000)
     });
     const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data.detail || 'No se pudo cargar la información de mercado.');
+    if (!res.ok) throw new Error(_textoErrorApi(data.detail) || 'No se pudo cargar la información de mercado.');
 
     const portalesHtml = (data.portales || []).map(p => `
       <a href="${escHtml(p.url)}" target="_blank" rel="noopener" style="
@@ -5896,7 +5915,16 @@ async function _enviarCambiarPassword() {
       signal: AbortSignal.timeout(70000)
     });
     const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data.detail || 'No se pudo cambiar la contraseña.');
+    if (!res.ok) throw new Error(_textoErrorApi(data.detail) || 'No se pudo cambiar la contraseña.');
+    /* QA-SEG-05: el servidor cierra las otras sesiones y entrega un token nuevo */
+    if (data.token) {
+      _TOKEN_SESION = data.token;
+      try {
+        const ses = JSON.parse(localStorage.getItem(_SESION_KEY) || '{}');
+        ses.token = data.token;
+        localStorage.setItem(_SESION_KEY, JSON.stringify(ses));
+      } catch (e) {}
+    }
     _mostrarMsgPassword('_pw_cambiar_msg', data.mensaje || 'Contraseña actualizada.', false);
     setTimeout(() => document.getElementById('_pwModalCambiar')?.remove(), 1600);
   } catch (e) {
@@ -6011,7 +6039,7 @@ async function _enviarRestablecerPassword(token) {
       signal: AbortSignal.timeout(70000)
     });
     const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data.detail || 'El enlace es inválido o ya expiró. Solicita uno nuevo.');
+    if (!res.ok) throw new Error(_textoErrorApi(data.detail) || 'El enlace es inválido o ya expiró. Solicita uno nuevo.');
     _mostrarMsgPassword('_pw_restablecer_msg', data.mensaje || 'Contraseña restablecida.', false);
     btn.textContent = 'Listo ✓';
     setTimeout(() => {
@@ -6266,7 +6294,7 @@ async function _cambiarPlanMiCuenta() {
       body: JSON.stringify({ plan: planNuevo })
     });
     const d = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(d.detail || 'No se pudo cambiar el plan.');
+    if (!res.ok) throw new Error(_textoErrorApi(d.detail) || 'No se pudo cambiar el plan.');
     msgEl.style.display = 'block'; msgEl.style.background = 'rgba(16,185,129,.12)'; msgEl.style.color = '#10B981';
     msgEl.textContent = d.mensaje || 'Listo.';
     await _cargarMiPerfil();
@@ -6311,7 +6339,7 @@ async function _guardarMiPerfil() {
       body: JSON.stringify(body)
     });
     const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data.detail || 'No se pudieron guardar tus datos.');
+    if (!res.ok) throw new Error(_textoErrorApi(data.detail) || 'No se pudieron guardar tus datos.');
     if (msgEl) { msgEl.style.display = 'block'; msgEl.textContent = data.mensaje || 'Datos actualizados.'; msgEl.style.background = 'rgba(34,197,94,.12)'; msgEl.style.color = 'var(--green)'; }
     // Reflejar los cambios de inmediato en PARTICIPANTE y en el panel lateral
     if (body.nombre !== undefined) PARTICIPANTE.nombre = body.nombre;
@@ -6344,7 +6372,7 @@ async function _subirFotoMiCuenta() {
       body: formData
     });
     const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data.detail || 'No se pudo subir la foto.');
+    if (!res.ok) throw new Error(_textoErrorApi(data.detail) || 'No se pudo subir la foto.');
     if (msgEl) { msgEl.style.color = 'var(--green)'; msgEl.textContent = data.mensaje || 'Foto actualizada.'; }
     await _cargarFotoMiCuenta();
     await _refrescarFotoSidebar();
@@ -6363,7 +6391,7 @@ async function _quitarFotoMiCuenta() {
       headers: { 'Authorization': `Bearer ${_obtenerToken()}` }
     });
     const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data.detail || 'No se pudo quitar la foto.');
+    if (!res.ok) throw new Error(_textoErrorApi(data.detail) || 'No se pudo quitar la foto.');
     if (msgEl) { msgEl.style.color = 'var(--green)'; msgEl.textContent = data.mensaje || 'Foto eliminada.'; }
     await _cargarFotoMiCuenta();
     await _refrescarFotoSidebar();
@@ -6406,7 +6434,7 @@ async function _solicitarEliminacionMiCuenta() {
       body: JSON.stringify({ comentario })
     });
     const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data.detail || 'No se pudo enviar tu solicitud.');
+    if (!res.ok) throw new Error(_textoErrorApi(data.detail) || 'No se pudo enviar tu solicitud.');
     await _cargarMiPerfil();
   } catch (e) {
     alert(e.message || 'Error de conexión. Intenta nuevamente.');
@@ -6734,7 +6762,7 @@ async function _subirCV() {
       body: formData,
     });
     const data = await resp.json();
-    if (!resp.ok) throw new Error(data.detail || 'No se pudo analizar el CV.');
+    if (!resp.ok) throw new Error(_textoErrorApi(data.detail) || 'No se pudo analizar el CV.');
 
     // Actualizar la fuente única de verdad y re-sincronizar el panel lateral
     PARTICIPANTE.ats_score = data.ats_score;
@@ -6823,7 +6851,7 @@ async function _solicitarSesionConsultor() {
       body: JSON.stringify({ fecha, hora, comentario }),
     });
     const data = await resp.json();
-    if (!resp.ok) throw new Error(data.detail || 'No se pudo enviar la solicitud.');
+    if (!resp.ok) throw new Error(_textoErrorApi(data.detail) || 'No se pudo enviar la solicitud.');
 
     try {
       localStorage.setItem(_sesionConsultorKey(), JSON.stringify({
