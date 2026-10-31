@@ -174,6 +174,7 @@
     <a class="nav-item" data-sec="secDonut" href="#secDonut"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg> Planes</a>
     <a class="nav-item" data-sec="secTareas" href="#secTareas"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg> Tareas</a>
     <a class="nav-item" data-sec="secParticipantes" href="#secParticipantes"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg> Participantes</a>
+    <a class="nav-item" data-sec="secSesiones" href="#secSesiones">Sesiones</a>
     <a class="nav-item" data-sec="secAuditoria" href="#secAuditoria"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect><path d="M9 4H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-3"></path><line x1="8" y1="11" x2="16" y2="11"></line><line x1="8" y1="15" x2="16" y2="15"></line></svg> Auditoría</a>
     <a class="nav-item" data-sec="secCorreos" href="#secCorreos"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22 6 12 13 2 6"></polyline></svg> Correos</a>
     <a class="nav-item" data-sec="secEstudios" href="#secEstudios"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="1"></rect><line x1="9" y1="22" x2="9" y2="18"></line><line x1="15" y1="22" x2="15" y2="18"></line></svg> Estudios</a>
@@ -210,12 +211,27 @@
       <option value="">Todas las solicitudes</option>
       <option value="pendiente">Con eliminación pendiente</option>
     </select>
+    <label class="stat-chip" style="cursor:pointer;"><input type="checkbox" id="filtroAtencion" onchange="renderTabla()" style="margin-right:6px;">Solo los que esperan mi acción</label>
     <div class="stat-chip">Total: <b id="statTotal">—</b></div>
     <div class="stat-chip">Eliminaciones pendientes: <b id="statPendientes" style="color:var(--red)">—</b></div>
     <button class="btn-secondary" onclick="cargarListado()" style="margin-left:auto;display:inline-flex;align-items:center;gap:6px;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg> Actualizar</button>
   </div>
 
   <div id="tablaWrap"><div class="loading">Cargando participantes…</div></div>
+  </div>
+
+  <div class="panel-section" id="secSesiones" style="padding-bottom:4px;">
+  <h2 style="display:flex;align-items:center;gap:8px;">Agenda de sesiones Premium</h2>
+  <div style="font-size:12.5px;color:var(--muted);margin-bottom:10px;">
+    Todas las sesiones con el consultor pedidas por participantes Premium. Las aceptadas se pueden descargar
+    como calendario (.ics) para importarlas en Google Calendar u Outlook.
+  </div>
+  <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
+    <button class="btn-secondary" onclick="cargarSesiones()">Actualizar</button>
+    <button class="btn-secondary" onclick="_descargarIcs()">Descargar sesiones aceptadas (.ics)</button>
+  </div>
+  <div id="_ics_msg" class="msg"></div>
+  <div id="sesionesWrap"><div class="loading">Cargando sesiones…</div></div>
   </div>
 
   <div class="panel-section" id="secAuditoria" style="padding-bottom:4px;">
@@ -776,10 +792,49 @@ function _listaTareas(items, render) {
   return `<div class="tarea-lista" tabindex="0" role="region" aria-label="Lista de participantes">${items.map(render).join('')}</div>`;
 }
 
+/* Agenda de sesiones Premium (REQ-PREMIUM: el consultor coordina la entrevista) */
+async function cargarSesiones() {
+  const w = document.getElementById('sesionesWrap');
+  if (!w) return;
+  w.innerHTML = '<div class="loading">Cargando sesiones…</div>';
+  try {
+    const d = await _apiGet('/api/admin/sesiones?todas=true');
+    const ses = d.sesiones || [];
+    if (!ses.length) { w.innerHTML = '<div class="empty">Ningún participante Premium ha pedido sesión todavía.</div>'; return; }
+    const est = e => e === 'solicitada' ? '<span class="badge badge-pago-pendiente">Por confirmar</span>'
+                  : e === 'aceptada' || e === 'confirmada' ? `<span class="badge badge-ok">${icono('check',12)} Aceptada</span>`
+                  : e === 'rechazada' ? '<span class="badge badge-muted">Rechazada</span>' : `<span class="badge badge-muted">${escHtml(e)}</span>`;
+    w.innerHTML = `<table><thead><tr><th>Fecha</th><th>Hora</th><th>Participante</th><th>Comentario</th><th>Estado</th><th></th></tr></thead><tbody>
+      ${ses.map(x => `<tr>
+        <td style="white-space:nowrap;">${escHtml((x.fecha || '').split('-').reverse().join('-'))}</td>
+        <td>${escHtml(x.hora)}</td>
+        <td>${escHtml(x.participante_nombre)}</td>
+        <td style="color:var(--text2);">${escHtml(x.comentario || '—')}</td>
+        <td>${est(x.estado)}</td>
+        <td><button class="btn-ver" onclick="abrirDetalle('${escHtml(x.participante_id)}')">${x.estado === 'solicitada' ? 'Responder' : 'Ver'}</button></td>
+      </tr>`).join('')}</tbody></table>`;
+  } catch (e) { w.innerHTML = `<div class="empty">${icono('warning',14)} ${escHtml(e.message)}</div>`; }
+}
+
+async function _descargarIcs() {
+  try {
+    const d = await _apiSend('POST', '/api/admin/calendar/sync', {});
+    if (!d.total_sesiones) { _mostrarMsg('_ics_msg', 'No hay sesiones aceptadas para descargar.', true); return; }
+    const blob = new Blob([d.ics_data], { type: 'text/calendar;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = 'atdc-sesiones.ics';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+    _mostrarMsg('_ics_msg', `Descargado: ${d.total_sesiones} sesión(es). Ábrelo para agregarlas a tu calendario.`, false);
+  } catch (e) { _mostrarMsg('_ics_msg', e.message, true); }
+}
+
 function renderTareas() {
   const pagosPendientes = LISTADO.filter(p => p.pago_estado === 'pendiente');
   const eliminaciones = LISTADO.filter(p => p.solicitud_eliminacion_estado === 'pendiente');
   const sesionesPremium = LISTADO.filter(p => p.sesion_premium_estado === 'solicitada');
+  const informesRevision = LISTADO.filter(p => p.informe_estado === 'pendiente_revision');
+  const entrevistasPend = LISTADO.filter(p => p.etapa && p.etapa.codigo === 'entrevista');
   const sinCv = LISTADO.filter(p => !p.cv_subido);
   const porDefinir = LISTADO.filter(p => p.datos_por_definir);
 
@@ -798,9 +853,25 @@ function renderTareas() {
   document.getElementById('tareasGrid').innerHTML =
     tarjeta(`${icono('credit-card',13)} Pagos pendientes de confirmar`, '#F59E0B', pagosPendientes, p => itemParticipante(p, `pidió ${p.plan_solicitado || p.plan}`)) +
     tarjeta(`${icono('trash',13)} Solicitudes de eliminación de datos`, '#EF4444', eliminaciones, p => itemParticipante(p, p.solicitud_eliminacion_estado)) +
+    tarjeta(`${icono('document',13)} Informes Premium por revisar`, '#EF4444', informesRevision, p => itemParticipante(p, 'revisar y aprobar')) +
     tarjeta(`${icono('calendar',13)} Sesiones Premium por confirmar`, '#F59E0B', sesionesPremium, p => itemParticipante(p, 'Premium')) +
+    tarjeta(`${icono('edit',13)} Entrevistas por analizar`, '#F59E0B', entrevistasPend, p => itemParticipante(p, 'sesión aceptada')) +
     tarjeta(`${icono('paperclip',13)} Sin CV subido`, '#94A3B8', sinCv, p => itemParticipante(p, p.plan)) +
     tarjeta(`${icono('edit',13)} Datos del perfil por completar`, '#3B82F6', porDefinir, p => itemParticipante(p, p.plan));
+}
+
+/* REQ-ADMIN-ETAPA: etapa calculada por el servidor según el plan; en rojo
+   cuando la persona está esperando una acción del Consultor. */
+function _badgeEtapa(et) {
+  if (!et || !et.texto) return '<span class="badge badge-muted">—</span>';
+  const cls = et.requiere_admin ? 'badge-pendiente' : (et.codigo === 'entregado' ? 'badge-ok' : 'badge-muted');
+  return `<span class="badge ${cls}" title="${et.requiere_admin ? 'Requiere acción del consultor' : 'Le toca a la persona'}">${et.requiere_admin ? '● ' : ''}${escHtml(et.texto)}</span>`;
+}
+function _badgeInforme(est) {
+  if (est === 'pendiente_revision') return '<span class="badge badge-pago-pendiente">Por revisar</span>';
+  if (est === 'aprobado') return `<span class="badge badge-ok">${icono('check',12)} Aprobado</span>`;
+  if (est === 'entregado') return `<span class="badge badge-ok">${icono('check',12)} Entregado</span>`;
+  return '<span class="badge badge-muted">—</span>';
 }
 
 function renderTabla() {
@@ -812,6 +883,7 @@ function renderTabla() {
     if (q && !p.nombre.toLowerCase().includes(q)) return false;
     if (planFiltro && p.plan !== planFiltro) return false;
     if (eliminacionFiltro && p.solicitud_eliminacion_estado !== eliminacionFiltro) return false;
+    if (document.getElementById('filtroAtencion')?.checked && !(p.etapa && p.etapa.requiere_admin)) return false;
     return true;
   });
 
@@ -832,8 +904,8 @@ function renderTabla() {
       <td>${escHtml(p.cargo_objetivo)}</td>
       <td>${escHtml(p.sector)}</td>
       <td>${escHtml(p.ats_score)}/100</td>
-      <td>Día ${escHtml(p.proceso_dia)}</td>
-      <td>${p.tiene_informe_final ? `<span class="badge badge-ok">${icono('check',12)} Informe</span>` : '<span class="badge badge-muted">—</span>'}</td>
+      <td>${_badgeEtapa(p.etapa)}</td>
+      <td>${_badgeInforme(p.informe_estado)}</td>
       <td>${p.solicitud_eliminacion_estado === 'pendiente' ? '<span class="badge badge-pendiente">⏳ Pendiente</span>' : (p.solicitud_eliminacion_estado === 'procesada' ? '<span class="badge badge-ok">Procesada</span>' : '<span class="badge badge-muted">—</span>')}</td>
       <td><button class="btn-ver" onclick="abrirDetalle('${escHtml(p.id)}')">Ver detalle</button></td>
     </tr>`).join('');
@@ -842,7 +914,7 @@ function renderTabla() {
     <table>
       <thead><tr>
         <th>ID</th><th>Nombre</th><th>Plan</th><th>Pago</th><th>Cargo objetivo</th><th>Sector</th>
-        <th>ATS</th><th>Proceso</th><th>Informe final</th><th>Eliminación</th><th></th>
+        <th>ATS</th><th>Etapa</th><th>Informe final</th><th>Eliminación</th><th></th>
       </tr></thead>
       <tbody>${filasHtml}</tbody>
     </table>`;
@@ -879,6 +951,8 @@ const _ACCION_LABELS = {
   marcar_plan_regalo: `${icono('credit-card',13)} Regaló plan (Admin)`,
   subir_estudio_mercado: `${icono('document',13)} Subió estudio de mercado (Admin)`,
   eliminar_estudio_mercado: `${icono('trash',13)} Eliminó estudio de mercado (Admin)`,
+  editar_informe: `${icono('edit',13)} Editó informe final (Admin)`,
+  aprobar_informe: `${icono('check',13)} Aprobó y entregó informe (Admin)`,
   solicitud_rectificacion: `${icono('lock',13)} Pidió rectificar datos`,
   solicitud_supresion: `${icono('lock',13)} Pidió suprimir datos`,
   solicitud_oposicion: `${icono('lock',13)} Se opuso a un tratamiento`,
@@ -1327,6 +1401,100 @@ function cerrarDetalle() {
   document.getElementById('detalleOverlay').innerHTML = '';
 }
 
+/* REQ-PREMIUM-REVISION: el Informe Premium queda retenido hasta que el
+   Consultor lo revise (y si quiere lo corrija) y lo apruebe aquí. Antes la
+   "validación" se guardaba solo en el navegador del consultor y el
+   participante veía el informe completo apenas lo generaba. */
+let _INFORME_EDIT = null;
+function _htmlInformeAdmin(p, informe) {
+  const est = informe.estado || 'entregado';
+  const secs = informe.secciones || [];
+  _INFORME_EDIT = { id: p.id, secciones: secs.map(s => ({ ...s })) };
+  const cab = `<div style="font-size:12.5px;color:var(--muted);margin-bottom:8px;">
+      Plan ${escHtml(informe.plan)} · generado ${escHtml(informe.fecha)} (${_fmtFecha(informe.generado_en)})
+      ${informe.editado_en ? ` · editado ${_fmtFecha(informe.editado_en)}` : ''}
+      ${informe.aprobado_en ? ` · aprobado ${_fmtFecha(informe.aprobado_en)}` : ''}
+    </div>`;
+  if (est === 'pendiente_revision') {
+    return cab + `
+      <div class="msg" style="display:block;background:rgba(239,68,68,.12);color:var(--red);margin-bottom:10px;">
+        ${icono('lock',13)} Retenido: el participante solo ve "Tu informe está en revisión". Revísalo, corrige lo que necesites y apruébalo para entregárselo.
+      </div>
+      ${secs.map((s, i) => `
+        <div class="informe-sec">
+          <input id="_inf_t_${i}" value="${escHtml(s.titulo)}" aria-label="Título de la sección ${i+1}" style="width:100%;font-weight:600;margin-bottom:6px;">
+          <textarea id="_inf_c_${i}" aria-label="Contenido de la sección ${i+1}" style="width:100%;min-height:140px;font-size:12.5px;line-height:1.55;">${escHtml(s.contenido)}</textarea>
+        </div>`).join('')}
+      <label style="display:block;font-size:12.5px;margin:8px 0 4px;">Nota para el participante (opcional, va en el correo)</label>
+      <textarea id="_inf_nota" style="width:100%;min-height:60px;" placeholder="Ej: Revisé tu informe; pon atención a la sección de brechas.">${escHtml(informe.nota_consultor || '')}</textarea>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;">
+        <button class="btn-secondary" onclick="_guardarInformeAdmin('${escHtml(p.id)}')">Guardar cambios</button>
+        <button class="btn-primary" onclick="_aprobarInformeAdmin('${escHtml(p.id)}')">${icono('check',14)} Aprobar y entregar</button>
+      </div>
+      <div id="_inf_msg" class="msg"></div>`;
+  }
+  return cab + `
+    <div id="_inf_msg" class="msg"></div>
+    <div style="margin-bottom:8px;">${_badgeInforme(est)} ${est === 'aprobado' ? '<span style="font-size:12px;color:var(--muted);">— visible para el participante</span>' : ''}</div>
+    ${informe.nota_consultor ? `<div style="font-size:12.5px;color:var(--text2);margin-bottom:8px;">Nota enviada: "${escHtml(informe.nota_consultor)}"</div>` : ''}
+    <details>
+      <summary>Ver las ${secs.length} secciones del informe</summary>
+      ${secs.map(s => `
+        <div class="informe-sec">
+          <h4>${escHtml(s.icono || '📄')} ${escHtml(s.titulo)}</h4>
+          <p>${escHtml(s.contenido || '')}</p>
+        </div>`).join('')}
+    </details>`;
+}
+function _seccionesEditadas() {
+  return (_INFORME_EDIT ? _INFORME_EDIT.secciones : []).map((s, i) => ({
+    id: s.id, icono: s.icono,
+    titulo: document.getElementById('_inf_t_' + i)?.value ?? s.titulo,
+    contenido: document.getElementById('_inf_c_' + i)?.value ?? s.contenido,
+  }));
+}
+async function _guardarInformeAdmin(id) {
+  try {
+    const nota = document.getElementById('_inf_nota')?.value ?? null;
+    const d = await _apiSend('PUT', `/api/admin/participantes/${id}/informe`, { secciones: _seccionesEditadas(), nota_consultor: nota });
+    _mostrarMsg('_inf_msg', d.mensaje || 'Cambios guardados.', false);
+  } catch (e) { _mostrarMsg('_inf_msg', e.message, true); }
+}
+async function _aprobarInformeAdmin(id) {
+  if (!confirm('¿Aprobar y entregar el informe? El participante podrá verlo y recibirá un correo.')) return;
+  try {
+    const nota = document.getElementById('_inf_nota')?.value ?? null;
+    await _apiSend('PUT', `/api/admin/participantes/${id}/informe`, { secciones: _seccionesEditadas(), nota_consultor: nota });
+    const d = await _apiSend('PATCH', `/api/admin/participantes/${id}/informe/aprobar`, { nota_consultor: nota });
+    await abrirDetalle(id);
+    _mostrarMsg('_inf_msg', d.mensaje || 'Informe aprobado.', false);
+    cargarListado();
+  } catch (e) { _mostrarMsg('_inf_msg', e.message, true); }
+}
+
+/* Acciones de soporte: funciones del servidor que no tenían botón */
+async function _devolverIntentosCv(id) {
+  if (!confirm('¿Devolver los intentos de subida de CV a este participante?')) return;
+  try {
+    const d = await _apiSend('POST', `/api/ats/reset-rechazos?pid=${encodeURIComponent(id)}`, {});
+    _mostrarMsg('_sop_msg', d.mensaje || 'Intentos devueltos.', false);
+  } catch (e) { _mostrarMsg('_sop_msg', /no tiene rechazos/i.test(e.message) ? 'Este participante no tiene CV rechazados: no hay intentos que devolver.' : e.message, true); }
+}
+async function _reiniciarTest(id, tipo) {
+  const razon = prompt(`Motivo para reiniciar el test ${tipo === 'disc' ? 'DISC' : 'Kostick'} (queda en auditoría):`, 'Se desconectó a mitad del test');
+  if (razon === null) return;
+  try {
+    const d = await _apiSend('POST', `/api/admin/test/resetear/${id}/${tipo}`, { razon: razon.trim() || 'Reset administrativo' });
+    _mostrarMsg('_sop_msg', d.mensaje || 'Test reiniciado: la persona puede rendirlo de nuevo.', false);
+  } catch (e) { _mostrarMsg('_sop_msg', e.message, true); }
+}
+async function _marcarRegalo(id, valor) {
+  try {
+    const d = await _apiSend('PATCH', `/api/admin/participantes/${id}/regalo`, { plan_regalo: !!valor });
+    _mostrarMsg('_sop_msg', d.mensaje || 'Guardado.', false);
+  } catch (e) { _mostrarMsg('_sop_msg', e.message, true); }
+}
+
 function _renderDetalle(p) {
   const fotoSrc = p.foto_b64 ? `data:${escHtml(p.foto_mime)};base64,${escHtml(p.foto_b64)}` : '';
   const disc = p.disc || {};
@@ -1446,20 +1614,21 @@ function _renderDetalle(p) {
     </div>` : ''}
 
     <div class="sec">
+      <div class="sec-title">Acciones de soporte</div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
+        <button class="btn-secondary" onclick="_devolverIntentosCv('${escHtml(p.id)}')">${icono('paperclip',14)} Devolver intentos de CV</button>
+        <button class="btn-secondary" onclick="_reiniciarTest('${escHtml(p.id)}','disc')">${icono('puzzle',14)} Reiniciar test DISC</button>
+        <button class="btn-secondary" onclick="_reiniciarTest('${escHtml(p.id)}','kostick')">${icono('puzzle',14)} Reiniciar test Kostick</button>
+        <label style="display:inline-flex;align-items:center;gap:6px;font-size:12.5px;">
+          <input type="checkbox" ${p.plan_regalo ? 'checked' : ''} onchange="_marcarRegalo('${escHtml(p.id)}', this.checked)"> Plan de cortesía (no cuenta como venta)
+        </label>
+      </div>
+      <div id="_sop_msg" class="msg"></div>
+    </div>
+
+    <div class="sec">
       <div class="sec-title">Informe Final</div>
-      ${informe ? `
-        <div style="font-size:12.5px;color:var(--muted);margin-bottom:8px;">
-          Plan ${escHtml(informe.plan)} · generado el ${escHtml(informe.fecha)} (${escHtml(informe.generado_en)})
-        </div>
-        <details>
-          <summary>Ver las ${informe.secciones?.length || 0} secciones del informe</summary>
-          ${(informe.secciones || []).map(s => `
-            <div class="informe-sec">
-              <h4>${s.icono || '📄'} ${escHtml(s.titulo)}</h4>
-              <p>${(s.contenido || '').replace(/</g,'&lt;')}</p>
-            </div>`).join('')}
-        </details>
-      ` : '<div style="color:var(--muted);font-size:12.5px;">Este participante aún no ha generado su Informe Final.</div>'}
+      ${informe ? _htmlInformeAdmin(p, informe) : '<div style="color:var(--muted);font-size:12.5px;">Este participante aún no ha generado su Informe Final.</div>'}
     </div>
 
     <div class="sec">
@@ -1597,7 +1766,7 @@ async function _responderSesion(id, accion) {
     const data = await _apiSend('PATCH', `/api/admin/sesiones/${id}/${accion}`, body);
     await abrirDetalle(id);
     _mostrarMsg('_ses_msg', data.mensaje || (accion === 'aceptar' ? 'Sesión aceptada.' : 'Sesión rechazada.'), false);
-    cargarListado();
+    cargarListado(); cargarSesiones();
   } catch (e) { _mostrarMsg('_ses_msg', e.message, true); }
 }
 
@@ -1686,6 +1855,7 @@ cargarListado();
 cargarAuditoria(0);
 cargarPlantillas();
 cargarEstudiosMercado();
+cargarSesiones();
 
 // Fix QA-UX-NAV-01: barra de navegación rápida entre secciones del Admin.
 // Calcula el alto real del topbar + navbar (varía un poco según fuente del
