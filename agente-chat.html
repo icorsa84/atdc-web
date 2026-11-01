@@ -1003,7 +1003,7 @@
   @keyframes tabFadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 
   /* ================================================================
-     ADMIN STRIP — vista consultor ICORSA
+     ADMIN STRIP — vista Consultor
      ================================================================ */
   .admin-strip{
     display:flex;align-items:center;gap:8px;
@@ -1540,7 +1540,7 @@
       <!-- Strip admin (visible solo para el consultor) -->
       <div class="admin-strip" id="adminStrip" style="display:none">
         <div class="admin-strip-dot"></div>
-        <span>Vista Consultor ICORSA — <strong>El Consultor</strong></span>
+        <span>Vista Consultor — <strong>El Consultor</strong></span>
         <span class="admin-plan-badge" id="adminPlanBadge">Plan Premium</span>
         <!-- Fix QA-PREMIUM-GATE-02: se quitaron aquí el botón "🎁 Activar
              plan" y el panel "🎤 Entrevista". Ambos llamaban al backend con
@@ -3237,7 +3237,7 @@ let informeAbierto   = false;
 let tabActiva        = 0;      // índice de la tab activa en el informe
 
 /* ----------------------------------------------------------------
-   MODO ADMIN — activar vía /admin en la URL (consultor ICORSA)
+   MODO ADMIN — activar vía /admin en la URL (Consultor)
    La clave se guarda en sessionStorage para no pedir en cada recarga
    ---------------------------------------------------------------- */
 const _IS_ADMIN_PATH = window.location.pathname.endsWith('/admin') ||
@@ -3278,7 +3278,7 @@ function _mostrarModalAdmin() {
         font-size:.95rem;border:none;cursor:pointer;transition:opacity .2s;
       ">Ingresar</button>
       <p style="color:var(--muted,#64748b);font-size:.78rem;margin-top:14px;">
-        Área exclusiva para Consultores ICORSA
+        Área exclusiva para el Consultor
       </p>
     </div>
   `;
@@ -3338,10 +3338,10 @@ function _activarModoAdmin() {
     planBadgeTop.style.background = 'rgba(139,92,246,.15)';
     planBadgeTop.style.color = '#c4b5fd';
     planBadgeTop.style.borderColor = 'rgba(139,92,246,.35)';
-    planBadgeTop.innerHTML = icono('shield',13) + ' Consultor ICORSA';
+    planBadgeTop.innerHTML = icono('shield',13) + ' Consultor';
   }
   const agentSub = document.getElementById('agentSub');
-  if (agentSub) agentSub.textContent = `Vista Administrador · ICORSA Consultores`;
+  if (agentSub) agentSub.textContent = `Vista Administrador · Consultor`;
   // Mostrar controles admin que estaban ocultos
   document.querySelectorAll('[data-admin-only]').forEach(el => el.style.removeProperty('display'));
 }
@@ -4269,7 +4269,7 @@ function renderInformeVacio() {
     },
     Premium: {
       badge:'badge-premium', desc:'CV + DISC + Kostick + Mercado + Entrevista',
-      items:['✓ Perfil integral consolidado','✓ Análisis de entrevista y discurso','✓ Brecha entre perfil y mercado','✓ Plan de acción personalizado','✓ Guía de posicionamiento completo','✓ Revisión humana ICORSA antes de entrega']
+      items:['✓ Perfil integral consolidado','✓ Análisis de entrevista y discurso','✓ Brecha entre perfil y mercado','✓ Plan de acción personalizado','✓ Guía de posicionamiento completo','✓ Revisión humana del Consultor antes de la entrega']
     }
   };
   const info = infos[plan];
@@ -4773,7 +4773,7 @@ Walmart Chile busca perfiles con orientación a procesos, capacidad de trabajo b
 - 3+ entrevistas en las primeras 2 semanas de postulación activa
 - Renta negociada ≥ $3.500.000 CLP` },
     { id:'revision', titulo:'Estado de Revisión', icono:'🔍', contenido: `
-**Este informe está sujeto a revisión humana por tu consultor ICORSA antes de la entrega final.**
+**Este informe está sujeto a revisión humana por tu Consultor antes de la entrega final.**
 
 El informe fue generado automáticamente integrando tus evaluaciones DISC (${P.disc.codigo}), Kostick, puntaje ATS (${P.ats_score}/100) y datos de mercado disponibles.
 
@@ -4784,7 +4784,7 @@ El informe fue generado automáticamente integrando tus evaluaciones DISC (${P.d
 
 El consultor puede complementar, ajustar o agregar observaciones basadas en su interacción directa contigo durante el proceso. El informe revisado te será enviado directamente.
 
-**Si tienes preguntas antes de recibir el informe validado**, puedes preguntarle al agente ATDC o comunicarte directamente con ICORSA Consulting.` }
+**Si tienes preguntas antes de recibir el informe validado**, puedes preguntarle al agente ATDC o comunicarte directamente con tu Consultor.` }
   ]};
 }
 
@@ -4865,7 +4865,7 @@ function renderInformeCompleto(informe) {
     if (IS_ADMIN) {
       topBadge = `<div class="inf-admin-note">✅ Vista consultor — todas las secciones disponibles para revisión</div>`;
     } else if (!informeValidadoAdmin) {
-      topBadge = `<div class="inf-review-badge">🔍 Pendiente de revisión por consultor ICORSA</div>`;
+      topBadge = `<div class="inf-review-badge">🔍 Pendiente de revisión por tu Consultor</div>`;
     }
   }
 
@@ -5038,7 +5038,7 @@ function validarInformeAdmin() {
     badge.style.background = 'rgba(34,197,94,.07)';
     badge.style.borderColor = 'rgba(34,197,94,.25)';
     badge.style.color = 'var(--green)';
-    badge.textContent = '✅ Revisado y validado por consultor ICORSA';
+    badge.textContent = '✅ Revisado y validado por tu Consultor';
   }
 }
 
@@ -5123,7 +5123,7 @@ async function activarPlanAdmin() {
 
   // 6. Actualizar subtítulo del topbar si hay IS_ADMIN
   const sub = document.getElementById('topbarSubtitle');
-  if (sub && IS_ADMIN) sub.textContent = `Consultor ICORSA — ${PARTICIPANTE.nombre} • Plan ${nuevoPlan} (regalo)`;
+  if (sub && IS_ADMIN) sub.textContent = `Consultor — ${PARTICIPANTE.nombre} • Plan ${nuevoPlan} (regalo)`;
 
   // 7. Actualizar botón de validación: solo aplica a Premium
   const validateBtn = document.getElementById('adminValidateBtn');
@@ -5615,8 +5615,8 @@ function exportarInforme() {
   // Fix RISK-07: reflejar estado real de validación en la exportación TXT
   if (inf.plan==='Premium') {
     const estadoExport = informeValidadoAdmin
-      ? `Estado: Validado por consultor ICORSA ✓`
-      : `Estado: Pendiente de revisión por consultor ICORSA`;
+      ? `Estado: Validado por el Consultor ✓`
+      : `Estado: Pendiente de revisión por el Consultor`;
     txt += `${estadoExport}\n`;
   }
   txt += `\n${'—'.repeat(60)}\n\n`;
@@ -5643,7 +5643,7 @@ function exportarInforme() {
   });
 
   txt += `${'='.repeat(60)}\n`;
-  txt += `Generado por Agente ATDC · ICORSA Consulting\n`;
+  txt += `Generado por Agente ATDC · Consultor ATDC\n`;
   txt += `Documento confidencial — uso exclusivo del participante\n`;
 
   // Descargar
@@ -6816,9 +6816,9 @@ async function _abrirPrivacidad() {
       <a href="#modalPrivacidad" onclick="document.getElementById('modalPrivacidad').classList.add('open')" style="
         padding:10px;border-radius:8px;border:1px solid var(--border2);background:transparent;
         color:var(--text2);font-weight:700;font-size:12px;cursor:pointer;text-align:center;text-decoration:none;display:block;">📜 Política de Privacidad</a>
-      <a href="mailto:ico.icorsa84@gmail.com" style="
+      <a href="mailto:contacto@atdc.app" style="
         padding:10px;border-radius:8px;border:1px solid var(--border2);background:transparent;
-        color:var(--text2);font-weight:700;font-size:12px;cursor:pointer;text-align:center;text-decoration:none;display:block;">📧 Contactar DPO</a>
+        color:var(--text2);font-weight:700;font-size:12px;cursor:pointer;text-align:center;text-decoration:none;display:block;">📧 Contactar al responsable de datos</a>
     </div>
   `);
 
@@ -6871,7 +6871,7 @@ async function _solicitarAuditoria() {
     const auditoria = await res.json();
     alert(`Registro de acceso a tus datos:\n\n${auditoria.eventos?.map(e =>
       `${e.fecha}: ${e.tipo} por ${e.usuario}`
-    ).join('\n') || 'Sin accesos registrados'}\n\nPara reportes detallados, contacta a: ico.icorsa84@gmail.com`);
+    ).join('\n') || 'Sin accesos registrados'}\n\nPara reportes detallados, contacta a: contacto@atdc.app`);
   } catch (e) {
     alert(e.message || 'Error al cargar auditoría.');
   } finally {
@@ -7292,11 +7292,11 @@ async function init() {
       planBadgeTop.style.background = 'rgba(139,92,246,.15)';
       planBadgeTop.style.color = '#c4b5fd';
       planBadgeTop.style.borderColor = 'rgba(139,92,246,.35)';
-      planBadgeTop.innerHTML = icono('shield',13) + ' Consultor ICORSA';
+      planBadgeTop.innerHTML = icono('shield',13) + ' Consultor';
     }
     // Subtítulo con nombre de participante
     const agentSub = document.getElementById('agentSub');
-    if (agentSub) agentSub.textContent = `Vista Administrador · ICORSA Consultores — ${PARTICIPANTE.nombre} (Plan ${PARTICIPANTE.plan})`;
+    if (agentSub) agentSub.textContent = `Vista Administrador · Consultor — ${PARTICIPANTE.nombre} (Plan ${PARTICIPANTE.plan})`;
     // Mostrar botón de informe directamente si hay informe guardado
     if (tieneInforme) {
       document.getElementById('btnInformeTxt').innerHTML = icono('search',15) + ' Revisar Informe Participante';
@@ -7420,8 +7420,8 @@ async function init() {
     if (IS_ADMIN) {
       // Fix RISK-06: usar PARTICIPANTE.nombre en lugar de texto hardcodeado
       bienvenida = online
-        ? `**Vista Consultor ICORSA** — Participante: **${PARTICIPANTE.nombre}** (Plan ${PARTICIPANTE.plan})\n\nPuedes revisar su informe final con el botón de arriba, validarlo y liberarlo al participante. El agente también responde preguntas sobre el perfil del participante.`
-        : `**Vista Consultor ICORSA** — Modo local activo.\n\nParticipante: **${PARTICIPANTE.nombre}** · Plan ${PARTICIPANTE.plan}. Puedes generar el informe con datos locales o esperar conexión al servidor.`;
+        ? `**Vista Consultor** — Participante: **${PARTICIPANTE.nombre}** (Plan ${PARTICIPANTE.plan})\n\nPuedes revisar su informe final con el botón de arriba, validarlo y liberarlo al participante. El agente también responde preguntas sobre el perfil del participante.`
+        : `**Vista Consultor** — Modo local activo.\n\nParticipante: **${PARTICIPANTE.nombre}** · Plan ${PARTICIPANTE.plan}. Puedes generar el informe con datos locales o esperar conexión al servidor.`;
     } else {
       const _planB = getPlanActual();
       const _dRest = _diasRestantesPlan();
@@ -8375,7 +8375,7 @@ Promise.resolve(window._onboardingListo).then(() => {
 
       <h3>1. Identificación del Responsable</h3>
       <p>El presente servicio es provisto por <strong>Isaac Cornejo Salvo</strong>, Consultor en Recursos Humanos y Desarrollo Organizacional,
-         en adelante «el Consultor», con domicilio en Chile. Contacto: <a href="mailto:ico.icorsa84@gmail.com">ico.icorsa84@gmail.com</a>.</p>
+         en adelante «el Consultor», con domicilio en Chile. Contacto: <a href="mailto:contacto@atdc.app">contacto@atdc.app</a>.</p>
 
       <h3>2. Objeto del Servicio</h3>
       <p>ATDC es una plataforma digital de outplacement asistido por inteligencia artificial que apoya el proceso de recolocación
@@ -8424,7 +8424,7 @@ Promise.resolve(window._onboardingListo).then(() => {
 
       <h3>1. Responsable del Tratamiento</h3>
       <p><strong>Isaac Cornejo Salvo</strong> — Consultor en Recursos Humanos, Chile.<br>
-         Contacto DPO: <a href="mailto:ico.icorsa84@gmail.com">ico.icorsa84@gmail.com</a></p>
+         Contacto del responsable de datos: <a href="mailto:contacto@atdc.app">contacto@atdc.app</a></p>
 
       <h3>2. Marco Legal Aplicable</h3>
       <p>Esta política se enmarca en:</p>
@@ -8454,7 +8454,7 @@ Promise.resolve(window._onboardingListo).then(() => {
         <li><strong>P</strong>ortabilidad — recibir sus datos en formato legible</li>
         <li><strong>B</strong>loqueo — suspender temporalmente el tratamiento</li>
       </ul>
-      <p>Para ejercer estos derechos: <a href="mailto:ico.icorsa84@gmail.com">ico.icorsa84@gmail.com</a></p>
+      <p>Para ejercer estos derechos: <a href="mailto:contacto@atdc.app">contacto@atdc.app</a></p>
 
       <h3>5. Almacenamiento y Seguridad</h3>
       <p>Los datos se almacenan en servidores ubicados en la Unión Europea (Render.com — Frankfurt).
