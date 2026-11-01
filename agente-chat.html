@@ -1751,6 +1751,7 @@
       <div id="sidePanelAtsNote" style="font-size:.73rem;color:var(--muted);margin-top:4px">Objetivo: 85+ · Faltan KW de logística</div>
       <input type="file" id="cvFileInput" accept=".pdf,.txt" style="display:none" onchange="_subirCV()">
       <button id="btnSubirCV" onclick="document.getElementById('cvFileInput').click()" title="Sube tu CV en PDF o TXT (máx. 5 MB). La IA lo analiza y actualiza tu puntaje ATS al instante." style="margin-top:8px;width:100%;padding:8px 10px;border-radius:8px;border:1px solid var(--border2);background:var(--blue2);color:#fff;font-weight:700;font-size:.78rem;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05 12.25 20.24a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg> Subir mi CV (PDF o TXT)</button>
+      <div id="cvVersionesBox" style="display:none;margin-top:8px;font-size:.73rem;color:var(--muted);"></div>
       <div id="cvUploadStatus" style="font-size:.72rem;color:var(--muted);margin-top:4px;"></div>
     </div>
 
@@ -2434,6 +2435,8 @@ function _inicializarDesde(data) {
   // (plan_activo). 'plan' puede ser un plan pedido con pago pendiente.
   PARTICIPANTE.plan_activo  = data.plan_activo || data.plan;
   PARTICIPANTE.pago_estado  = data.pago_estado || 'confirmado';
+  PARTICIPANTE.plan_vence_en = data.plan_vence_en || '';
+  PARTICIPANTE.plan_vencido  = !!data.plan_vencido;
 
   /* Task #298: Si datos_por_definir es true, mostrar modal obligatorio
      al login para completar cargo/sector/renta faltantes */
@@ -2921,6 +2924,10 @@ function _aplicarPerfilAlEstado(d) {
   if (d.plan) PARTICIPANTE.plan = d.plan;
   if (d.plan_activo) PARTICIPANTE.plan_activo = d.plan_activo;
   if (d.pago_estado) PARTICIPANTE.pago_estado = d.pago_estado;
+  if ('plan_vence_en' in d) PARTICIPANTE.plan_vence_en = d.plan_vence_en || '';
+  if ('plan_vencido' in d) PARTICIPANTE.plan_vencido = !!d.plan_vencido;
+  if (Array.isArray(d.cv_versiones)) PARTICIPANTE.cv_versiones = d.cv_versiones;
+  if (typeof d.cv_versiones_limite === 'number') PARTICIPANTE.cv_versiones_limite = d.cv_versiones_limite;
   PARTICIPANTE.cargo          = d.cargo_objetivo || 'Por definir';
   PARTICIPANTE.sector         = d.sector || 'Por definir';
   PARTICIPANTE.renta_objetivo = d.renta_objetivo || 'Por definir';
@@ -3562,6 +3569,17 @@ function getPlanActual() {
   // REQ-PLAN-GATE-UI: el participante ve SOLO lo que ya tiene activo. Un
   // valor en localStorage o un plan con pago pendiente no habilitan nada.
   return PARTICIPANTE.plan_activo || PARTICIPANTE.plan || 'Inicial';
+}
+/* REQ-PLAN-VIGENCIA */
+function _fechaCorta(iso) {
+  try { return new Date(iso).toLocaleDateString('es-CL', { day: 'numeric', month: 'long', year: 'numeric' }); } catch (e) { return iso || ''; }
+}
+function _diasRestantesPlan() {
+  if (!PARTICIPANTE.plan_vence_en || PARTICIPANTE.plan_vencido) return null;
+  return Math.ceil((new Date(PARTICIPANTE.plan_vence_en).getTime() - Date.now()) / 86400000);
+}
+function _planVencido() {
+  return !IS_ADMIN && !!PARTICIPANTE.plan_vencido && PARTICIPANTE.pago_estado !== 'pendiente';
 }
 function _pagoPendiente() {
   return !IS_ADMIN && PARTICIPANTE.pago_estado === 'pendiente' && PARTICIPANTE.plan && PARTICIPANTE.plan !== getPlanActual();
@@ -4308,6 +4326,10 @@ async function generarInforme() {
   // por plan. Se corta aquí, antes de llamar a la API o al fallback, igual
   // que ya se hace con el chat para este mismo plan.
   const planActualGen = getPlanActual();
+  if (planActualGen === 'Inicial' && !IS_ADMIN && informeGenerado) {   // plan vencido: solo ver
+    abrirInforme();
+    return;
+  }
   if (planActualGen === 'Inicial' && !IS_ADMIN) {
     if (!informeAbierto) {
       informeAbierto = true;
@@ -5530,13 +5552,13 @@ function renderMdInforme(md) {
 function _mostrarExportes(informe) {
   document.getElementById('btnExport').style.display = informe.en_revision ? 'none' : 'flex';
   const b = document.getElementById('btnExportPdf');
-  if (b) b.style.display = (!informe.en_revision && informe.plan === 'Premium' && (getPlanActual() === 'Premium' || IS_ADMIN)) ? 'flex' : 'none';
+  if (b) b.style.display = (!informe.en_revision && informe.plan === 'Premium') ? 'flex' : 'none';
 }
 
 /* Informe premium descargable en PDF: se arma una página de impresión con el
    informe aprobado y el navegador la guarda como PDF. */
 function exportarInformePDF() {
-  if (!informeGenerado || (getPlanActual() !== 'Premium' && !IS_ADMIN)) return;
+  if (!informeGenerado || informeGenerado.plan !== 'Premium') return;
   const inf = informeGenerado, P = PARTICIPANTE;
   const secs = (inf.secciones || []).map(sec => `
     <section><h2>${escHtml(sec.titulo || '')}</h2><div>${renderMdInforme(sec.contenido || '')}</div></section>`).join('');
@@ -5791,8 +5813,8 @@ function _aplicarGateoPorPlan() {
       ">
         <span style="color:var(--green);">${icono('lock', 20)}</span>
         <div style="flex:1;">
-          <div style="font-weight:700;color:var(--text);font-size:.92rem;">El plan Inicial no incluye conversación con el agente</div>
-          <div style="color:var(--muted);font-size:.82rem;margin-top:2px;">Incluye tu puntaje ATS. Para conversar con el agente, revisar tu CV a fondo y recibir tu informe, mejora tu plan.</div>
+          <div style="font-weight:700;color:var(--text);font-size:.92rem;">${_planVencido() ? `Tu acceso al plan ${escHtml(PARTICIPANTE.plan)} terminó el ${_fechaCorta(PARTICIPANTE.plan_vence_en)}` : 'El plan Inicial no incluye conversación con el agente'}</div>
+          <div style="color:var(--muted);font-size:.82rem;margin-top:2px;">${_planVencido() ? 'Tu Informe Final sigue disponible. Para volver a conversar con el agente, renueva tu plan desde Mi cuenta.' : 'Incluye tu puntaje ATS. Para conversar con el agente, revisar tu CV a fondo y recibir tu informe, mejora tu plan.'}</div>
         </div>
         <a href="https://atdc.app/#planes" target="_blank" style="
           flex-shrink:0;padding:10px 16px;border-radius:8px;background:var(--blue2);
@@ -5833,7 +5855,8 @@ function _aplicarGateoPorPlan() {
   const _qt = document.querySelector('.quick-topics');
   if (_qt) _qt.style.display = [...document.querySelectorAll('.qt-btn[data-qt]')].some(b => b.style.display !== 'none') ? '' : 'none';
   const _wrapInf = document.getElementById('btnInformeWrap');
-  if (_wrapInf) _wrapInf.style.display = (plan === 'Inicial' && !IS_ADMIN) ? 'none' : '';
+  const _verInforme = (plan === 'Inicial' && !IS_ADMIN && !!window._INFORME_SERVIDOR);   // plan vencido con informe
+  if (_wrapInf) _wrapInf.style.display = (plan === 'Inicial' && !IS_ADMIN && !_verInforme) ? 'none' : '';
 
   // Sección "Sesión con el Consultor": solo visible para Plan Premium
   const premiumSec = document.getElementById('premiumSesionSec');
@@ -5848,8 +5871,8 @@ function _aplicarGateoPorPlan() {
   // vez de dejar que el participante llegue al botón y recién ahí se entere).
   const btnTxtInforme = document.getElementById('btnInformeTxt');
   if (btnTxtInforme) {
-    btnTxtInforme.innerHTML = (plan === 'Inicial' && !IS_ADMIN)
-      ? `${icono('lock',15)} Informe Final (mejora tu plan)`
+    btnTxtInforme.innerHTML = _verInforme
+      ? `${icono('document',15)} Ver mi Informe Final`
       : `${icono('document',15)} Generar Informe Final`;
   }
 }
@@ -6376,7 +6399,10 @@ async function _cargarMiPerfil() {
         if (elPlanBtn) { elPlanBtn.disabled = true; elPlanBtn.style.opacity = '.5'; elPlanBtn.style.cursor = 'not-allowed'; }
         if (elPlanSelect) elPlanSelect.disabled = true;
       } else {
-        elPlanNota.innerHTML = `Plan actual: <strong>${d.plan}</strong>. Subir de plan queda pendiente de pago hasta que confirmemos tu transferencia; bajar a Inicial es inmediato.`;
+        const _vig = d.plan_vencido
+          ? ` <span style="color:#EF4444">Tu acceso terminó el ${_fechaCorta(d.plan_vence_en)}: elige un plan y presiona «Cambiar plan» para renovarlo.</span>`
+          : (d.plan_vence_en ? ` Acceso hasta el <strong>${_fechaCorta(d.plan_vence_en)}</strong>.` : '');
+        elPlanNota.innerHTML = `Plan actual: <strong>${escHtml(d.plan)}</strong>.${_vig} Subir de plan queda pendiente de pago hasta que confirmemos tu transferencia; bajar a Inicial es inmediato.`;
         elPlanNota.style.color = '';
         if (elPlanBtn) { elPlanBtn.disabled = false; elPlanBtn.style.opacity = '1'; elPlanBtn.style.cursor = 'pointer'; }
         if (elPlanSelect) elPlanSelect.disabled = false;
@@ -6419,7 +6445,7 @@ async function _cambiarPlanMiCuenta() {
   if (!sel || !msgEl) return;
   const planNuevo = sel.value;
   const planActual = (_MI_PERFIL_CACHE && _MI_PERFIL_CACHE.plan) || '';
-  if (planNuevo === planActual) {
+  if (planNuevo === planActual && !(_MI_PERFIL_CACHE && _MI_PERFIL_CACHE.plan_vencido)) {
     msgEl.style.display = 'block'; msgEl.style.background = 'rgba(148,163,184,.12)'; msgEl.style.color = 'var(--muted)';
     msgEl.textContent = `Ya tienes el plan ${planNuevo} activo.`;
     return;
@@ -6900,6 +6926,7 @@ async function _subirCV() {
   try {
     const formData = new FormData();
     formData.append('archivo', archivo);
+    if (_cvCargoSel) formData.append('cargo', _cvCargoSel);   // REQ-CV-VERSIONES
     const resp = await fetch(CONFIG.cv_subir_url, {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${_obtenerToken()}` },
@@ -6911,6 +6938,7 @@ async function _subirCV() {
     // Actualizar la fuente única de verdad y re-sincronizar el panel lateral
     PARTICIPANTE.ats_score = data.ats_score;
     PARTICIPANTE.kw_faltantes = data.kw_faltantes || [];
+    (PARTICIPANTE.cv_versiones = PARTICIPANTE.cv_versiones || []).push({ cargo: _cvCargoSel, ats_score: data.ats_score, fecha: new Date().toISOString() });
     _refrescarATSsidebar();
     etapaRegistrarHito('cv'); // Fix NAV-ETAPAS-01: marca la etapa "CV + ATS" como completada
 
@@ -6923,11 +6951,48 @@ async function _subirCV() {
     if (status) { status.innerHTML = `${icono('warning',12)} ${e.message || 'Error al subir el CV. Intenta nuevamente.'}`; status.style.color = 'var(--amber)'; }
   } finally {
     if (btn) { btn.disabled = false; btn.innerHTML = icono('paperclip',14) + ' Subir mi CV (PDF o TXT)'; }
+    try { _pintarVersionesCV(); } catch (e) {}   // REQ-CV-VERSIONES: bloquea si se agotaron
     input.value = '';
   }
 }
 
+/* REQ-CV-VERSIONES: cada CV aprobado es una versión para uno de los cargos
+   objetivo. Se muestra para qué cargo se sube y cuántas versiones quedan. */
+let _cvCargoSel = '';
+function _cargosObjetivo() {
+  const c = PARTICIPANTE.cargo;
+  return (Array.isArray(c) ? c : (c && c !== 'Por definir' ? [c] : [])).filter(Boolean);
+}
+function _pintarVersionesCV() {
+  const box = document.getElementById('cvVersionesBox');
+  if (!box) return;
+  const plan = getPlanActual();
+  const cargos = _cargosObjetivo();
+  if (IS_ADMIN || plan === 'Inicial' || !cargos.length) { box.style.display = 'none'; return; }
+  if (!cargos.includes(_cvCargoSel)) _cvCargoSel = cargos[0];
+  const lim = typeof PARTICIPANTE.cv_versiones_limite === 'number' ? PARTICIPANTE.cv_versiones_limite : 0;
+  const usadas = (PARTICIPANTE.cv_versiones || []).filter(v => (v.cargo || '') === _cvCargoSel).length;
+  const selector = cargos.length > 1 ? `
+    <label for="cvCargoSelect" style="display:block;margin-bottom:3px;">CV para el cargo</label>
+    <select id="cvCargoSelect" onchange="_cvCargoSel=this.value;_pintarVersionesCV()" style="width:100%;padding:6px 8px;border-radius:7px;border:1px solid var(--border2);background:var(--bg);color:var(--text);font-size:.75rem;margin-bottom:5px;">
+      ${cargos.map(c => `<option value="${escHtml(c)}" ${c === _cvCargoSel ? 'selected' : ''}>${escHtml(c)}</option>`).join('')}
+    </select>` : '';
+  const conteo = lim
+    ? `Versiones de CV para «${escHtml(_cvCargoSel)}»: <strong>${Math.min(usadas, lim)} de ${lim}</strong>`
+    : `Versiones de CV para «${escHtml(_cvCargoSel)}»: <strong>${usadas}</strong> (ilimitadas)`;
+  box.innerHTML = selector + conteo;
+  box.style.display = '';
+  const btn = document.getElementById('btnSubirCV');
+  const agotado = lim && usadas >= lim;
+  if (btn && !btn.dataset.ocupado) {
+    btn.disabled = !!agotado;
+    btn.style.opacity = agotado ? '.5' : '1';
+    btn.title = agotado ? `Ya usaste las ${lim} versión(es) de CV de tu plan para este cargo.` : 'Sube tu CV en PDF o TXT (máx. 5 MB). La IA lo analiza y actualiza tu puntaje ATS al instante.';
+  }
+}
+
 function _refrescarATSsidebar() {
+  try { _pintarVersionesCV(); } catch (e) {}
   const P = PARTICIPANTE;
   const score = P.ats_score || 0;
   const elAtsScore = document.getElementById('sidePanelAtsScore');
@@ -7079,7 +7144,7 @@ async function init() {
     const elNombre = document.getElementById('sidePanelNombre');
     if (elNombre) elNombre.textContent = P.nombre;
     const elDiaPlan = document.getElementById('sidePanelDiaPlan');
-    if (elDiaPlan) elDiaPlan.textContent = `Proceso día ${P.dia_proceso} · Plan ${IS_ADMIN ? P.plan : getPlanActual()}` + (_pagoPendiente() ? ` (${P.plan} por activar)` : '');
+    if (elDiaPlan) elDiaPlan.textContent = `Proceso día ${P.dia_proceso} · Plan ${IS_ADMIN ? P.plan : getPlanActual()}` + (_pagoPendiente() ? ` (${P.plan} por activar)` : (_planVencido() ? ` (${P.plan} vencido)` : ''));
     const elCargo = document.getElementById('sidePanelCargo');
     if (elCargo) elCargo.textContent = P.cargo;
     const elSector = document.getElementById('sidePanelSector');
@@ -7192,8 +7257,13 @@ async function init() {
         : `**Vista Consultor ICORSA** — Modo local activo.\n\nParticipante: **${PARTICIPANTE.nombre}** · Plan ${PARTICIPANTE.plan}. Puedes generar el informe con datos locales o esperar conexión al servidor.`;
     } else {
       const _planB = getPlanActual();
+      const _dRest = _diasRestantesPlan();
       const _avisoPago = _pagoPendiente()
         ? `\n\n⏳ Pediste el plan **${PARTICIPANTE.plan}**: se activará cuando confirmemos tu pago. Mientras tanto ves lo incluido en tu plan **${_planB}**.`
+        : _planVencido()
+        ? `\n\n📅 Tu acceso al plan **${PARTICIPANTE.plan}** terminó el ${_fechaCorta(PARTICIPANTE.plan_vence_en)}. ${window._INFORME_SERVIDOR ? 'Puedes seguir viendo y descargando tu Informe Final. ' : ''}Para continuar, renueva tu plan desde **Mi cuenta**.`
+        : (_dRest !== null && _dRest <= 7)
+        ? `\n\n📅 Tu acceso al plan **${_planB}** vence el **${_fechaCorta(PARTICIPANTE.plan_vence_en)}** (${_dRest <= 1 ? 'mañana o antes' : 'en ' + _dRest + ' días'}).`
         : '';
       bienvenida = (_planB === 'Inicial')
         ? `¡Bienvenido, **${PARTICIPANTE.nombre.split(' ')[0]}**! Tu plan **Inicial** incluye **1 análisis ATS** (Sistema de Seguimiento de Candidatos) de tu CV: súbelo con el botón **Subir mi CV** del panel derecho y verás tu puntaje, tus categorías débiles y las mejoras sugeridas.${_avisoPago}`

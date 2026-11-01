@@ -1488,6 +1488,27 @@ async function _reiniciarTest(id, tipo) {
     _mostrarMsg('_sop_msg', d.mensaje || 'Test reiniciado: la persona puede rendirlo de nuevo.', false);
   } catch (e) { _mostrarMsg('_sop_msg', e.message, true); }
 }
+/* REQ-PLAN-VIGENCIA: ampliar el periodo de acceso del plan pagado */
+async function _extenderAcceso(id) {
+  const dias = prompt('¿Cuántos días de acceso quieres agregar? (si ya venció, se cuentan desde hoy)', '15');
+  if (dias === null) return;
+  const n = parseInt(dias, 10);
+  if (!(n >= 1 && n <= 365)) { _mostrarMsg('_sop_msg', 'Indica un número de días entre 1 y 365.', true); return; }
+  try {
+    const d = await _apiSend('PATCH', `/api/admin/participantes/${id}/extender-acceso`, { dias: n });
+    _mostrarMsg('_sop_msg', d.mensaje || 'Acceso extendido.', false);
+    cargarListado();
+  } catch (e) { _mostrarMsg('_sop_msg', e.message, true); }
+}
+function _textoVigencia(p) {
+  if (!p.plan_vence_en || p.plan === 'Inicial') return '';
+  const f = new Date(p.plan_vence_en);
+  const txt = f.toLocaleDateString('es-CL', { day: 'numeric', month: 'long', year: 'numeric' });
+  const dias = Math.ceil((f.getTime() - Date.now()) / 86400000);
+  return dias < 0
+    ? `<span style="color:var(--red,#DC2626);font-weight:600;">Acceso al plan ${escHtml(p.plan)} vencido el ${txt}</span>`
+    : `Acceso al plan ${escHtml(p.plan)} hasta el <strong>${txt}</strong> (${dias} día${dias === 1 ? '' : 's'})`;
+}
 async function _marcarRegalo(id, valor) {
   try {
     const d = await _apiSend('PATCH', `/api/admin/participantes/${id}/regalo`, { plan_regalo: !!valor });
@@ -1615,7 +1636,10 @@ function _renderDetalle(p) {
 
     <div class="sec">
       <div class="sec-title">Acciones de soporte</div>
+      ${_textoVigencia(p) ? `<div style="font-size:13px;margin-bottom:8px;">${_textoVigencia(p)}</div>` : ''}
+      ${(Array.isArray(p.cv_versiones) && p.cv_versiones.length) ? `<div style="font-size:12.5px;color:var(--text2);margin-bottom:8px;">Versiones de CV aprobadas: ${p.cv_versiones.map(v => `${escHtml(v.cargo || '—')} (${escHtml(String(v.ats_score ?? ''))}/100)`).join(' · ')}</div>` : ''}
       <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
+        ${p.plan !== 'Inicial' && (p.pago_estado || 'confirmado') !== 'pendiente' ? `<button class="btn-secondary" onclick="_extenderAcceso('${escHtml(p.id)}')">${icono('calendar',14)} Extender acceso…</button>` : ''}
         <button class="btn-secondary" onclick="_devolverIntentosCv('${escHtml(p.id)}')">${icono('paperclip',14)} Devolver intentos de CV</button>
         <button class="btn-secondary" onclick="_reiniciarTest('${escHtml(p.id)}','disc')">${icono('puzzle',14)} Reiniciar test DISC</button>
         <button class="btn-secondary" onclick="_reiniciarTest('${escHtml(p.id)}','kostick')">${icono('puzzle',14)} Reiniciar test Kostick</button>
