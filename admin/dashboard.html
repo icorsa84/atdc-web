@@ -133,7 +133,7 @@
     font-size:13.5px; font-weight:700; cursor:pointer; }
   .btn-secondary { background:transparent; border:1px solid var(--border2); color:var(--text2);
     border-radius:8px; padding:9px 16px; font-size:13.5px; font-weight:600; cursor:pointer; }
-  .btn-danger { background:rgba(239,68,68,.1); border:1px solid rgba(239,68,68,.4); color:var(--red);
+  .btn-danger { background:rgba(239,68,68,.1); border:1px solid rgba(239,68,68,.4); color:#fca5a5;
     border-radius:8px; padding:9px 16px; font-size:13.5px; font-weight:700; cursor:pointer; }
   .msg { font-size:12.5px; margin-top:8px; padding:8px 11px; border-radius:7px; display:none; }
   .bar-row { display:flex; align-items:center; gap:8px; font-size:12.5px; margin-bottom:6px; }
@@ -267,7 +267,7 @@
     <div class="stat-chip">Total: <b id="audTotal">—</b></div>
     <button class="btn-secondary" onclick="cargarAuditoria(audOffset)" style="margin-left:auto;display:inline-flex;align-items:center;gap:6px;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg> Actualizar</button>
   </div>
-  <div id="auditoriaWrap"><div class="loading">Cargando auditoría…</div></div>
+  <div id="auditoriaWrap" tabindex="0" role="region" aria-label="Registro de auditoría"><div class="loading">Cargando auditoría…</div></div>
   <div id="auditoriaPaginador" style="display:flex;gap:8px;align-items:center;justify-content:flex-end;margin-top:10px;font-size:12.5px;color:var(--muted);"></div>
   </div>
 
@@ -1662,7 +1662,7 @@ function _renderDetalle(p) {
     <div class="sec">
       <div class="sec-title">Datos del participante</div>
       <div class="field-row">
-        <div class="field"><label>Nombre</label><input id="_d_nombre" value="${(p.nombre||'').replace(/"/g,'&quot;')}"></div>
+        <div class="field"><label for="_d_nombre">Nombre</label><input id="_d_nombre" value="${(p.nombre||'').replace(/"/g,'&quot;')}"></div>
         <!-- Fix QA-UX-CATALOGO-01: antes texto libre; mostraba literalmente
              "Por definir" como si fuera un valor real tipeado, y no había
              forma de distinguir de un vistazo "no lo sabemos" de "el
@@ -1676,7 +1676,7 @@ function _renderDetalle(p) {
       </div>
       <div class="field-row">
         <div class="field">
-          <label>Plan contratado</label>
+          <label for="_d_plan">Plan contratado</label>
           <select id="_d_plan">
             ${['Inicial','Esencial','Profesional','Premium'].map(pl => `<option value="${pl}" ${pl===p.plan?'selected':''}>${pl}</option>`).join('')}
           </select>
@@ -1832,18 +1832,18 @@ function _renderDetalle(p) {
         <summary style="display:flex;align-items:center;gap:6px;">${icono('lightning',13)} Alternativa: analizar aquí con la IA de ATDC (pegando la transcripción)</summary>
         <div style="margin-top:10px;">
           <div class="field" style="margin-bottom:8px;">
-            <label>Transcripción de la entrevista</label>
+            <label for="_ent_transcripcion">Transcripción de la entrevista</label>
             <textarea id="_ent_transcripcion" style="width:100%;min-height:120px;" placeholder="Pega aquí la transcripción completa.&#10;Formato sugerido:&#10;CONSULTOR: pregunta...&#10;CANDIDATO: respuesta..."></textarea>
           </div>
           <div class="field" style="margin-bottom:8px;">
-            <label>Opinión del Consultor</label>
+            <label for="_ent_opinion">Opinión del Consultor</label>
             <textarea id="_ent_opinion" style="width:100%;min-height:70px;" placeholder="Tus observaciones e impresiones cualitativas del candidato."></textarea>
           </div>
           <div class="field-row" style="margin-bottom:8px;">
-            <div class="field"><label>Fecha</label><input id="_ent_fecha" placeholder="2026-10-24"></div>
-            <div class="field"><label>Duración (min)</label><input id="_ent_duracion" type="number" min="10" max="180" placeholder="60"></div>
+            <div class="field"><label for="_ent_fecha">Fecha</label><input id="_ent_fecha" placeholder="2026-10-24"></div>
+            <div class="field"><label for="_ent_duracion">Duración (min)</label><input id="_ent_duracion" type="number" min="10" max="180" placeholder="60"></div>
             <div class="field">
-              <label>Modalidad</label>
+              <label for="_ent_modalidad">Modalidad</label>
               <select id="_ent_modalidad">
                 <option value="videollamada" selected>Videollamada</option>
                 <option value="presencial">Presencial</option>

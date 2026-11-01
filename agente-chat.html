@@ -19,14 +19,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="ATDC">
 <link rel="manifest" href="/manifest.json">
-<!-- Microsoft Clarity — analítica de uso del sitio (proyecto "ATDC", outplacement.atdc.app) -->
-<script type="text/javascript">
-    (function(c,l,a,r,i,t,y){
-        c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
-        t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
-        y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
-    })(window, document, "clarity", "script", "z2y52edk0j");
-</script>
+<!-- (Se quitó un segundo fragmento de Clarity duplicado: contaba dos veces cada visita) -->
 <script>
   /* Fix UX-TEMA-01: aplica el tema guardado ANTES de pintar la página,
      para que no haya parpadeo (flash oscuro→claro) al cargar. */
@@ -865,6 +858,10 @@
   }
   .informe-title-wrap{display:flex;align-items:center;gap:10px}
   .informe-plan-badge{padding:3px 10px;border-radius:var(--r-full);font-size:.7rem;font-weight:700}
+  /* Contraste en tema claro (los morados claros eran ilegibles sobre fondo blanco) */
+  :root[data-theme="light"] .plan-badge{color:#5b21b6;background:rgba(139,92,246,.10);border-color:rgba(109,40,217,.35)}
+  :root[data-theme="light"] .badge-premium{color:#5b21b6}
+  :root[data-theme="light"] .inf-overlay-premium .inf-tab.active{color:#6d28d9;border-bottom-color:#6d28d9}
   .badge-esencial{background:rgba(34,197,94,.12);color:var(--green);border:1px solid rgba(34,197,94,.3)}
   .badge-profesional{background:rgba(96,200,255,.12);color:var(--cyan);border:1px solid rgba(96,200,255,.3)}
   .badge-premium{background:rgba(139,92,246,.12);color:#c4b5fd;border:1px solid rgba(139,92,246,.3)}
@@ -1472,7 +1469,7 @@
 
 <!-- PROCESO — cada paso es clickeable: el participante puede saltar
      adelante o volver atrás libremente (fix NAV-ETAPAS-01) -->
-<div class="proceso-bar">
+<div class="proceso-bar" tabindex="0" role="region" aria-label="Etapas de tu proceso">
   <div class="paso ok" id="pasoPerfil" onclick="etapaIrA('perfil')"
        title="Ir a Perfil — puedes volver cuando quieras">✔ Perfil</div>
   <div class="paso-sep" id="sepCvAts">—</div>
@@ -2178,8 +2175,10 @@ function _multiSelectConOtro(idBase, catalogo, valorActual) {
         cursor: text; display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
       }
       .multi-select-input:focus-within { border-color: var(--blue); }
+      :root[data-theme="light"] .multi-chip { color: #1e3a8a; background: #dbeafe; }
+      :root[data-theme="light"] .multi-chip button { color: #1e3a8a; }
       .multi-chip {
-        background: rgba(59, 130, 246, 0.2); color: #93c5fd; padding: 3px 8px;
+        background: rgba(59, 130, 246, 0.2); color: #bfdbfe; padding: 3px 8px;
         border-radius: 6px; font-size: 13px; display: inline-flex; align-items: center;
         white-space: nowrap;
       }
@@ -4434,7 +4433,7 @@ async function generarInforme() {
 
   informeGenerado = informe;
   guardarInforme(informe);
-  etapaRegistrarHito('informe'); // Fix NAV-ETAPAS-01: marca la etapa "Informe final" como completada
+  if (!informe.en_revision) etapaRegistrarHito('informe'); // Fix NAV-ETAPAS-01 (en revisión aún no cuenta como completada)
   // REQ-PREMIUM-REVISION: la aprobación la decide el servidor, no este navegador
   informeValidadoAdmin = (informe.estado === 'aprobado');
   try { localStorage.removeItem(CONFIG.informe_key + '_validado'); } catch(e) {}
@@ -5719,8 +5718,8 @@ function _pintarSelectorPaisMercado() {
     return `<button onclick="_abrirMercado('${p}')" style="
         padding:5px 11px;border-radius:999px;font-size:.72rem;font-weight:700;cursor:pointer;
         white-space:nowrap;
-        border:1px solid ${activo ? 'var(--cyan2)' : 'var(--border)'};
-        background:${activo ? 'var(--cyan2)' : 'var(--bg)'};
+        border:1px solid ${activo ? '#0b5d7a' : 'var(--border)'};
+        background:${activo ? '#0b5d7a' : 'var(--bg)'};
         color:${activo ? '#fff' : 'var(--text)'};">${escHtml(p)}</button>`;
   }).join('');
 }
@@ -5770,7 +5769,7 @@ async function _abrirMercado(pais) {
         </div>
         <div style="color:var(--muted);font-size:.8rem;margin-top:3px;">${escHtml(p.descripcion || '')}</div>
         ${(p.tags || []).length ? `<div style="margin-top:7px;display:flex;flex-wrap:wrap;gap:5px;">
-          ${(p.tags || []).map(t => `<span style="font-size:.7rem;padding:2px 8px;border-radius:999px;background:var(--bg3);color:var(--muted);">${escHtml(t)}</span>`).join('')}
+          ${(p.tags || []).map(t => `<span style="font-size:.7rem;padding:2px 8px;border-radius:999px;background:var(--bg3);color:var(--text2);">${escHtml(t)}</span>`).join('')}
         </div>` : ''}
       </a>`).join('');
 
@@ -6433,7 +6432,7 @@ async function _abrirMiCuenta() {
     <div style="font-size:.73rem;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;margin-bottom:8px;">Tu plan</div>
     <div id="_mc_plan_nota" style="font-size:.78rem;color:var(--text2);margin-bottom:10px;line-height:1.5;"></div>
     <div style="display:flex;gap:8px;margin-bottom:8px;">
-      <select id="_mc_plan_select" style="flex:1;padding:10px 12px;border-radius:8px;background:var(--bg);
+      <select id="_mc_plan_select" aria-label="Elige un plan" style="flex:1;padding:10px 12px;border-radius:8px;background:var(--bg);
         border:1.5px solid var(--border);color:var(--text);font-size:13.5px;outline:none;">
         <option value="Inicial">Inicial</option>
         <option value="Esencial">Esencial</option>
@@ -7282,7 +7281,7 @@ async function init() {
     // hito para que la barra de etapas quede coherente sin pisar su estado
     // directo — etapaCargar() ya corrió antes en init(), así que esto solo
     // agrega el hito que pudiera faltar y vuelve a pintar.
-    etapaRegistrarHito('informe');
+    if (!(window._INFORME_SERVIDOR && window._INFORME_SERVIDOR.en_revision)) etapaRegistrarHito('informe');
   }
 
   // ---- MODO ADMIN (cuando ya autenticado vía sessionStorage o URL legacy) ----
@@ -8077,7 +8076,7 @@ const ETAPAS = {
 };
 
 let etapaEstado = {
-  etapaActual: 'diagnostico',  // etapa en la que está el participante
+  etapaActual: 'cv_ats',  // etapa en la que está el participante (se recalcula al cargar)
   hitos: {}    // {disc: true, kostick: true, ...}
 };
 
@@ -8222,14 +8221,38 @@ function etapaIrA(etapa) {
   }
 }
 
+/* Los hitos se deducen de lo que el SERVIDOR sabe (CV, DISC, Kostick,
+   informe), no solo de este navegador: en otro equipo la barra mostraba
+   etapas como pendientes aunque ya estuvieran hechas. */
+function _hitosDesdeServidor() {
+  const P = PARTICIPANTE, h = {};
+  if ((P.cv_versiones || []).length || (P.ats_score || 0) > 0) h.cv = true;
+  if (P.disc && P.disc.codigo && P.disc.codigo !== '—' && P.disc.natural) h.disc = true;
+  if (P.kostick) h.kostick = true;
+  const inf = window._INFORME_SERVIDOR;
+  if (inf && !inf.en_revision) h.informe = true;
+  return h;
+}
+function _etapaSugerida() {
+  const orden = ['perfil', 'cv_ats', 'diagnostico', 'informe'].filter(_etapaDisponible);
+  return orden.find(e => !_etapaCompletada(e)) || orden[orden.length - 1];
+}
 function etapaCargar() {
+  let guardada = null;
   try {
     const saved = localStorage.getItem('atdc_etapa_'+CONFIG.participante_id);
     if (saved) {
       const parsed = JSON.parse(saved);
-      etapaEstado = Object.assign({ etapaActual:'diagnostico', hitos:{} }, parsed);
+      etapaEstado = Object.assign({ etapaActual:'cv_ats', hitos:{} }, parsed);
+      guardada = parsed.etapaActual || null;
     }
   } catch(e) {}
+  try { Object.assign(etapaEstado.hitos, _hitosDesdeServidor()); } catch (e) {}
+  // Etapa actual: la que el participante eligió, si su plan la incluye y no
+  // está terminada; si no, la primera pendiente de su plan.
+  if (!guardada || !_etapaDisponible(guardada) || _etapaCompletada(guardada)) {
+    etapaEstado.etapaActual = _etapaSugerida();
+  }
   etapaActualizarProcesoBar();
 }
 
@@ -8251,20 +8274,20 @@ function chips_bienvenida() {
   const testsDisponibles = restriccionChipsGate.tests_psicometricos || IS_ADMIN;
   const etapa = etapaEstado.etapaActual;
   if (!IS_ADMIN && !(PARTICIPANTE.antecedentes && PARTICIPANTE.antecedentes.situacion)) {
-    chips.push({ label:`${icono('user',14)} Contar mi situación`, action:'_abrirAntecedentes()' });
+    chips.push({ label:`${icono('user',14)} Contar mi situación`, action: () => _abrirAntecedentes() });
   }
 
   if (etapa === 'cv_ats') {
-    chips.push({ label:`${icono('document',14)} Optimizar mi CV`, action:`preguntar('¿Qué palabras clave le faltan a mi CV para llegar a 85 en ATS?')` });
+    chips.push({ label:`${icono('document',14)} Optimizar mi CV`, action: () => preguntar('¿Qué palabras clave le faltan a mi CV para llegar a 85 en ATS?') });
   } else if (etapa === 'diagnostico') {
     if (testsDisponibles && !etapaEstado.hitos.disc) {
-      chips.push({ label:`${icono('chart-bar',14)} Hacer test DISC`, action:'abrirTestDisc()' });
+      chips.push({ label:`${icono('chart-bar',14)} Hacer test DISC`, action: () => abrirTestDisc() });
     }
     if (testsDisponibles && !etapaEstado.hitos.kostick) {
-      chips.push({ label:`${icono('brain',14)} Hacer test Kostick`, action:'abrirTestKostick()' });
+      chips.push({ label:`${icono('brain',14)} Hacer test Kostick`, action: () => abrirTestKostick() });
     }
   } else if (etapa === 'informe') {
-    chips.push({ label:`${icono('mic',14)} Preparar entrevista`, action:`preguntar('¿Cómo me preparo para la entrevista con ${PARTICIPANTE.entrevista}?')` });
+    chips.push({ label:`${icono('mic',14)} Preparar entrevista`, action: () => preguntar(`¿Cómo me preparo para la entrevista con ${PARTICIPANTE.entrevista || 'la empresa'}?`) });
   }
   return chips;
 }
@@ -8278,7 +8301,8 @@ function renderChips(chips, container) {
     const btn = document.createElement('button');
     btn.className = 'test-start-chip';
     btn.innerHTML = chip.label;
-    btn.onclick = () => { try { eval(chip.action); } catch(e){} };
+    // Sin eval(): cada acción es una función (compatible con la política de seguridad CSP)
+    btn.onclick = () => { try { if (typeof chip.action === 'function') chip.action(); } catch(e){ console.warn(e); } };
     wrap.appendChild(btn);
   });
   container.appendChild(wrap);
