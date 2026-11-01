@@ -1725,6 +1725,9 @@
       <div class="s-row"><span class="s-key">Cargo objetivo</span><span class="s-val" id="sidePanelCargo">Jefe de Operaciones</span></div>
       <div class="s-row"><span class="s-key">Sector</span><span class="s-val" id="sidePanelSector">Retail / Logística</span></div>
       <div class="s-row"><span class="s-key">Renta objetivo</span><span class="s-val" id="sidePanelRenta">$3.5M CLP</span></div>
+      <button id="btnAntecedentes" onclick="_abrirAntecedentes()" title="Cuéntanos tu situación para adaptar las recomendaciones"
+        style="margin-top:8px;width:100%;padding:7px 10px;border-radius:8px;border:1px solid var(--border2);
+        background:transparent;color:var(--text2);font-weight:600;font-size:.75rem;cursor:pointer;gap:6px;display:none;align-items:center;justify-content:center;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg> <span id="btnAntecedentesTxt">Mi situación</span></button>
       <button id="btnMiCuenta" onclick="_abrirMiCuenta()" title="Ver y editar tus datos, tu foto de perfil y la privacidad de tus datos personales"
         style="margin-top:8px;width:100%;padding:7px 10px;border-radius:8px;border:1px solid var(--border2);
         background:transparent;color:var(--text2);font-weight:600;font-size:.75rem;cursor:pointer;gap:6px;display:flex;align-items:center;justify-content:center;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg> Mi cuenta</button>
@@ -1752,6 +1755,7 @@
       <input type="file" id="cvFileInput" accept=".pdf,.txt" style="display:none" onchange="_subirCV()">
       <button id="btnSubirCV" onclick="document.getElementById('cvFileInput').click()" title="Sube tu CV en PDF o TXT (máx. 5 MB). La IA lo analiza y actualiza tu puntaje ATS al instante." style="margin-top:8px;width:100%;padding:8px 10px;border-radius:8px;border:1px solid var(--border2);background:var(--blue2);color:#fff;font-weight:700;font-size:.78rem;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05 12.25 20.24a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg> Subir mi CV (PDF o TXT)</button>
       <div id="cvVersionesBox" style="display:none;margin-top:8px;font-size:.73rem;color:var(--muted);"></div>
+      <button id="btnCvWord" onclick="_cvMejoradoWord()" style="display:none;margin-top:8px;width:100%;padding:8px 10px;border-radius:8px;border:1px solid var(--border2);background:transparent;color:var(--text);font-weight:700;font-size:.76rem;cursor:pointer;align-items:center;justify-content:center;gap:6px;" title="Versión mejorada de tu último CV aprobado para este cargo: Word, Arial 10, máximo 2 páginas.">⬇ <span id="btnCvWordTxt">Mi CV mejorado (Word)</span></button>
       <div id="cvUploadStatus" style="font-size:.72rem;color:var(--muted);margin-top:4px;"></div>
     </div>
 
@@ -2927,6 +2931,7 @@ function _aplicarPerfilAlEstado(d) {
   if ('plan_vence_en' in d) PARTICIPANTE.plan_vence_en = d.plan_vence_en || '';
   if ('plan_vencido' in d) PARTICIPANTE.plan_vencido = !!d.plan_vencido;
   if (Array.isArray(d.cv_versiones)) PARTICIPANTE.cv_versiones = d.cv_versiones;
+  if (d.antecedentes && typeof d.antecedentes === 'object') PARTICIPANTE.antecedentes = d.antecedentes;
   if (typeof d.cv_versiones_limite === 'number') PARTICIPANTE.cv_versiones_limite = d.cv_versiones_limite;
   PARTICIPANTE.cargo          = d.cargo_objetivo || 'Por definir';
   PARTICIPANTE.sector         = d.sector || 'Por definir';
@@ -5858,6 +5863,14 @@ function _aplicarGateoPorPlan() {
   const _verInforme = (plan === 'Inicial' && !IS_ADMIN && !!window._INFORME_SERVIDOR);   // plan vencido con informe
   if (_wrapInf) _wrapInf.style.display = (plan === 'Inicial' && !IS_ADMIN && !_verInforme) ? 'none' : '';
 
+  // REQ-ANTECEDENTES: «Mi situación» desde Esencial (lo usan el agente y el informe)
+  const _bAnt = document.getElementById('btnAntecedentes');
+  if (_bAnt) {
+    _bAnt.style.display = (!IS_ADMIN && plan !== 'Inicial') ? 'flex' : 'none';
+    const _txt = document.getElementById('btnAntecedentesTxt');
+    if (_txt) _txt.textContent = (PARTICIPANTE.antecedentes && PARTICIPANTE.antecedentes.situacion) ? 'Mi situación' : 'Completar mi situación';
+  }
+
   // Sección "Sesión con el Consultor": solo visible para Plan Premium
   const premiumSec = document.getElementById('premiumSesionSec');
   if (premiumSec) {
@@ -5990,6 +6003,91 @@ window.addEventListener('resize', () => {
    Reutiliza el mismo look & feel que el modal de onboarding (vars
    de tema, por lo que responde igual al toggle claro/oscuro).
    ================================================================ */
+
+/* REQ-ANTECEDENTES: antecedentes personales y bienestar */
+async function _abrirAntecedentes() {
+  let info;
+  try {
+    const r = await fetch(`${_BACKEND}/api/mi-perfil/antecedentes`, { headers: { 'Authorization': `Bearer ${_obtenerToken()}` } });
+    info = await r.json();
+    if (!r.ok) throw new Error(_textoErrorApi(info.detail) || 'No se pudieron cargar tus antecedentes.');
+  } catch (e) { agentMsg(`⚠️ ${e.message}`); return; }
+  const a = info.antecedentes || {}, O = info.opciones || {};
+  const sel = (id, ops, val, vacio) => `<select id="${id}" style="width:100%;padding:8px 10px;border-radius:8px;border:1px solid var(--border2);background:var(--bg);color:var(--text);margin-bottom:10px;">
+      ${vacio ? `<option value="">${vacio}</option>` : ''}${Object.entries(ops).filter(([k]) => k).map(([k, t]) => `<option value="${escHtml(k)}" ${k === val ? 'selected' : ''}>${escHtml(t)}</option>`).join('')}</select>`;
+  const lbl = (f, t) => `<label for="${f}" style="display:block;font-size:.78rem;font-weight:600;color:var(--text2);margin-bottom:4px;">${t}</label>`;
+  const regiones = Object.fromEntries((info.regiones || []).map(r => [r, r]));
+  const mods = info.modalidades || {};
+  const ov = _modalPassword('_antModal', `${icono('user',18)} Mi situación`, `
+    <p style="font-size:.8rem;color:var(--muted);margin:0 0 12px;">Con esto el agente adapta el ritmo, las metas y las recomendaciones de tu informe. Solo lo ven tú, el agente y tu consultor.</p>
+    ${lbl('_ant_sit','¿Cuál es tu situación hoy?')}${sel('_ant_sit', O.situacion || {}, a.situacion, 'Elige una opción')}
+    <div id="_ant_tiempo_wrap">${lbl('_ant_tiempo','¿Cuánto tiempo llevas sin trabajo?')}${sel('_ant_tiempo', O.tiempo_sin_trabajo || {}, a.tiempo_sin_trabajo, 'Elige una opción')}</div>
+    ${lbl('_ant_urg','¿Qué tan urgente es para ti encontrar trabajo?')}${sel('_ant_urg', O.urgencia || {}, a.urgencia, 'Elige una opción')}
+    ${lbl('_ant_cargas','¿Cuántas personas dependen de tus ingresos?')}
+    <input id="_ant_cargas" type="number" min="0" max="15" value="${Number.isInteger(a.cargas_familiares) ? a.cargas_familiares : 0}" style="width:100%;padding:8px 10px;border-radius:8px;border:1px solid var(--border2);background:var(--bg);color:var(--text);margin-bottom:10px;">
+    ${lbl('_ant_region','Región donde vives')}${sel('_ant_region', regiones, a.region, 'Elige tu región')}
+    ${lbl('_ant_comuna','Comuna (opcional)')}
+    <input id="_ant_comuna" maxlength="60" value="${escHtml(a.comuna || '')}" style="width:100%;padding:8px 10px;border-radius:8px;border:1px solid var(--border2);background:var(--bg);color:var(--text);margin-bottom:10px;">
+    ${lbl('_ant_tras','¿Podrías trasladarte por trabajo?')}${sel('_ant_tras', O.traslado || {}, a.traslado, 'Elige una opción')}
+    <fieldset style="border:none;padding:0;margin:0 0 10px;"><legend style="font-size:.78rem;font-weight:600;color:var(--text2);margin-bottom:4px;">Modalidades que te sirven</legend>
+      ${Object.entries(mods).map(([k, t]) => `<label style="display:inline-flex;align-items:center;gap:5px;margin-right:12px;font-size:.82rem;color:var(--text);"><input type="checkbox" class="_ant_mod" value="${escHtml(k)}" ${(a.modalidades || []).includes(k) ? 'checked' : ''}> ${escHtml(t)}</label>`).join('')}
+    </fieldset>
+    ${lbl('_ant_ini','¿Cuándo podrías empezar?')}${sel('_ant_ini', O.inicio || {}, a.inicio, 'Elige una opción')}
+    <div style="border-top:1px solid var(--border);margin:6px 0 10px;"></div>
+    <label style="display:flex;gap:8px;align-items:flex-start;font-size:.8rem;color:var(--text);margin-bottom:10px;">
+      <input type="checkbox" id="_ant_consent" ${a.consentimiento_bienestar ? 'checked' : ''} onchange="document.getElementById('_ant_bien').style.display=this.checked?'block':'none'">
+      <span><strong>Opcional:</strong> quiero contar cómo me siento con la búsqueda para que el agente cuide el ritmo y el tono. Entiendo que ATDC no presta atención psicológica.</span></label>
+    <div id="_ant_bien" style="display:${a.consentimiento_bienestar ? 'block' : 'none'};">
+      ${lbl('_ant_animo','¿Cómo te sientes con tu búsqueda? (1 muy mal · 5 muy bien)')}${sel('_ant_animo', {1:'1',2:'2',3:'3',4:'4',5:'5'}, String(a.animo || ''), 'Prefiero no decir')}
+      ${lbl('_ant_apoyo','¿Cuentas con personas que te apoyen en este periodo?')}${sel('_ant_apoyo', O.apoyo || {}, a.apoyo || '', 'Prefiero no decir')}
+      ${lbl('_ant_com','¿Algo más que quieras que tengamos en cuenta? (opcional)')}
+      <textarea id="_ant_com" maxlength="600" style="width:100%;min-height:60px;padding:8px 10px;border-radius:8px;border:1px solid var(--border2);background:var(--bg);color:var(--text);margin-bottom:10px;">${escHtml(a.comentario_bienestar || '')}</textarea>
+    </div>
+    <div id="_ant_msg" style="display:none;font-size:.8rem;margin-bottom:8px;"></div>
+    <button id="_ant_btn" onclick="_guardarAntecedentes()" style="width:100%;padding:10px;border-radius:8px;border:none;background:var(--blue2);color:#fff;font-weight:700;cursor:pointer;">Guardar</button>
+  `);
+  const caja = ov.querySelector('div'); if (caja) { caja.style.maxWidth = '520px'; }
+  const sit = document.getElementById('_ant_sit');
+  const sync = () => { document.getElementById('_ant_tiempo_wrap').style.display = sit.value === 'cesante' ? 'block' : 'none'; };
+  sit.addEventListener('change', sync); sync();
+}
+async function _guardarAntecedentes() {
+  const v = id => (document.getElementById(id)?.value || '');
+  const msg = document.getElementById('_ant_msg');
+  const consent = document.getElementById('_ant_consent').checked;
+  const body = {
+    situacion: v('_ant_sit'), tiempo_sin_trabajo: v('_ant_sit') === 'cesante' ? v('_ant_tiempo') : '',
+    urgencia: v('_ant_urg'), cargas_familiares: parseInt(v('_ant_cargas') || '0', 10) || 0,
+    region: v('_ant_region'), comuna: v('_ant_comuna').trim(), traslado: v('_ant_tras'),
+    modalidades: [...document.querySelectorAll('._ant_mod:checked')].map(x => x.value), inicio: v('_ant_ini'),
+    consentimiento_bienestar: consent,
+    animo: consent && v('_ant_animo') ? parseInt(v('_ant_animo'), 10) : null,
+    apoyo: consent ? v('_ant_apoyo') : '', comentario_bienestar: consent ? v('_ant_com').trim() : '',
+  };
+  const faltan = [];
+  if (!body.situacion) faltan.push('tu situación');
+  if (body.situacion === 'cesante' && !body.tiempo_sin_trabajo) faltan.push('el tiempo sin trabajo');
+  if (!body.urgencia) faltan.push('la urgencia');
+  if (!body.region) faltan.push('la región');
+  if (!body.traslado) faltan.push('el traslado');
+  if (!body.modalidades.length) faltan.push('al menos una modalidad');
+  if (!body.inicio) faltan.push('cuándo podrías empezar');
+  if (faltan.length) { msg.style.display = 'block'; msg.style.color = 'var(--red)'; msg.textContent = 'Falta: ' + faltan.join(', ') + '.'; return; }
+  const btn = document.getElementById('_ant_btn'); btn.disabled = true; btn.textContent = 'Guardando…';
+  try {
+    const r = await fetch(`${_BACKEND}/api/mi-perfil/antecedentes`, { method: 'PUT',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${_obtenerToken()}` }, body: JSON.stringify(body) });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(_textoErrorApi(d.detail) || 'No se pudo guardar.');
+    PARTICIPANTE.antecedentes = { ...body, situacion: body.situacion };
+    document.getElementById('_antModal')?.remove();
+    try { _aplicarGateoPorPlan(); } catch (e) {}
+    agentMsg(`✅ ${d.mensaje || 'Antecedentes guardados.'}`);
+  } catch (e) {
+    msg.style.display = 'block'; msg.style.color = 'var(--red)'; msg.textContent = e.message;
+    btn.disabled = false; btn.textContent = 'Guardar';
+  }
+}
 
 function _modalPassword(id, tituloHtml, cuerpoHtml) {
   document.getElementById(id)?.remove();
@@ -6938,7 +7036,7 @@ async function _subirCV() {
     // Actualizar la fuente única de verdad y re-sincronizar el panel lateral
     PARTICIPANTE.ats_score = data.ats_score;
     PARTICIPANTE.kw_faltantes = data.kw_faltantes || [];
-    (PARTICIPANTE.cv_versiones = PARTICIPANTE.cv_versiones || []).push({ cargo: _cvCargoSel, ats_score: data.ats_score, fecha: new Date().toISOString() });
+    (PARTICIPANTE.cv_versiones = PARTICIPANTE.cv_versiones || []).push({ cargo: _cvCargoSel, ats_score: data.ats_score, fecha: new Date().toISOString(), tiene_mejorado: false });
     _refrescarATSsidebar();
     etapaRegistrarHito('cv'); // Fix NAV-ETAPAS-01: marca la etapa "CV + ATS" como completada
 
@@ -6982,12 +7080,63 @@ function _pintarVersionesCV() {
     : `Versiones de CV para «${escHtml(_cvCargoSel)}»: <strong>${usadas}</strong> (ilimitadas)`;
   box.innerHTML = selector + conteo;
   box.style.display = '';
+  // REQ-CV-WORD: CV mejorado del último CV aprobado para este cargo
+  const bw = document.getElementById('btnCvWord');
+  if (bw) {
+    const idx = _idxUltimaVersion(_cvCargoSel);
+    bw.style.display = idx >= 0 ? 'flex' : 'none';
+    const v = idx >= 0 ? PARTICIPANTE.cv_versiones[idx] : null;
+    const t = document.getElementById('btnCvWordTxt');
+    if (t && !bw.dataset.ocupado) t.textContent = v && v.tiene_mejorado ? 'Descargar mi CV mejorado (Word)' : 'Crear mi CV mejorado (Word)';
+  }
   const btn = document.getElementById('btnSubirCV');
   const agotado = lim && usadas >= lim;
   if (btn && !btn.dataset.ocupado) {
     btn.disabled = !!agotado;
     btn.style.opacity = agotado ? '.5' : '1';
     btn.title = agotado ? `Ya usaste las ${lim} versión(es) de CV de tu plan para este cargo.` : 'Sube tu CV en PDF o TXT (máx. 5 MB). La IA lo analiza y actualiza tu puntaje ATS al instante.';
+  }
+}
+
+function _idxUltimaVersion(cargo) {
+  const vs = PARTICIPANTE.cv_versiones || [];
+  for (let i = vs.length - 1; i >= 0; i--) if ((vs[i].cargo || '') === (cargo || '')) return i;
+  return -1;
+}
+async function _descargarCvWord(idx) {
+  const r = await fetch(`${_BACKEND}/api/cv/mejorado/${idx}`, { headers: { 'Authorization': `Bearer ${_obtenerToken()}` } });
+  if (!r.ok) { const d = await r.json().catch(() => ({})); throw new Error(_textoErrorApi(d.detail) || 'No se pudo descargar.'); }
+  const blob = await r.blob();
+  const nombre = ((r.headers.get('Content-Disposition') || '').match(/filename="([^"]+)"/) || [])[1] || 'CV_mejorado_ATDC.docx';
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = nombre;
+  document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+}
+async function _cvMejoradoWord() {
+  const idx = _idxUltimaVersion(_cvCargoSel);
+  if (idx < 0) return;
+  const bw = document.getElementById('btnCvWord'), t = document.getElementById('btnCvWordTxt');
+  const v = PARTICIPANTE.cv_versiones[idx];
+  bw.dataset.ocupado = '1'; bw.disabled = true;
+  try {
+    if (!v.tiene_mejorado) {
+      if (t) t.textContent = 'Creando tu CV mejorado… (~1 min)';
+      const r = await fetch(`${_BACKEND}/api/cv/mejorar`, { method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${_obtenerToken()}` },
+        body: JSON.stringify({ version: idx }), signal: AbortSignal.timeout(180000) });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(_textoErrorApi(d.detail) || 'No se pudo crear el CV mejorado.');
+      v.tiene_mejorado = true;
+      agentMsg(`✅ ${d.mensaje}` + ((d.descartes || []).length
+        ? `\n\nPara que todo lo que dice tu CV sea verificable, dejé fuera lo que no aparece en tu CV original:\n${d.descartes.map(x => '- ' + x).join('\n')}`
+        : '') + `\n\nRevisa que todo sea exacto antes de enviarlo.`);
+    }
+    if (t) t.textContent = 'Descargando…';
+    await _descargarCvWord(idx);
+  } catch (e) {
+    agentMsg(`⚠️ ${e.message}`);
+  } finally {
+    delete bw.dataset.ocupado; bw.disabled = false;
+    try { _pintarVersionesCV(); } catch (e) {}
   }
 }
 
@@ -8082,6 +8231,9 @@ function chips_bienvenida() {
 
   const testsDisponibles = restriccionChipsGate.tests_psicometricos || IS_ADMIN;
   const etapa = etapaEstado.etapaActual;
+  if (!IS_ADMIN && !(PARTICIPANTE.antecedentes && PARTICIPANTE.antecedentes.situacion)) {
+    chips.push({ label:`${icono('user',14)} Contar mi situación`, action:'_abrirAntecedentes()' });
+  }
 
   if (etapa === 'cv_ats') {
     chips.push({ label:`${icono('document',14)} Optimizar mi CV`, action:`preguntar('¿Qué palabras clave le faltan a mi CV para llegar a 85 en ATS?')` });

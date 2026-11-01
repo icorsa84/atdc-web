@@ -175,6 +175,7 @@
     <a class="nav-item" data-sec="secTareas" href="#secTareas"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg> Tareas</a>
     <a class="nav-item" data-sec="secParticipantes" href="#secParticipantes"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg> Participantes</a>
     <a class="nav-item" data-sec="secSesiones" href="#secSesiones">Sesiones</a>
+    <a class="nav-item" data-sec="secListaNegra" href="#secListaNegra">Lista negra</a>
     <a class="nav-item" data-sec="secAuditoria" href="#secAuditoria"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect><path d="M9 4H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-3"></path><line x1="8" y1="11" x2="16" y2="11"></line><line x1="8" y1="15" x2="16" y2="15"></line></svg> Auditoría</a>
     <a class="nav-item" data-sec="secCorreos" href="#secCorreos"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22 6 12 13 2 6"></polyline></svg> Correos</a>
     <a class="nav-item" data-sec="secEstudios" href="#secEstudios"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="1"></rect><line x1="9" y1="22" x2="9" y2="18"></line><line x1="15" y1="22" x2="15" y2="18"></line></svg> Estudios</a>
@@ -223,6 +224,23 @@
   </div>
 
   <div id="tablaWrap"><div class="loading">Cargando participantes…</div></div>
+  </div>
+
+  <div class="panel-section" id="secListaNegra" style="padding-bottom:4px;">
+  <h2 style="display:flex;align-items:center;gap:8px;">Lista negra</h2>
+  <div style="font-size:12.5px;color:var(--muted);margin-bottom:10px;">
+    Correos o dominios que no pueden registrarse ni entrar (tampoco con Google). Un dominio bloquea
+    también sus subdominios. Las cuentas que ya existen quedan sin acceso mientras estén bloqueadas.
+  </div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-bottom:10px;">
+    <div><label for="_ln_valor" style="display:block;font-size:12px;margin-bottom:3px;">Correo o dominio</label>
+      <input id="_ln_valor" placeholder="persona@correo.cl o empresa.cl" style="min-width:260px;max-width:100%;padding:8px 10px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);"></div>
+    <div><label for="_ln_motivo" style="display:block;font-size:12px;margin-bottom:3px;">Motivo (interno)</label>
+      <input id="_ln_motivo" placeholder="Opcional" maxlength="300" style="min-width:240px;max-width:100%;padding:8px 10px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);"></div>
+    <button class="btn-primary" onclick="_agregarListaNegra()">Bloquear</button>
+  </div>
+  <div id="_ln_msg" class="msg"></div>
+  <div id="listaNegraWrap"><div class="loading">Cargando…</div></div>
   </div>
 
   <div class="panel-section" id="secSesiones" style="padding-bottom:4px;">
@@ -798,6 +816,41 @@ function _listaTareas(items, render) {
 }
 
 /* Agenda de sesiones Premium (REQ-PREMIUM: el consultor coordina la entrevista) */
+/* REQ-LISTA-NEGRA */
+async function cargarListaNegra() {
+  const w = document.getElementById('listaNegraWrap');
+  if (!w) return;
+  try {
+    const d = await _apiSend('GET', '/api/admin/lista-negra');
+    const filas = [...(d.correos || []).map(x => ({ ...x, tipo: 'Correo' })), ...(d.dominios || []).map(x => ({ ...x, tipo: 'Dominio' }))];
+    const afect = (d.cuentas_afectadas || []);
+    w.innerHTML = (filas.length ? `<table><thead><tr><th>Tipo</th><th>Valor</th><th>Motivo</th><th>Desde</th><th></th></tr></thead><tbody>
+      ${filas.map(x => `<tr><td>${x.tipo}</td><td><strong>${escHtml(x.valor)}</strong></td><td>${escHtml(x.motivo || '—')}</td>
+        <td>${escHtml((x.fecha || '').slice(0, 10))}</td>
+        <td><button class="btn-secondary" onclick="_quitarListaNegra('${escHtml(x.valor)}')">Desbloquear</button></td></tr>`).join('')}
+      </tbody></table>` : '<div style="font-size:13px;color:var(--muted);">No hay correos ni dominios bloqueados.</div>')
+      + (afect.length ? `<div style="font-size:12.5px;margin-top:8px;">Cuentas existentes sin acceso: ${afect.map(a => `${escHtml(a.nombre)} (${escHtml(a.email)})`).join(' · ')}</div>` : '');
+  } catch (e) { w.innerHTML = `<div class="msg error" style="display:block">${escHtml(e.message)}</div>`; }
+}
+async function _agregarListaNegra() {
+  const v = (document.getElementById('_ln_valor').value || '').trim();
+  const m = (document.getElementById('_ln_motivo').value || '').trim();
+  if (!v) { _mostrarMsg('_ln_msg', 'Escribe un correo o un dominio.', true); return; }
+  try {
+    const d = await _apiSend('POST', '/api/admin/lista-negra', { valor: v, motivo: m });
+    _mostrarMsg('_ln_msg', d.mensaje || 'Bloqueado.', false);
+    document.getElementById('_ln_valor').value = ''; document.getElementById('_ln_motivo').value = '';
+    cargarListaNegra();
+  } catch (e) { _mostrarMsg('_ln_msg', e.message, true); }
+}
+async function _quitarListaNegra(v) {
+  if (!confirm(`¿Desbloquear «${v}»?`)) return;
+  try {
+    const d = await _apiSend('DELETE', `/api/admin/lista-negra/${encodeURIComponent(v)}`);
+    _mostrarMsg('_ln_msg', d.mensaje || 'Desbloqueado.', false); cargarListaNegra();
+  } catch (e) { _mostrarMsg('_ln_msg', e.message, true); }
+}
+
 async function cargarSesiones() {
   const w = document.getElementById('sesionesWrap');
   if (!w) return;
@@ -936,6 +989,9 @@ function renderTabla() {
    más abajo, luego de que icono() ya está definido arriba en este mismo
    archivo. */
 const _ACCION_LABELS = {
+  guardar_antecedentes: `${icono('user',13)} Actualizó su situación`,
+  importar_entrevista: `${icono('document',13)} Importó entrevista (IA externa)`, prompt_entrevista_externa: `${icono('document',13)} Generó prompt de entrevista`,
+  lista_negra_agregar: `${icono('lock',13)} Bloqueó en lista negra`, lista_negra_quitar: `${icono('unlock',13)} Quitó de lista negra`,
   aviso_vencimiento: `${icono('mail',13)} Aviso de vencimiento`, extender_acceso: `${icono('calendar',13)} Extendió el acceso`,
   registro: `${icono('check',13)} Registro`, login: `${icono('key',13)} Login`,
   cambio_password: `${icono('lock',13)} Cambió contraseña`, solicitud_recuperar_password: `${icono('mail',13)} Pidió recuperar contraseña`,
@@ -1519,6 +1575,31 @@ async function _extenderAcceso(id) {
     cargarListado();
   } catch (e) { _mostrarMsg('_sop_msg', e.message, true); }
 }
+/* REQ-ANTECEDENTES */
+const _ANT_TXT = {
+  situacion: { cesante: 'Sin trabajo actualmente', empleado: 'Con trabajo, busca cambiar', independiente: 'Independiente', otra: 'Otra' },
+  tiempo_sin_trabajo: { menos_1: 'menos de 1 mes', '1_3': '1 a 3 meses', '3_6': '3 a 6 meses', '6_12': '6 a 12 meses', mas_12: 'más de 12 meses' },
+  urgencia: { alta: 'Alta', media: 'Media', baja: 'Baja' },
+  traslado: { no: 'No', region: 'Dentro de su región', pais: 'A otra región', extranjero: 'Incluso al extranjero' },
+  inicio: { inmediato: 'Inmediato', '2_semanas': '2 semanas', '1_mes': '1 mes', mas: 'Más de 1 mes' },
+  apoyo: { si: 'Sí', parcial: 'En parte', no: 'No' },
+  mod: { presencial: 'Presencial', hibrido: 'Híbrida', remoto: 'Remota' },
+};
+function _htmlAntecedentes(a) {
+  if (!a || !a.situacion) return '<div style="color:var(--muted);font-size:12.5px;">Aún no completa «Mi situación».</div>';
+  const T = _ANT_TXT, fila = (k, v) => v ? `<div style="font-size:13px;margin-bottom:3px;"><span style="color:var(--muted);">${k}:</span> ${escHtml(String(v))}</div>` : '';
+  let h = fila('Situación', (T.situacion[a.situacion] || a.situacion) + (a.tiempo_sin_trabajo ? ` (${T.tiempo_sin_trabajo[a.tiempo_sin_trabajo] || ''})` : ''))
+    + fila('Urgencia', T.urgencia[a.urgencia]) + fila('Personas a su cargo', String(a.cargas_familiares ?? 0))
+    + fila('Ubicación', [a.comuna, a.region].filter(Boolean).join(', ')) + fila('Traslado', T.traslado[a.traslado])
+    + fila('Modalidad', (a.modalidades || []).map(m => T.mod[m] || m).join(', ')) + fila('Inicio', T.inicio[a.inicio]);
+  if (a.consentimiento_bienestar) {
+    const bajo = a.animo && a.animo <= 2;
+    h += `<div style="margin-top:6px;padding:8px 10px;border-radius:8px;background:${bajo ? 'rgba(239,68,68,.08)' : 'var(--bg)'};border:1px solid var(--border);">
+      <div style="font-size:12px;font-weight:600;margin-bottom:4px;">Bienestar (con su consentimiento)${bajo ? ' — ánimo bajo: considera contactarla' : ''}</div>
+      ${fila('Cómo se siente (1–5)', a.animo ? String(a.animo) : 'Prefiere no decir')}${fila('Red de apoyo', T.apoyo[a.apoyo] || 'Prefiere no decir')}${fila('Comentario', a.comentario_bienestar)}</div>`;
+  }
+  return h + (a.actualizado_en ? `<div style="font-size:11.5px;color:var(--muted);margin-top:4px;">Actualizado el ${escHtml(a.actualizado_en.slice(0, 10))}</div>` : '');
+}
 function _textoVigencia(p) {
   if (!p.plan_vence_en || p.plan === 'Inicial') return '';
   const f = new Date(p.plan_vence_en);
@@ -1654,6 +1735,11 @@ function _renderDetalle(p) {
     </div>` : ''}
 
     <div class="sec">
+      <div class="sec-title">Situación personal (declarada por la persona)</div>
+      ${_htmlAntecedentes(p.antecedentes)}
+    </div>
+
+    <div class="sec">
       <div class="sec-title">Acciones de soporte</div>
       ${_textoVigencia(p) ? `<div style="font-size:13px;margin-bottom:8px;">${_textoVigencia(p)}</div>` : ''}
       ${(Array.isArray(p.cv_versiones) && p.cv_versiones.length) ? `<div style="font-size:12.5px;color:var(--text2);margin-bottom:8px;">Versiones de CV aprobadas: ${p.cv_versiones.map(v => `${escHtml(v.cargo || '—')} (${escHtml(String(v.ats_score ?? ''))}/100)`).join(' · ')}</div>` : ''}
@@ -1684,7 +1770,7 @@ function _renderDetalle(p) {
       </div>` : ''}
       ${(p.entrevistas && p.entrevistas.length) ? p.entrevistas.slice().reverse().map(e => `
         <details style="margin-bottom:8px;">
-          <summary>${e.fecha_entrevista || 'Sin fecha'} · ${e.modalidad || ''} ${e.duracion_minutos ? `· ${escHtml(e.duracion_minutos)} min` : ''} — generado el ${escHtml(e.generado_en)}</summary>
+          <summary>${e.origen === 'ia_externa' ? '<span class="badge badge-muted">IA externa</span> ' : ''}${escHtml(e.fecha_entrevista || 'Sin fecha')} · ${escHtml(e.modalidad || '')} ${e.duracion_minutos ? `· ${escHtml(e.duracion_minutos)} min` : ''} — generado el ${escHtml(e.generado_en)}</summary>
           <div style="font-size:12.5px;color:var(--text2);margin:8px 0;"><strong>Opinión del Consultor:</strong> ${(e.opinion_consultor||'').replace(/</g,'&lt;')}</div>
           <div class="informe-sec"><p>${(e.informe_md||'').replace(/</g,'&lt;')}</p></div>
         </details>`).join('')
@@ -1702,8 +1788,48 @@ function _renderDetalle(p) {
            participante), eso dejaba el Informe Premium bloqueado para
            siempre. Este formulario reemplaza a ese panel: aquí sí se envía
            con el id real del participante (${escHtml(p.id)}). -->
+      <!-- REQ-ENTREVISTA-EXTERNA: flujo con la IA externa del consultor -->
+      <details id="_entExtDetails" style="margin-top:10px;" open>
+        <summary style="display:flex;align-items:center;gap:6px;">${icono('document',13)} Registrar entrevista con tu IA externa (la transcripción no entra a ATDC)</summary>
+        <div style="margin-top:10px;font-size:12.5px;">
+          <ol style="margin:0 0 10px 18px;padding:0;line-height:1.6;">
+            <li>Copia el prompt (ya trae los datos de ${escHtml(p.nombre)}, su DISC, Kostick y CV).</li>
+            <li>En tu IA, pega el prompt y reemplaza la marca <code>[PEGA AQUÍ LA TRANSCRIPCIÓN…]</code> por la transcripción.</li>
+            <li>Guarda la respuesta en Word, JSON o texto y súbela aquí (o pégala).</li>
+          </ol>
+          <div class="field" style="margin-bottom:8px;">
+            <label for="_ext_comps">Competencias a evaluar (opcional, separadas por coma)</label>
+            <input id="_ext_comps" style="width:100%" placeholder="Liderazgo de equipos, Orientación a resultados, Negociación…">
+          </div>
+          <button class="btn-secondary" onclick="_copiarPromptEntrevista('${escHtml(p.id)}')">${icono('document',14)} Copiar prompt para mi IA</button>
+          <div id="_ext_prompt_msg" class="msg"></div>
+          <textarea id="_ext_prompt" readonly style="display:none;width:100%;min-height:110px;margin-top:6px;font-size:12px;" aria-label="Prompt para la IA externa"></textarea>
+          <div style="border-top:1px solid var(--border);margin:12px 0 10px;"></div>
+          <div class="field" style="margin-bottom:8px;">
+            <label for="_ext_archivo">Análisis de tu IA (Word .docx, JSON, Markdown o texto)</label>
+            <input type="file" id="_ext_archivo" accept=".docx,.json,.md,.txt">
+          </div>
+          <div class="field" style="margin-bottom:8px;">
+            <label for="_ext_texto">…o pégalo aquí</label>
+            <textarea id="_ext_texto" style="width:100%;min-height:90px;" placeholder="Pega aquí la respuesta completa de tu IA."></textarea>
+          </div>
+          <div class="field" style="margin-bottom:8px;">
+            <label for="_ext_opinion">Tu opinión como consultor (opcional)</label>
+            <textarea id="_ext_opinion" style="width:100%;min-height:60px;"></textarea>
+          </div>
+          <div class="field-row" style="margin-bottom:8px;">
+            <div class="field"><label for="_ext_fecha">Fecha</label><input id="_ext_fecha" type="date"></div>
+            <div class="field"><label for="_ext_duracion">Duración (min)</label><input id="_ext_duracion" type="number" min="10" max="180" placeholder="60"></div>
+            <div class="field"><label for="_ext_modalidad">Modalidad</label>
+              <select id="_ext_modalidad"><option value="videollamada" selected>Videollamada</option><option value="presencial">Presencial</option><option value="telefonica">Telefónica</option></select></div>
+          </div>
+          <button class="btn-primary" id="_ext_btn" onclick="_importarEntrevistaExterna('${escHtml(p.id)}')">${icono('check',14)} Importar análisis</button>
+          <div id="_ext_msg" class="msg"></div>
+        </div>
+      </details>
+
       <details id="_entFormDetails" style="margin-top:10px;">
-        <summary style="display:flex;align-items:center;gap:6px;">${icono('document',13)} Registrar nueva entrevista para ${escHtml(p.nombre)}</summary>
+        <summary style="display:flex;align-items:center;gap:6px;">${icono('lightning',13)} Alternativa: analizar aquí con la IA de ATDC (pegando la transcripción)</summary>
         <div style="margin-top:10px;">
           <div class="field" style="margin-bottom:8px;">
             <label>Transcripción de la entrevista</label>
@@ -1824,6 +1950,46 @@ async function _confirmarPago(id) {
 
 // Fix QA-PREMIUM-GATE-02: registra el análisis de entrevista para el
 // participante REAL (ver el comentario junto al formulario, más arriba).
+/* REQ-ENTREVISTA-EXTERNA */
+async function _copiarPromptEntrevista(id) {
+  try {
+    const comps = encodeURIComponent((document.getElementById('_ext_comps')?.value || '').trim());
+    const mod = encodeURIComponent(document.getElementById('_ext_modalidad')?.value || 'videollamada');
+    const d = await _apiSend('GET', `/api/admin/participantes/${encodeURIComponent(id)}/entrevista/prompt?competencias=${comps}&modalidad=${mod}`);
+    const ta = document.getElementById('_ext_prompt');
+    ta.value = d.prompt; ta.style.display = 'block';
+    let copiado = false;
+    try { await navigator.clipboard.writeText(d.prompt); copiado = true; } catch (e) { ta.select(); try { copiado = document.execCommand('copy'); } catch (e2) {} }
+    _mostrarMsg('_ext_prompt_msg', copiado ? 'Prompt copiado. Pégalo en tu IA junto con la transcripción.' : 'Selecciona el texto de abajo y cópialo (Ctrl+C).', false);
+  } catch (e) { _mostrarMsg('_ext_prompt_msg', e.message, true); }
+}
+async function _importarEntrevistaExterna(id) {
+  const arch = document.getElementById('_ext_archivo')?.files?.[0];
+  const texto = (document.getElementById('_ext_texto')?.value || '').trim();
+  if (!arch && !texto) { _mostrarMsg('_ext_msg', 'Sube el archivo del análisis o pégalo en el cuadro.', true); return; }
+  const fd = new FormData();
+  if (arch) fd.append('archivo', arch);
+  fd.append('texto', texto);
+  fd.append('opinion_consultor', (document.getElementById('_ext_opinion')?.value || '').trim());
+  fd.append('fecha_entrevista', document.getElementById('_ext_fecha')?.value || '');
+  fd.append('duracion_minutos', document.getElementById('_ext_duracion')?.value || '');
+  fd.append('modalidad', document.getElementById('_ext_modalidad')?.value || 'videollamada');
+  const btn = document.getElementById('_ext_btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Importando…'; }
+  try {
+    const res = await fetch(`${BACKEND}/api/admin/participantes/${encodeURIComponent(id)}/entrevista/importar`, {
+      method: 'POST', headers: { 'X-Admin-Key': ADMIN_KEY }, body: fd });
+    if (res.status === 401) { _salir(); throw new Error('Sesión admin inválida.'); }
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(_textoError(d.detail) || 'No se pudo importar.');
+    _mostrarMsg('_ext_msg', d.mensaje || 'Importado.', false);
+    setTimeout(() => { abrirDetalle(id); cargarListado(); }, 900);
+  } catch (e) {
+    _mostrarMsg('_ext_msg', e.message, true);
+    if (btn) { btn.disabled = false; btn.innerHTML = `${icono('check',14)} Importar análisis`; }
+  }
+}
+
 async function _analizarEntrevistaAdmin(id) {
   const transcripcion = (document.getElementById('_ent_transcripcion')?.value || '').trim();
   const opinion       = (document.getElementById('_ent_opinion')?.value || '').trim();
@@ -1899,6 +2065,7 @@ cargarAuditoria(0);
 cargarPlantillas();
 cargarEstudiosMercado();
 cargarSesiones();
+cargarListaNegra();
 
 // Fix QA-UX-NAV-01: barra de navegación rápida entre secciones del Admin.
 // Calcula el alto real del topbar + navbar (varía un poco según fuente del
