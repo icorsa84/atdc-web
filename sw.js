@@ -16,7 +16,7 @@
  * Cambiar CACHE_NAME borra las copias viejas al activarse.
  */
 
-const CACHE_NAME = 'atdc-v12';
+const CACHE_NAME = 'atdc-v13';
 const STATIC_ASSETS = [
   '/',
   '/agente-chat.html',
