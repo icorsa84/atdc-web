@@ -194,6 +194,11 @@
   <div class="panel-section" id="secTareas">
     <h2 style="display:flex;align-items:center;gap:8px;"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg> Tareas pendientes</h2>
     <div id="tareasGrid" class="tareas-grid"></div>
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:10px;font-size:12.5px;color:var(--muted);">
+      <button class="btn-secondary" onclick="_revisarVencimientos()" title="Los avisos de término de acceso se envían solos; este botón los revisa en este momento.">Revisar vencimientos ahora</button>
+      <span>Los participantes reciben un correo 7 días antes de que termine su acceso y otro el día que termina; a ti te llega un resumen.</span>
+      <div id="_venc_msg" class="msg" style="flex-basis:100%"></div>
+    </div>
   </div>
 
   <div class="panel-section" id="secParticipantes" style="padding-bottom:4px;">
@@ -837,6 +842,10 @@ function renderTareas() {
   const entrevistasPend = LISTADO.filter(p => p.etapa && p.etapa.codigo === 'entrevista');
   const sinCv = LISTADO.filter(p => !p.cv_subido);
   const porDefinir = LISTADO.filter(p => p.datos_por_definir);
+  // REQ-PLAN-VIGENCIA: accesos que vencen en 7 días o ya vencidos
+  const _diasVence = p => p.plan_vence_en ? Math.ceil((new Date(p.plan_vence_en).getTime() - Date.now()) / 86400000) : null;
+  const porVencer = LISTADO.filter(p => p.plan !== 'Inicial' && p.pago_estado !== 'pendiente' && (p.plan_vencido || (_diasVence(p) !== null && _diasVence(p) <= 7)))
+    .sort((a, b) => (_diasVence(a) ?? 0) - (_diasVence(b) ?? 0));
 
   const tarjeta = (titulo, color, items, render) => `
     <div class="tarea-card">
@@ -856,6 +865,8 @@ function renderTareas() {
     tarjeta(`${icono('document',13)} Informes Premium por revisar`, '#EF4444', informesRevision, p => itemParticipante(p, 'revisar y aprobar')) +
     tarjeta(`${icono('calendar',13)} Sesiones Premium por confirmar`, '#F59E0B', sesionesPremium, p => itemParticipante(p, 'Premium')) +
     tarjeta(`${icono('edit',13)} Entrevistas por analizar`, '#F59E0B', entrevistasPend, p => itemParticipante(p, 'sesión aceptada')) +
+    tarjeta(`${icono('calendar',13)} Accesos por vencer o vencidos`, '#F59E0B', porVencer, p => itemParticipante(p,
+      p.plan_vencido ? `${escHtml(p.plan)} · vencido` : `${escHtml(p.plan)} · vence en ${_diasVence(p)} día${_diasVence(p) === 1 ? '' : 's'}`)) +
     tarjeta(`${icono('paperclip',13)} Sin CV subido`, '#94A3B8', sinCv, p => itemParticipante(p, p.plan)) +
     tarjeta(`${icono('edit',13)} Datos del perfil por completar`, '#3B82F6', porDefinir, p => itemParticipante(p, p.plan));
 }
@@ -925,6 +936,7 @@ function renderTabla() {
    más abajo, luego de que icono() ya está definido arriba en este mismo
    archivo. */
 const _ACCION_LABELS = {
+  aviso_vencimiento: `${icono('mail',13)} Aviso de vencimiento`, extender_acceso: `${icono('calendar',13)} Extendió el acceso`,
   registro: `${icono('check',13)} Registro`, login: `${icono('key',13)} Login`,
   cambio_password: `${icono('lock',13)} Cambió contraseña`, solicitud_recuperar_password: `${icono('mail',13)} Pidió recuperar contraseña`,
   restablecer_password: `${icono('unlock',13)} Restableció contraseña`,
@@ -1487,6 +1499,13 @@ async function _reiniciarTest(id, tipo) {
     const d = await _apiSend('POST', `/api/admin/test/resetear/${id}/${tipo}`, { razon: razon.trim() || 'Reset administrativo' });
     _mostrarMsg('_sop_msg', d.mensaje || 'Test reiniciado: la persona puede rendirlo de nuevo.', false);
   } catch (e) { _mostrarMsg('_sop_msg', e.message, true); }
+}
+async function _revisarVencimientos() {
+  try {
+    const d = await _apiSend('POST', '/api/admin/vencimientos/revisar', {});
+    _mostrarMsg('_venc_msg', d.mensaje || 'Revisión lista.', false);
+    cargarListado();
+  } catch (e) { _mostrarMsg('_venc_msg', e.message, true); }
 }
 /* REQ-PLAN-VIGENCIA: ampliar el periodo de acceso del plan pagado */
 async function _extenderAcceso(id) {
