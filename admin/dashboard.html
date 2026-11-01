@@ -255,6 +255,10 @@
   </div>
   <div id="_ics_msg" class="msg"></div>
   <div id="sesionesWrap"><div class="loading">Cargando sesiones…</div></div>
+  <!-- REQ-CALENDARIO -->
+  <div id="calendarioWrap" style="margin-top:14px;border:1px solid var(--border);border-radius:12px;padding:14px;">
+    <div class="loading">Cargando calendario…</div>
+  </div>
   </div>
 
   <div class="panel-section" id="secAuditoria" style="padding-bottom:4px;">
@@ -868,11 +872,85 @@ async function cargarSesiones() {
         <td>${escHtml(x.hora)}</td>
         <td>${escHtml(x.participante_nombre)}</td>
         <td style="color:var(--text2);">${escHtml(x.comentario || '—')}</td>
-        <td>${est(x.estado)}</td>
+        <td>${est(x.estado)}${x.meet_link ? `<br><a href="${escHtml(x.meet_link)}" target="_blank" rel="noopener" style="font-size:12px;">Google Meet</a>` : ''}</td>
         <td><button class="btn-ver" onclick="abrirDetalle('${escHtml(x.participante_id)}')">${x.estado === 'solicitada' ? 'Responder' : 'Ver'}</button></td>
       </tr>`).join('')}</tbody></table>`;
   } catch (e) { w.innerHTML = `<div class="empty">${icono('warning',14)} ${escHtml(e.message)}</div>`; }
 }
+
+/* REQ-CALENDARIO: conexión con Google Calendar y horario de atención */
+const _DIAS_CAL = ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'];
+async function cargarCalendario() {
+  const w = document.getElementById('calendarioWrap'); if (!w) return;
+  try {
+    const c = await _apiGet('/api/admin/calendario');
+    const fila = i => {
+      const r = (c.horario[String(i)] || []).map(x => x.join('-')).join(', ');
+      return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap;">
+        <label for="_cal_d${i}" style="width:90px;font-size:13px;">${_DIAS_CAL[i]}</label>
+        <input id="_cal_d${i}" value="${escHtml(r)}" placeholder="Sin atención" style="flex:1;min-width:160px;max-width:100%;padding:7px 9px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);">
+      </div>`;
+    };
+    w.innerHTML = `
+      <h3 style="margin:0 0 6px;font-size:15px;">Calendario y horario de atención</h3>
+      <div style="font-size:13px;margin-bottom:10px;">
+        ${c.conectado
+          ? `${icono('check-circle',14)} Conectado a Google Calendar${c.email ? ' (<strong>' + escHtml(c.email) + '</strong>)' : ''}. Los participantes ven solo tus horarios libres y, al aceptar, se crea el evento con Google Meet y Google les envía la invitación.`
+          : `${icono('warning',14)} Google Calendar no está conectado. Los participantes ven tu horario de atención, pero no se descuentan tus otros compromisos ni se crea el Meet.`}
+        ${c.error ? `<div style="color:#fca5a5;margin-top:4px;">${escHtml(c.error)}</div>` : ''}
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
+        ${c.conectado
+          ? `<button class="btn-secondary" onclick="_desconectarCalendario()">Desconectar</button>`
+          : `<button class="btn-primary" onclick="_conectarCalendario()" ${c.oauth_configurado ? '' : 'disabled'}>Conectar mi Google Calendar</button>`}
+      </div>
+      ${!c.conectado ? `<div style="font-size:12px;color:var(--muted);margin-bottom:12px;">En Google Cloud, la credencial OAuth debe tener esta URI de redireccionamiento autorizada: <code>${escHtml(c.redirect_uri)}</code></div>` : ''}
+      <div style="font-size:12.5px;color:var(--muted);margin-bottom:6px;">Rangos por día en formato <code>HH:MM-HH:MM</code>, separados por coma. Vacío = no atiendes ese día.</div>
+      ${[0,1,2,3,4,5,6].map(fila).join('')}
+      <div class="field-row" style="margin-top:6px;">
+        <div class="field"><label for="_cal_dur">Duración (min)</label><input id="_cal_dur" type="number" min="15" max="180" value="${c.duracion}"></div>
+        <div class="field"><label for="_cal_pau">Pausa entre sesiones (min)</label><input id="_cal_pau" type="number" min="0" max="60" value="${c.pausa}"></div>
+        <div class="field"><label for="_cal_ant">Aviso mínimo (horas)</label><input id="_cal_ant" type="number" min="0" max="168" value="${c.anticipacion_horas}"></div>
+        <div class="field"><label for="_cal_dias">Días visibles</label><input id="_cal_dias" type="number" min="1" max="90" value="${c.dias_adelante}"></div>
+      </div>
+      <button class="btn-primary" onclick="_guardarCalendario()">Guardar horario</button>
+      <div id="_cal_msg" class="msg"></div>`;
+  } catch (e) { w.innerHTML = `<div class="empty">${icono('warning',14)} ${escHtml(e.message)}</div>`; }
+}
+async function _guardarCalendario() {
+  const horario = {};
+  try {
+    for (let i = 0; i < 7; i++) {
+      const v = (document.getElementById('_cal_d' + i).value || '').trim();
+      horario[String(i)] = v ? v.split(',').map(r => { const m = r.trim().match(/^(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})$/);
+        if (!m) throw new Error(`Revisa el formato del ${_DIAS_CAL[i]}: usa HH:MM-HH:MM`);
+        return [m[1].padStart(5, '0'), m[2].padStart(5, '0')]; }) : [];
+    }
+    const d = await _apiSend('PUT', '/api/admin/calendario', { horario,
+      duracion: +document.getElementById('_cal_dur').value, pausa: +document.getElementById('_cal_pau').value,
+      anticipacion_horas: +document.getElementById('_cal_ant').value, dias_adelante: +document.getElementById('_cal_dias').value });
+    _mostrarMsg('_cal_msg', d.mensaje || 'Guardado.', false);
+  } catch (e) { _mostrarMsg('_cal_msg', e.message, true); }
+}
+async function _conectarCalendario() {
+  try { const d = await _apiGet('/api/admin/calendario/conectar'); window.location.href = d.url; }
+  catch (e) { _mostrarMsg('_cal_msg', e.message, true); }
+}
+async function _desconectarCalendario() {
+  if (!confirm('¿Desconectar Google Calendar? Las sesiones ya creadas siguen en tu calendario.')) return;
+  try { const d = await _apiSend('DELETE', '/api/admin/calendario/google'); _mostrarMsg('_cal_msg', d.mensaje, false); cargarCalendario(); }
+  catch (e) { _mostrarMsg('_cal_msg', e.message, true); }
+}
+(function _avisoVueltaCalendario() {
+  const q = new URLSearchParams(location.search).get('calendario');
+  if (!q) return;
+  const txt = { ok: 'Google Calendar conectado correctamente.', cancelado: 'Cancelaste la conexión con Google.',
+    sin_permiso: 'Google no entregó el permiso de calendario. Vuelve a conectar y marca todas las casillas de permisos.',
+    estado_invalido: 'El enlace de conexión venció. Vuelve a presionar «Conectar mi Google Calendar».',
+    error: 'Google rechazó la conexión. Revisa que la URI de redireccionamiento esté autorizada en la credencial.' }[q] || '';
+  history.replaceState(null, '', location.pathname + location.hash);
+  setTimeout(() => { if (txt) _mostrarMsg('_cal_msg', txt, q !== 'ok'); document.getElementById('secSesiones')?.scrollIntoView(); }, 1500);
+})();
 
 async function _descargarIcs() {
   try {
@@ -989,6 +1067,7 @@ function renderTabla() {
    más abajo, luego de que icono() ya está definido arriba en este mismo
    archivo. */
 const _ACCION_LABELS = {
+  conectar_calendario: `${icono('calendar',13)} Conectó Google Calendar`, desconectar_calendario: `${icono('calendar',13)} Desconectó Google Calendar`, configurar_calendario: `${icono('calendar',13)} Cambió el horario de atención`,
   guardar_antecedentes: `${icono('user',13)} Actualizó su situación`,
   importar_entrevista: `${icono('document',13)} Importó entrevista (IA externa)`, prompt_entrevista_externa: `${icono('document',13)} Generó prompt de entrevista`,
   lista_negra_agregar: `${icono('lock',13)} Bloqueó en lista negra`, lista_negra_quitar: `${icono('unlock',13)} Quitó de lista negra`,
@@ -2066,6 +2145,7 @@ cargarPlantillas();
 cargarEstudiosMercado();
 cargarSesiones();
 cargarListaNegra();
+cargarCalendario();
 
 // Fix QA-UX-NAV-01: barra de navegación rápida entre secciones del Admin.
 // Calcula el alto real del topbar + navbar (varía un poco según fuente del

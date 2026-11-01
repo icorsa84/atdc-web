@@ -1807,10 +1807,10 @@
       <div class="s-lbl" style="display:flex;align-items:center;gap:5px;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg> Sesión con el Consultor</div>
       <div id="premiumSesionEstado" title="Beneficio exclusivo del plan Premium: una sesión de orientación personal con el consultor." style="font-size:.78rem;color:var(--muted);margin-bottom:8px">Aún no has solicitado una sesión.</div>
       <div id="premiumSesionForm">
-        <input type="date" id="premiumFecha" title="Elige la fecha en que te gustaría tener la sesión" style="width:100%;margin-bottom:6px;padding:6px 8px;border-radius:6px;border:1px solid var(--border2);background:transparent;color:var(--text);font-size:.78rem;">
-        <input type="time" id="premiumHora" title="Elige el horario preferido — el consultor confirmará disponibilidad" style="width:100%;margin-bottom:6px;padding:6px 8px;border-radius:6px;border:1px solid var(--border2);background:transparent;color:var(--text);font-size:.78rem;">
-        <textarea id="premiumComentario" placeholder="¿Algún tema puntual que quieras conversar? (opcional)" style="width:100%;margin-bottom:6px;padding:6px 8px;border-radius:6px;border:1px solid var(--border2);background:transparent;color:var(--text);font-size:.78rem;resize:vertical;min-height:50px;box-sizing:border-box;"></textarea>
-        <button onclick="_solicitarSesionConsultor()" title="Envía tu solicitud de horario al consultor por correo. No queda agendada automáticamente — él te confirmará." style="width:100%;padding:8px 10px;border-radius:8px;border:none;background:var(--amber);color:#111;font-weight:700;font-size:.78rem;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg> Solicitar sesión</button>
+        <div id="premiumSlots" style="font-size:.76rem;color:var(--muted);margin-bottom:6px;">Cargando horarios disponibles…</div>
+        <label for="premiumComentario" style="display:block;font-size:.74rem;color:var(--text2);margin:4px 0 3px;">Tema que quieres conversar (opcional)</label>
+        <textarea id="premiumComentario" maxlength="500" style="width:100%;margin-bottom:6px;padding:6px 8px;border-radius:6px;border:1px solid var(--border2);background:transparent;color:var(--text);font-size:.78rem;resize:vertical;min-height:50px;box-sizing:border-box;"></textarea>
+        <button id="premiumBtnSolicitar" onclick="_solicitarSesionConsultor()" disabled style="width:100%;padding:8px 10px;border-radius:8px;border:none;background:var(--blue2);color:#fff;font-weight:700;font-size:.78rem;cursor:pointer;">Solicitar este horario</button>
       </div>
     </div>
 
@@ -7185,61 +7185,77 @@ function _sesionConsultorKey() {
   return `atdc_sesion_consultor_${CONFIG.participante_id}`;
 }
 
-function _restaurarEstadoSesionConsultor() {
+/* REQ-CALENDARIO: el participante elige entre los horarios libres del consultor */
+let _slotElegido = null, _dispCache = null;
+function _restaurarEstadoSesionConsultor() { _cargarDisponibilidad(); }
+
+async function _cargarDisponibilidad() {
+  const cont = document.getElementById('premiumSlots');
+  if (!cont) return;
   try {
-    const guardado = JSON.parse(localStorage.getItem(_sesionConsultorKey()) || 'null');
-    if (guardado && guardado.estado === 'solicitada') {
-      _pintarSesionSolicitada(guardado.fecha, guardado.hora, guardado.link || '');
-    }
-  } catch (e) {}
+    const r = await fetch(`${_BACKEND}/api/premium/disponibilidad`, { headers: { 'Authorization': `Bearer ${_obtenerToken()}` } });
+    const d = await r.json();
+    if (!r.ok) throw new Error(_textoErrorApi(d.detail) || 'No se pudieron cargar los horarios.');
+    _dispCache = d; _pintarAgenda();
+  } catch (e) { cont.innerHTML = `${icono('warning',12)} ${escHtml(e.message)}`; }
 }
 
-function _pintarSesionSolicitada(fecha, hora, link) {
+function _pintarAgenda() {
+  const d = _dispCache || {}, ses = d.sesion || {};
   const estadoEl = document.getElementById('premiumSesionEstado');
   const formEl = document.getElementById('premiumSesionForm');
-  if (estadoEl) {
-    estadoEl.innerHTML = `${icono('mail',12)} Solicitaste una sesión para el <strong>${fecha}</strong> a las <strong>${hora}</strong>. El consultor te confirmará por correo.` +
-      (link ? `<br><a href="${link}" target="_blank" style="color:var(--blue2);font-size:.75rem;">+ Agregar a mi Google Calendar</a>` : '');
+  const cont = document.getElementById('premiumSlots');
+  const leg = (f, h) => { try { const x = new Date(f + 'T12:00:00'); return x.toLocaleDateString('es-CL', { weekday: 'long', day: 'numeric', month: 'long' }) + ` a las ${h}`; } catch (e) { return `${f} ${h}`; } };
+  if (ses.estado === 'aceptada') {
+    estadoEl.innerHTML = `${icono('check-circle',12)} <strong>Sesión confirmada</strong>: ${escHtml(leg(ses.fecha, ses.hora))} (${d.duracion || 45} min).`
+      + (ses.meet_link ? `<br><a href="${escHtml(ses.meet_link)}" target="_blank" rel="noopener" style="color:var(--blue2);font-weight:700;">Entrar a la videollamada (Google Meet)</a>` : '<br>El consultor te enviará el enlace de la videollamada.');
+    estadoEl.style.color = 'var(--text2)'; formEl.style.display = 'none'; return;
   }
-  if (formEl) formEl.style.display = 'none';
+  if (ses.estado === 'solicitada') {
+    estadoEl.innerHTML = `${icono('mail',12)} Pediste el ${escHtml(leg(ses.fecha, ses.hora))}. El consultor te confirmará por correo.`;
+    estadoEl.style.color = 'var(--text2)'; formEl.style.display = 'none'; return;
+  }
+  estadoEl.innerHTML = ses.estado === 'rechazada'
+    ? `${icono('warning',12)} El consultor no pudo en el horario que pediste${ses.motivo_rechazo ? ' (' + escHtml(ses.motivo_rechazo) + ')' : ''}. Elige otro:`
+    : `Elige uno de los horarios libres del consultor (${d.duracion || 45} min, por videollamada).`;
+  formEl.style.display = '';
+  const dias = d.dias || [];
+  if (!dias.length) { cont.innerHTML = 'Por ahora no hay horarios libres en las próximas semanas. Escríbele al consultor respondiendo cualquiera de sus correos.'; return; }
+  const diaSel = (_slotElegido && dias.find(x => x.fecha === _slotElegido.fecha)) ? _slotElegido.fecha : dias[0].fecha;
+  const dia = dias.find(x => x.fecha === diaSel);
+  cont.innerHTML = `
+    <label for="premiumDia" style="display:block;font-size:.74rem;color:var(--text2);margin-bottom:3px;">Día</label>
+    <select id="premiumDia" onchange="_slotElegido={fecha:this.value,hora:null};_pintarAgenda()" style="width:100%;margin-bottom:6px;padding:6px 8px;border-radius:6px;border:1px solid var(--border2);background:var(--bg);color:var(--text);font-size:.78rem;">
+      ${dias.map(x => `<option value="${x.fecha}" ${x.fecha === diaSel ? 'selected' : ''}>${escHtml(x.etiqueta)}</option>`).join('')}
+    </select>
+    <div role="group" aria-label="Horas disponibles" style="display:flex;flex-wrap:wrap;gap:5px;">
+      ${dia.horas.map(h => { const on = !!(_slotElegido && _slotElegido.fecha === diaSel && _slotElegido.hora === h);
+        return `<button type="button" aria-pressed="${on}" onclick="_slotElegido={fecha:'${diaSel}',hora:'${h}'};_pintarAgenda()" style="padding:5px 9px;border-radius:999px;font-size:.75rem;font-weight:700;cursor:pointer;border:1px solid ${on ? 'var(--blue2)' : 'var(--border2)'};background:${on ? 'var(--blue2)' : 'transparent'};color:${on ? '#fff' : 'var(--text)'};">${h}</button>`; }).join('')}
+    </div>
+    ${d.aviso ? `<div style="margin-top:5px;color:var(--amber);">${escHtml(d.aviso)}</div>` : ''}`;
+  const btn = document.getElementById('premiumBtnSolicitar');
+  if (btn) btn.disabled = !(_slotElegido && _slotElegido.hora && _slotElegido.fecha === diaSel);
 }
 
 async function _solicitarSesionConsultor() {
-  const fecha = document.getElementById('premiumFecha')?.value || '';
-  const hora = document.getElementById('premiumHora')?.value || '';
-  const comentario = document.getElementById('premiumComentario')?.value || '';
-  const estadoEl = document.getElementById('premiumSesionEstado');
-
-  if (!fecha || !hora) {
-    if (estadoEl) { estadoEl.innerHTML = icono('warning',12) + ' Elige una fecha y una hora.'; estadoEl.style.color = 'var(--amber)'; }
-    return;
-  }
-
-  if (estadoEl) { estadoEl.textContent = 'Enviando tu solicitud…'; estadoEl.style.color = 'var(--muted)'; }
-
+  if (!(_slotElegido && _slotElegido.hora)) return;
+  const { fecha, hora } = _slotElegido;
+  const comentario = (document.getElementById('premiumComentario')?.value || '').trim();
+  const btn = document.getElementById('premiumBtnSolicitar');
+  if (btn) { btn.disabled = true; btn.textContent = 'Enviando…'; }
   try {
-    const resp = await fetch(CONFIG.premium_agendar_url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${_obtenerToken()}`,
-      },
-      body: JSON.stringify({ fecha, hora, comentario }),
-    });
+    const resp = await fetch(CONFIG.premium_agendar_url, { method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${_obtenerToken()}` },
+      body: JSON.stringify({ fecha, hora, comentario }) });
     const data = await resp.json();
     if (!resp.ok) throw new Error(_textoErrorApi(data.detail) || 'No se pudo enviar la solicitud.');
-
-    try {
-      localStorage.setItem(_sesionConsultorKey(), JSON.stringify({
-        estado: 'solicitada', fecha, hora, link: data.link_calendario_participante,
-      }));
-    } catch (e) {}
-
-    _pintarSesionSolicitada(fecha, hora, data.link_calendario_participante);
-    agentMsg(`📅 **Solicitud enviada.** Quedaste agendado tentativamente para el ${fecha} a las ${hora}. El consultor confirmará el horario por correo.`);
+    _slotElegido = null;
+    agentMsg(`📅 **Solicitud enviada** para el ${fecha} a las ${hora}. El consultor la revisará y te llegará la confirmación por correo, con el enlace de la videollamada.`);
+    await _cargarDisponibilidad();
   } catch (e) {
-    if (estadoEl) { estadoEl.innerHTML = `${icono('warning',12)} ${e.message || 'Error al enviar la solicitud.'}`; estadoEl.style.color = 'var(--amber)'; }
-  }
+    agentMsg(`⚠️ ${e.message}`);
+    await _cargarDisponibilidad();
+  } finally { if (btn) btn.textContent = 'Solicitar este horario'; }
 }
 
 async function init() {
