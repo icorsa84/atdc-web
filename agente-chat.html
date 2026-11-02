@@ -5669,6 +5669,7 @@ function _pintarSelectorPaisMercado() {
 
 /* REQ-PLANES-LANDING: análisis de avisos en portales chilenos (Esencial+) */
 async function _abrirAvisos() {
+  if (getPlanActual() === 'Inicial' && !IS_ADMIN) { agentMsg('🔒 El análisis de avisos está incluido desde el plan **Esencial**.'); return; }  // REQ-PLAN-ESTRICTO
   const overlay = _modalPassword('_avisosModal', `${icono('search',18)} Analizar un aviso de empleo`, `
     <p style="font-size:.8rem;color:var(--muted);margin:0 0 10px;">Copia el texto completo del aviso (desde Laborum, Trabajando.com, LinkedIn, BNE u otro portal) y pégalo aquí. Lo comparo con tu CV y te digo qué tan bien calzas y qué ajustar antes de postular.</p>
     <label for="_av_texto" style="display:block;font-size:.78rem;font-weight:600;color:var(--text2);margin-bottom:4px;">Texto del aviso</label>
@@ -6084,6 +6085,7 @@ function _pintarEntrevistaAgendada() {
   }
 }
 function _abrirEntrevistaAgendada() {
+  if (!(PLAN_RESTRICCIONES[getPlanActual()] || {}).tests_psicometricos && !IS_ADMIN) { agentMsg('🔒 Registrar tu próxima entrevista está incluido en los planes **Profesional** y **Premium**.'); return; }  // REQ-PLAN-ESTRICTO
   const e = PARTICIPANTE.entrevista_agendada || {};
   const est = 'width:100%;padding:8px 10px;border-radius:8px;border:1px solid var(--border2);background:var(--bg);color:var(--text);margin-bottom:10px;box-sizing:border-box;';
   const lbl = (f, t) => `<label for="${f}" style="display:block;font-size:.78rem;font-weight:600;color:var(--text2);margin-bottom:4px;">${t}</label>`;
@@ -6119,6 +6121,7 @@ async function _guardarEntrevistaAgendada(borrar) {
 }
 
 async function _abrirAntecedentes() {
+  if (getPlanActual() === 'Inicial' && !IS_ADMIN) return;   // REQ-PLAN-ESTRICTO: «Mi situación» desde Esencial
   let info;
   try {
     const r = await fetch(`${_BACKEND}/api/mi-perfil/antecedentes`, { headers: { 'Authorization': `Bearer ${_obtenerToken()}` } });
@@ -7178,6 +7181,15 @@ function _cargosObjetivo() {
 }
 /* REQ-PLANES-LANDING: resultado del análisis ATS por plan. Inicial ve el
    puntaje y sus categorías débiles; las mejoras sugeridas son desde Esencial. */
+/* Nota bajo el puntaje ATS. «CV optimizado» solo con 85 o más; en el plan
+   Inicial no se muestran las palabras que faltan (son parte de las mejoras). */
+function _notaAts(P) {
+  const kw = Array.isArray(P.kw_faltantes) ? P.kw_faltantes : [];
+  if (kw.length) return `Objetivo: 85+ · Faltan: ${kw.slice(0, 2).join(', ')}…`;
+  if ((P.ats_score || 0) >= 85) return 'Objetivo: 85+ · CV optimizado';
+  if (getPlanActual() === 'Inicial' && !IS_ADMIN) return 'Objetivo: 85+ · Mejoras sugeridas desde el plan Esencial';
+  return 'Objetivo: 85+';
+}
 function _textoResultadoCV(data) {
   const cats = data.categorias || [];
   const debiles = cats.filter(c => c.debil);
@@ -7331,10 +7343,7 @@ function _refrescarATSsidebar() {
   }
   const elAtsNote = document.getElementById('sidePanelAtsNote');
   if (elAtsNote) {
-    const kw = Array.isArray(P.kw_faltantes) && P.kw_faltantes.length > 0
-      ? `Faltan: ${P.kw_faltantes.slice(0,2).join(', ')}…`
-      : 'CV optimizado';
-    elAtsNote.textContent = `Objetivo: 85+ · ${kw}`;
+    elAtsNote.textContent = _notaAts(P);
   }
   // REQ-PLANES-LANDING: categorías del análisis, con las débiles marcadas
   const elCats = document.getElementById('sidePanelAtsCats');
@@ -7526,10 +7535,7 @@ async function init() {
     }
     const elAtsNote = document.getElementById('sidePanelAtsNote');
     if (elAtsNote) {
-      const kw = Array.isArray(P.kw_faltantes) && P.kw_faltantes.length > 0
-        ? `Faltan: ${P.kw_faltantes.slice(0,2).join(', ')}…`
-        : 'CV optimizado';
-      elAtsNote.textContent = `Objetivo: 85+ · ${kw}`;
+      elAtsNote.textContent = _notaAts(P);
     }
     // --- DISC ---
     const discLbl = document.getElementById('sidePanelDiscLbl');
@@ -7616,7 +7622,9 @@ async function init() {
         ? `\n\n📅 Tu acceso al plan **${_planB}** vence el **${_fechaCorta(PARTICIPANTE.plan_vence_en)}** (${_dRest <= 1 ? 'mañana o antes' : 'en ' + _dRest + ' días'}).`
         : '';
       bienvenida = (_planB === 'Inicial')
-        ? `¡Bienvenido, **${PARTICIPANTE.nombre.split(' ')[0]}**! Tu plan **Inicial** incluye **1 análisis ATS** (Sistema de Seguimiento de Candidatos) de tu CV: súbelo con el botón **Subir mi CV** del panel lateral (en el teléfono, en el menú ☰) y verás tu puntaje y tus categorías débiles.${_avisoPago}`
+        ? ((PARTICIPANTE.ats_score || 0) > 0
+          ? `¡Hola, **${PARTICIPANTE.nombre.split(' ')[0]}**! Tu análisis ATS (Sistema de Seguimiento de Candidatos) ya está listo: **${PARTICIPANTE.ats_score}/100**. En el panel lateral ves tu puntaje por categoría y las categorías débiles. Las **mejoras sugeridas** y el agente en todas las etapas están incluidos desde el plan **Esencial** (puedes cambiarte desde **Mi cuenta**).${_avisoPago}`
+          : `¡Bienvenido, **${PARTICIPANTE.nombre.split(' ')[0]}**! Tu plan **Inicial** incluye **1 análisis ATS** (Sistema de Seguimiento de Candidatos) de tu CV: súbelo con el botón **Subir mi CV** del panel lateral (en el teléfono, en el menú ☰) y verás tu puntaje y tus categorías débiles.${_avisoPago}`)
         : (_mensajeProactivo(false) && !_pagoPendiente() && !_planVencido())
         ? _mensajeProactivo(false) + _avisoPago
         : online
