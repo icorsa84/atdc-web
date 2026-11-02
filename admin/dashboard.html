@@ -1657,6 +1657,41 @@ async function _extenderAcceso(id) {
     cargarListado();
   } catch (e) { _mostrarMsg('_sop_msg', e.message, true); }
 }
+/* REQ-PLANES-LANDING (Premium): retroalimentación post-sesión y CV final */
+async function _guardarRetro(id) {
+  const texto = (document.getElementById('_retro_txt')?.value || '').trim();
+  if (texto.length < 20) { _mostrarMsg('_retro_msg', 'Escribe al menos un par de frases.', true); return; }
+  try {
+    const d = await _apiSend('PUT', `/api/admin/participantes/${id}/retroalimentacion`, { texto, enviar_correo: !!document.getElementById('_retro_mail')?.checked });
+    _mostrarMsg('_retro_msg', d.correo_enviado ? 'Guardada y enviada por correo.' : 'Guardada. La persona la verá en su proceso.', false);
+  } catch (e) { _mostrarMsg('_retro_msg', e.message, true); }
+}
+async function _descargarCvParticipante(id) {
+  try {
+    const res = await fetch(`${BACKEND}/api/admin/participantes/${encodeURIComponent(id)}/cv-mejorado`, { headers: { 'X-Admin-Key': ADMIN_KEY } });
+    if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(_textoError(d.detail) || 'No se pudo descargar.'); }
+    const blob = await res.blob();
+    const nombre = ((res.headers.get('Content-Disposition') || '').match(/filename="([^"]+)"/) || [])[1] || `CV_${id}`;
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = nombre; document.body.appendChild(a); a.click();
+    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+  } catch (e) { _mostrarMsg('_cvc_msg', e.message, true); }
+}
+async function _subirCvConsultor(id) {
+  const arch = document.getElementById('_cvc_arch')?.files?.[0];
+  if (!arch) { _mostrarMsg('_cvc_msg', 'Elige el archivo del CV final.', true); return; }
+  const fd = new FormData();
+  fd.append('archivo', arch);
+  fd.append('nota', (document.getElementById('_cvc_nota')?.value || '').trim());
+  fd.append('enviar_correo', 'true');
+  try {
+    const res = await fetch(`${BACKEND}/api/admin/participantes/${encodeURIComponent(id)}/cv-consultor`, { method: 'POST', headers: { 'X-Admin-Key': ADMIN_KEY }, body: fd });
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(_textoError(d.detail) || 'No se pudo subir el CV.');
+    _mostrarMsg('_cvc_msg', d.correo_enviado ? 'CV subido y la persona fue avisada por correo.' : 'CV subido. La persona lo verá en su proceso.', false);
+    setTimeout(() => abrirDetalle(id), 900);
+  } catch (e) { _mostrarMsg('_cvc_msg', e.message, true); }
+}
+
 /* REQ-SIMULACION-01: próxima entrevista laboral del participante */
 async function _guardarEntrevistaAgendada(id, borrar) {
   const val = k => borrar ? '' : (document.getElementById('_ea_' + k)?.value || '').trim();
@@ -1869,6 +1904,29 @@ function _renderDetalle(p) {
       ${ea.empresa ? `<button class="btn-secondary" onclick="_guardarEntrevistaAgendada('${escHtml(p.id)}', true)">Borrar</button>` : ''}
       ${ea.actualizado_en ? `<div style="font-size:11.5px;color:var(--muted);margin-top:6px;">Última actualización: ${escHtml(String(ea.actualizado_en).slice(0,16).replace('T',' '))} por ${ea.actualizado_por === 'admin' ? 'el consultor' : 'el participante'}</div>` : ''}
       <div id="_ea_msg" class="msg"></div>
+    </div>`; })() : ''}
+
+    ${p.plan === 'Premium' ? (() => { const pr = p.premium || {}, re_ = pr.retroalimentacion || {}, cvc = pr.cv_consultor || {}, ses = pr.sesion_consultor || {}; return `
+    <div class="sec">
+      <div class="sec-title">Seguimiento Premium</div>
+      <div style="font-size:12.5px;color:var(--muted);margin-bottom:10px;">Sesión: <strong>${escHtml(ses.estado || 'sin solicitar')}</strong>${ses.fecha ? ` · ${escHtml(ses.fecha)} ${escHtml(ses.hora || '')}` : ''}. Estas dos entregas están prometidas en el plan Premium.</div>
+      <div class="field" style="margin-bottom:6px;">
+        <label for="_retro_txt">Retroalimentación post-sesión</label>
+        <textarea id="_retro_txt" style="width:100%;min-height:110px;" placeholder="Lo que conversamos, tus fortalezas, qué ajustar y los próximos pasos acordados…">${escHtml(re_.texto || '')}</textarea>
+      </div>
+      <label style="display:inline-flex;align-items:center;gap:6px;font-size:12.5px;margin-bottom:8px;"><input type="checkbox" id="_retro_mail" checked> Enviarla también por correo</label><br>
+      <button class="btn-primary" onclick="_guardarRetro('${escHtml(p.id)}')">${icono('check',14)} Guardar retroalimentación</button>
+      ${re_.fecha ? `<span style="font-size:11.5px;color:var(--muted);margin-left:8px;">Registrada el ${escHtml(String(re_.fecha).slice(0,16).replace('T',' '))}</span>` : ''}
+      <div id="_retro_msg" class="msg"></div>
+      <div style="border-top:1px solid var(--border);margin:14px 0 10px;"></div>
+      <div style="font-size:13px;font-weight:600;margin-bottom:6px;">CV revisado por el consultor (edición final)</div>
+      <div style="font-size:12.5px;color:var(--muted);margin-bottom:8px;">1) Descarga el CV de la persona, 2) edítalo en Word, 3) súbelo aquí: le llega un correo y lo descarga desde su proceso.</div>
+      <button class="btn-secondary" onclick="_descargarCvParticipante('${escHtml(p.id)}')">${icono('document',14)} Descargar su CV actual</button>
+      <div class="field" style="margin:10px 0 6px;"><label for="_cvc_arch">CV final (Word .docx o PDF, máx. 3 MB)</label><input type="file" id="_cvc_arch" accept=".docx,.pdf"></div>
+      <div class="field" style="margin-bottom:6px;"><label for="_cvc_nota">Nota para la persona (opcional)</label><input id="_cvc_nota" maxlength="1000" style="width:100%" placeholder="Ej.: Ajusté el perfil y reordené logros para gerencia de operaciones."></div>
+      <button class="btn-primary" onclick="_subirCvConsultor('${escHtml(p.id)}')">${icono('check',14)} Subir y avisar</button>
+      ${cvc.fecha ? `<span style="font-size:11.5px;color:var(--muted);margin-left:8px;">Subido: ${escHtml(cvc.nombre || '')} · ${escHtml(String(cvc.fecha).slice(0,16).replace('T',' '))}</span>` : ''}
+      <div id="_cvc_msg" class="msg"></div>
     </div>`; })() : ''}
 
     <div class="sec">

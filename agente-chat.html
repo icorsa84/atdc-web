@@ -1752,10 +1752,12 @@
         <div class="s-track"><div class="s-fill fill-mid" id="sidePanelAtsBar" style="width:74%"></div></div>
       </div>
       <div id="sidePanelAtsNote" style="font-size:.73rem;color:var(--muted);margin-top:4px">Objetivo: 85+ · Faltan KW de logística</div>
+      <div id="sidePanelAtsCats" style="display:none;margin-top:6px;font-size:.72rem;"></div>
       <input type="file" id="cvFileInput" accept=".pdf,.txt" style="display:none" onchange="_subirCV()">
       <button id="btnSubirCV" onclick="document.getElementById('cvFileInput').click()" title="Sube tu CV en PDF o TXT (máx. 5 MB). La IA lo analiza y actualiza tu puntaje ATS al instante." style="margin-top:8px;width:100%;padding:8px 10px;border-radius:8px;border:1px solid var(--border2);background:var(--blue2);color:#fff;font-weight:700;font-size:.78rem;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05 12.25 20.24a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg> Subir mi CV (PDF o TXT)</button>
       <div id="cvVersionesBox" style="display:none;margin-top:8px;font-size:.73rem;color:var(--muted);"></div>
       <button id="btnCvWord" onclick="_cvMejoradoWord()" style="display:none;margin-top:8px;width:100%;padding:8px 10px;border-radius:8px;border:1px solid var(--border2);background:transparent;color:var(--text);font-weight:700;font-size:.76rem;cursor:pointer;align-items:center;justify-content:center;gap:6px;" title="Versión mejorada de tu último CV aprobado para este cargo: Word, Arial 10, máximo 2 páginas.">⬇ <span id="btnCvWordTxt">Mi CV mejorado (Word)</span></button>
+      <button id="btnAvisos" onclick="_abrirAvisos()" style="display:none;margin-top:8px;width:100%;padding:8px 10px;border-radius:8px;border:1px solid var(--border2);background:transparent;color:var(--text);font-weight:700;font-size:.76rem;cursor:pointer;" title="Pega un aviso de Laborum, Trabajando, LinkedIn u otro portal y revisa qué tan bien calza con tu CV.">🔎 Analizar un aviso de empleo</button>
       <div id="cvUploadStatus" style="font-size:.72rem;color:var(--muted);margin-top:4px;"></div>
     </div>
 
@@ -1822,6 +1824,7 @@
         <textarea id="premiumComentario" maxlength="500" style="width:100%;margin-bottom:6px;padding:6px 8px;border-radius:6px;border:1px solid var(--border2);background:transparent;color:var(--text);font-size:.78rem;resize:vertical;min-height:50px;box-sizing:border-box;"></textarea>
         <button id="premiumBtnSolicitar" onclick="_solicitarSesionConsultor()" disabled style="width:100%;padding:8px 10px;border-radius:8px;border:none;background:var(--blue2);color:#fff;font-weight:700;font-size:.78rem;cursor:pointer;">Solicitar este horario</button>
       </div>
+      <div id="premiumEntregas" style="display:none;margin-top:10px;"></div>
     </div>
 
     <!-- HISTORIAL CROSS-SESIÓN -->
@@ -2942,6 +2945,11 @@ function _aplicarPerfilAlEstado(d) {
   if (Array.isArray(d.cv_versiones)) PARTICIPANTE.cv_versiones = d.cv_versiones;
   if (d.antecedentes && typeof d.antecedentes === 'object') PARTICIPANTE.antecedentes = d.antecedentes;
   if (typeof d.cv_versiones_limite === 'number') PARTICIPANTE.cv_versiones_limite = d.cv_versiones_limite;
+  PARTICIPANTE.mercado_analizado = !!d.mercado_analizado;
+  PARTICIPANTE.retroalimentacion = d.retroalimentacion || {};
+  PARTICIPANTE.cv_consultor = d.cv_consultor || {};
+  try { _pintarEntregasPremium(); } catch (e) {}
+  PARTICIPANTE.sesion_estado = d.sesion_estado || '';
   if (d.entrevista_agendada && typeof d.entrevista_agendada === 'object') { PARTICIPANTE.entrevista_agendada = d.entrevista_agendada; try { _pintarEntrevistaAgendada(); } catch (e) {} }
   PARTICIPANTE.cargo          = d.cargo_objetivo || 'Por definir';
   PARTICIPANTE.sector         = d.sector || 'Por definir';
@@ -2958,6 +2966,7 @@ function _aplicarPerfilAlEstado(d) {
   if (d.cv && typeof d.cv.ats_score === 'number') {
     PARTICIPANTE.ats_score    = d.cv.ats_score;
     PARTICIPANTE.kw_faltantes = d.cv.kw_faltantes || [];
+    PARTICIPANTE.cv_categorias = d.cv.categorias || [];
   }
 
   // Repintar los paneles ya existentes en el DOM. Cada uno protegido por su
@@ -3397,6 +3406,72 @@ function _planTieneMemoria() {
   return r.memoria !== false;   // por defecto, con memoria (Profesional/Premium)
 }
 
+/* REQ-PLANES-LANDING: "Agente proactivo: te indica qué hacer al ingresar"
+   (Profesional y Premium). Revisa en qué va el proceso y propone el
+   siguiente paso concreto, con el avance total. */
+function _pasosProceso() {
+  const P = PARTICIPANTE, plan = getPlanActual();
+  const vs = P.cv_versiones || [];
+  const ult = vs.length ? vs[vs.length - 1] : null;
+  const pendMej = ult ? (ult.mejoras || []).filter(m => m.estado === 'pendiente').length : 0;
+  const discOk = !!(P.disc && P.disc.natural && Object.values(P.disc.natural).some(v => v > 0));
+  const k = P.kostick || {};
+  const kostOk = ['ld', 'ri', 'ot', 'mr', 'rp'].some(x => Number(k[x]) > 0);
+  const ea = P.entrevista_agendada || {};
+  const pasos = [
+    { ok: (P.ats_score || 0) > 0 && vs.length > 0, txt: 'Sube tu CV con el botón **Subir mi CV** del panel lateral para conocer tu puntaje ATS.' },
+    { ok: !pendMej, txt: `Revisa las **${pendMej} mejoras sugeridas** para tu CV (botón **Revisar mejoras sugeridas** del panel) y aprueba las que quieras aplicar.` },
+    { ok: !!(P.antecedentes && P.antecedentes.situacion), txt: 'Cuéntame tu situación con el botón **Mi situación**: así ajusto metas y ritmo a tu realidad.' },
+    { ok: discOk, txt: 'Haz el **test DISC** (unos 10 minutos) para conocer tu estilo de comportamiento laboral.' },
+    { ok: kostOk, txt: 'Haz el **test Kostick** para identificar tus competencias laborales más fuertes.' },
+    { ok: !!P.mercado_analizado, txt: 'Revisa el **mercado laboral para tu perfil**: rangos de renta, empresas y portales.' },
+  ];
+  if (plan === 'Premium') {
+    const est = P.sesion_estado || '';
+    pasos.push({ ok: ['solicitada', 'aceptada', 'confirmada', 'realizada'].includes(est),
+      txt: est === 'rechazada' ? 'El consultor no pudo en el horario que pediste: **elige otro horario** para tu sesión en el panel lateral.'
+                               : 'Agenda tu **sesión personal con el consultor** desde el panel lateral.' });
+  }
+  pasos.push({ ok: !!(window._INFORME_SERVIDOR || (typeof informeGenerado !== 'undefined' && informeGenerado)), txt: `Genera tu **Informe Final ${plan}** con el botón de arriba.` });
+  // Entrevista próxima: prioridad alta si es en los próximos 14 días
+  let urgente = '';
+  if (ea.empresa && ea.fecha) {
+    const dias = Math.round((new Date(ea.fecha + 'T12:00:00') - new Date()) / 86400000);
+    if (dias >= 0 && dias <= 14) urgente = `Tienes entrevista en **${ea.empresa}** ${dias === 0 ? '**hoy**' : dias === 1 ? '**mañana**' : `en **${dias} días**`}. Pídeme que te ayude a prepararla: preguntas probables, ejemplos con método STAR y qué investigar de la empresa.`;
+  }
+  return { pasos, urgente };
+}
+function _mensajeProactivo(retomando) {
+  if (IS_ADMIN) return '';
+  const plan = getPlanActual();
+  if (!(PLAN_RESTRICCIONES[plan] || {}).memoria) return '';   // Profesional y Premium
+  const { pasos, urgente } = _pasosProceso();
+  const hechos = pasos.filter(p => p.ok).length, sig = pasos.find(p => !p.ok);
+  const nombre = (PARTICIPANTE.nombre || '').split(' ')[0];
+  const saludo = retomando ? `Hola de nuevo, **${nombre}**.` : `¡Bienvenido, **${nombre}**! Soy tu agente ATDC y te acompaño en todo tu proceso.`;
+  const avance = `Llevas **${hechos} de ${pasos.length}** pasos de tu proceso.`;
+  if (urgente) return `${saludo} ${avance}\n\n🎯 **Lo más importante ahora:** ${urgente}${sig ? `\n\nDespués: ${sig.txt}` : ''}`;
+  if (sig) return `${saludo} ${avance}\n\n👉 **Tu siguiente paso:** ${sig.txt}`;
+  return `${saludo} Completaste todos los pasos de tu proceso. 🎉\n\n👉 **Ahora:** analiza los avisos que te interesen con **Analizar un aviso de empleo** y pídeme ayuda con cada postulación.`;
+}
+
+/* REQ-PLANES-LANDING: "Memoria entre sesiones" (Profesional/Premium). La
+   conversación se guarda en el servidor; si en este equipo hay menos
+   mensajes (otro computador, otro navegador), se recupera la del servidor. */
+async function _sincronizarHistorialServidor() {
+  if (IS_ADMIN || !_planTieneMemoria()) return;
+  try {
+    const r = await fetch(`${_BACKEND}/api/mi-perfil/historial`, { headers: { 'Authorization': `Bearer ${_obtenerToken()}` }, signal: AbortSignal.timeout(8000) });
+    if (!r.ok) return;
+    const d = await r.json();
+    const srv = Array.isArray(d.historial) ? d.historial : [];
+    if (srv.length > historial.length) {
+      historial = srv.map(m => ({ role: m.role, content: m.content, ts: Date.now() }));
+      guardarHistorial();
+    }
+  } catch (e) {}
+}
+
 function cargarHistorial() {
   if (!_planTieneMemoria()) { historial = []; return; }
   try {
@@ -3445,6 +3520,8 @@ function limpiarHistorial() {
     historial = [];
     guardarHistorial();
     renderHistPanel();
+    // REQ-PLANES-LANDING: también se borra la copia del servidor
+    if (!IS_ADMIN) fetch(`${_BACKEND}/api/mi-perfil/historial`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${_obtenerToken()}` } }).catch(() => {});
     document.getElementById('chatBody').innerHTML = '';
     agentMsg('Historial limpiado. ¿En qué puedo ayudarte?', chips_bienvenida());
   };
@@ -5575,7 +5652,9 @@ function renderMdInforme(md) {
 function _mostrarExportes(informe) {
   document.getElementById('btnExport').style.display = informe.en_revision ? 'none' : 'flex';
   const b = document.getElementById('btnExportPdf');
-  if (b) b.style.display = (!informe.en_revision && informe.plan === 'Premium') ? 'flex' : 'none';
+  // REQ-PLANES-LANDING: PDF en los tres planes con informe, con diseño
+  // escalonado (Esencial básico < Profesional detallado < Premium completo).
+  if (b) b.style.display = (!informe.en_revision && ['Esencial', 'Profesional', 'Premium'].includes(informe.plan)) ? 'flex' : 'none';
 }
 
 /* Informe premium descargable en PDF: se arma una página de impresión con el
@@ -5587,63 +5666,115 @@ const _LOGO_ATDC_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 207
 const _ISO_ATDC_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64.00 64.00" aria-hidden="true"><defs><linearGradient id="atdcG2" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#2563EB"/><stop offset="1" stop-color="#7C3AED"/></linearGradient></defs><rect width="64" height="64" rx="16" fill="url(#atdcG2)"/><line x1="21" y1="43" x2="43" y2="21" stroke="#FFFFFF" stroke-width="2.6" stroke-linecap="round"/><circle cx="19" cy="45" r="5.2" fill="#FFFFFF" opacity="0.55"/><circle cx="32" cy="32" r="6.2" fill="#FFFFFF"/><circle cx="45" cy="19" r="5.2" fill="#FFFFFF"/></svg>`;
 
 function exportarInformePDF() {
-  if (!informeGenerado || informeGenerado.plan !== 'Premium') return;
-  const inf = informeGenerado, P = PARTICIPANTE;
+  if (!informeGenerado || !['Esencial', 'Profesional', 'Premium'].includes(informeGenerado.plan)) return;
+  const inf = informeGenerado, P = PARTICIPANTE, plan = inf.plan;
   const nombre = escHtml(inf.participante || P.nombre || '');
   const cargo = escHtml(String(inf.cargo || P.cargo || ''));
+  const sector = escHtml(String(P.sector && P.sector !== 'Por definir' ? P.sector : ''));
   const fecha = escHtml(inf.fecha || new Date().toLocaleDateString('es-CL', { day: 'numeric', month: 'long', year: 'numeric' }));
-  const secs = (inf.secciones || []).map(sec => `
-    <section><h2>${escHtml(sec.titulo || '')}</h2><div>${renderMdInforme(sec.contenido || '')}</div></section>`).join('');
-  const html = `<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Informe Final ATDC — ${nombre}</title>
-    <style>
+  const secciones = inf.secciones || [];
+  const secs = secciones.map((sec, i) => `
+    <section id="s${i}"><h2>${plan === 'Premium' ? `<span class="n">${String(i + 1).padStart(2, '0')}</span>` : ''}${escHtml(sec.titulo || '')}</h2><div>${renderMdInforme(sec.contenido || '')}</div></section>`).join('');
+  const ats = Number(P.ats_score) > 0 ? `${Number(P.ats_score)}/100` : '';
+  // El código DISC puede venir como perfil ("CD") o como puntajes ("D7-I3-S4-C10"):
+  // en el segundo caso se arma con las dos dimensiones más altas del perfil natural.
+  const _dc = String((P.disc && P.disc.codigo) || '');
+  const _nat = (P.disc && P.disc.natural) || null;
+  const disc = /^[DISC]{1,2}$/.test(_dc) ? _dc
+    : (_nat && Object.values(_nat).some(v => v > 0)) ? Object.entries(_nat).sort((a, b) => b[1] - a[1]).slice(0, 2).map(e => e[0]).join('') : '';
+  const discPat = (P.disc && P.disc.patron && P.disc.patron !== 'Sin evaluar') ? escHtml(String(P.disc.patron).split('—')[0].trim()) : '';
+  const k = P.kostick || {};
+  const kMax = Object.entries({ 'Liderazgo': k.ld, 'Relaciones': k.ri, 'Orientación a la tarea': k.ot, 'Motivación': k.mr, 'Regulación': k.rp })
+    .filter(([, v]) => Number(v) > 0).sort((a, b) => b[1] - a[1])[0];
+  const indicador = (v, t) => v ? `<div class="ind"><b>${v}</b><span>${t}</span></div>` : '';
+
+  // Estilos comunes a los tres niveles
+  const base = `
       @page { size: A4; margin: 18mm 16mm 20mm; }
       * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
       body { font-family: Arial, Helvetica, sans-serif; color: #0F172A; font-size: 10.5pt; line-height: 1.5; margin: 0; }
-      /* Portada */
-      .portada { height: 255mm; display: flex; flex-direction: column; page-break-after: always; break-after: page; }
-      .portada .logo svg { height: 22mm; width: auto; display: block; }
-      .portada .cuerpo { margin-top: 62mm; }
-      .portada .etiqueta { display: inline-block; font-size: 9pt; font-weight: 700; letter-spacing: .12em; text-transform: uppercase;
-        color: #fff; background: linear-gradient(135deg,#2563EB,#7C3AED); padding: 5px 12px; border-radius: 4px; }
-      .portada h1 { font-size: 30pt; line-height: 1.15; margin: 14px 0 6px; color: #0F172A; }
-      .portada .sub { font-size: 13pt; color: #475569; margin: 0; }
-      .portada .barra { height: 4px; width: 60mm; margin: 22px 0; background: linear-gradient(90deg,#2563EB,#7C3AED); border-radius: 2px; }
-      .portada dl { display: grid; grid-template-columns: 38mm 1fr; gap: 6px 10px; font-size: 11pt; margin: 0; }
-      .portada dt { color: #64748B; } .portada dd { margin: 0; font-weight: 700; }
-      .portada .pie { margin-top: auto; display: flex; align-items: center; gap: 10px; font-size: 8.5pt; color: #64748B;
-        border-top: 1px solid #E2E8F0; padding-top: 10px; }
-      .portada .pie svg { width: 7mm; height: 7mm; flex-shrink: 0; }
-      /* Encabezado de las páginas de contenido */
-      .cabecera { display: flex; align-items: center; gap: 8px; border-bottom: 2px solid #2563EB; padding-bottom: 6px; margin-bottom: 14px;
-        font-size: 9pt; color: #475569; }
-      .cabecera svg { width: 6mm; height: 6mm; }
-      .cabecera b { color: #0F172A; }
-      h2 { font-size: 12.5pt; color: #1E3A8A; border-bottom: 1px solid #DBE3F0; padding-bottom: 3px; margin: 18px 0 8px; page-break-after: avoid; break-after: avoid; }
+      h2 { font-size: 12.5pt; color: #1E3A8A; border-bottom: 1px solid #DBE3F0; padding-bottom: 3px; margin: 18px 0 8px; break-after: avoid; }
       h3, h4 { font-size: 11pt; margin: 12px 0 6px; color: #1E3A8A; }
       table { border-collapse: collapse; width: 100%; margin: 8px 0; font-size: 9.5pt; }
       th, td { border: 1px solid #C9D3E0; padding: 4px 6px; text-align: left; vertical-align: top; }
       th { background: #EEF2FF; }
-      blockquote { border-left: 3px solid #7C3AED; margin: 8px 0; padding: 2px 10px; color: #333; }
-      section { break-inside: auto; }
-    </style></head><body>
-    <div class="portada">
-      <div class="logo">${_LOGO_ATDC_SVG}</div>
-      <div class="cuerpo">
-        <span class="etiqueta">Plan Premium</span>
-        <h1>Informe Final<br>de Transición de Carrera</h1>
-        <p class="sub">Diagnóstico de empleabilidad y plan de acción</p>
+      blockquote { border-left: 3px solid #2563EB; margin: 8px 0; padding: 2px 10px; color: #333; }
+      .cabecera { display: flex; align-items: center; gap: 8px; border-bottom: 2px solid #2563EB; padding-bottom: 6px; margin-bottom: 14px; font-size: 9pt; color: #475569; }
+      .cabecera svg { width: 6mm; height: 6mm; } .cabecera b { color: #0F172A; }
+      .ind { border: 1px solid #DBE3F0; border-radius: 6px; padding: 8px 12px; min-width: 34mm; }
+      .ind b { display: block; font-size: 15pt; color: #1E3A8A; } .ind span { font-size: 8.5pt; color: #64748B; }
+      .pie { display: flex; align-items: center; gap: 10px; font-size: 8.5pt; color: #64748B; border-top: 1px solid #E2E8F0; padding-top: 10px; }
+      .pie svg { width: 7mm; height: 7mm; flex-shrink: 0; }`;
+  let estilos = base, inicio = '';
+
+  if (plan === 'Esencial') {
+    // Nivel 1 — Informe básico: encabezado sencillo, sin portada aparte.
+    estilos += `
+      .basico { display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 1.5px solid #CBD5E1; padding-bottom: 10px; margin-bottom: 16px; }
+      .basico .logo svg { height: 12mm; width: auto; display: block; }
+      .basico .dat { text-align: right; font-size: 9pt; color: #475569; }
+      .basico h1 { font-size: 16pt; margin: 0 0 2px; color: #0F172A; }
+      h2 { color: #0F172A; border-bottom-color: #E2E8F0; }`;
+    inicio = `
+    <div class="basico"><div class="logo">${_LOGO_ATDC_SVG}</div>
+      <div class="dat"><h1>Informe de Resultados</h1>Plan Esencial · ${nombre}<br>${cargo ? cargo + ' · ' : ''}${fecha}</div></div>`;
+  } else if (plan === 'Profesional') {
+    // Nivel 2 — Informe detallado: portada con datos e indicadores clave.
+    estilos += `
+      .portada { height: 255mm; display: flex; flex-direction: column; break-after: page; }
+      .portada .logo svg { height: 18mm; width: auto; display: block; }
+      .portada .cuerpo { margin-top: 55mm; }
+      .portada .etiqueta { display: inline-block; font-size: 9pt; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: #1E3A8A; border: 1.5px solid #2563EB; padding: 4px 10px; border-radius: 4px; }
+      .portada h1 { font-size: 26pt; line-height: 1.15; margin: 12px 0 6px; }
+      .portada .sub { font-size: 12pt; color: #475569; margin: 0 0 20px; }
+      .portada dl { display: grid; grid-template-columns: 38mm 1fr; gap: 5px 10px; font-size: 10.5pt; margin: 0 0 18px; }
+      .portada dt { color: #64748B; } .portada dd { margin: 0; font-weight: 700; }
+      .inds { display: flex; gap: 10px; } .portada .pie { margin-top: auto; }`;
+    inicio = `
+    <div class="portada"><div class="logo">${_LOGO_ATDC_SVG}</div>
+      <div class="cuerpo"><span class="etiqueta">Plan Profesional</span>
+        <h1>Informe de Diagnóstico<br>Profesional</h1><p class="sub">Perfil integral, fortalezas, brechas y posicionamiento de mercado</p>
+        <dl><dt>Participante</dt><dd>${nombre}</dd>${cargo ? `<dt>Cargo objetivo</dt><dd>${cargo}</dd>` : ''}${sector ? `<dt>Sector</dt><dd>${sector}</dd>` : ''}<dt>Fecha</dt><dd>${fecha}</dd></dl>
+        <div class="inds">${indicador(ats, 'Puntaje ATS del CV')}${indicador(disc, 'Perfil DISC' + (discPat ? ' · ' + discPat : ''))}${kMax ? indicador(kMax[1] + '/9', 'Kostick · ' + kMax[0]) : ''}</div></div>
+      <div class="pie">${_ISO_ATDC_SVG}<span>ATDC — Asistente de Transición y Desarrollo de Carrera · outplacement.atdc.app<br>Documento confidencial para uso de ${nombre}.</span></div></div>
+    <div class="cabecera">${_ISO_ATDC_SVG}<span><b>Informe Profesional ATDC</b> · ${nombre} · ${fecha}</span></div>`;
+  } else {
+    // Nivel 3 — Informe premium: portada completa, indicadores, índice y sello del consultor.
+    estilos += `
+      .portada { height: 255mm; display: flex; flex-direction: column; break-after: page; }
+      .portada .logo svg { height: 22mm; width: auto; display: block; }
+      .portada .cuerpo { margin-top: 48mm; }
+      .portada .etiqueta { display: inline-block; font-size: 9pt; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: #fff; background: linear-gradient(135deg,#2563EB,#7C3AED); padding: 5px 12px; border-radius: 4px; }
+      .portada h1 { font-size: 30pt; line-height: 1.15; margin: 14px 0 6px; }
+      .portada .sub { font-size: 13pt; color: #475569; margin: 0; }
+      .portada .barra { height: 4px; width: 60mm; margin: 22px 0; background: linear-gradient(90deg,#2563EB,#7C3AED); border-radius: 2px; }
+      .portada dl { display: grid; grid-template-columns: 38mm 1fr; gap: 6px 10px; font-size: 11pt; margin: 0 0 18px; }
+      .portada dt { color: #64748B; } .portada dd { margin: 0; font-weight: 700; }
+      .inds { display: flex; gap: 10px; } .ind { border-color: #C7D2FE; background: #F5F7FF; }
+      .sello { margin-top: 16px; display: inline-flex; align-items: center; gap: 8px; font-size: 9.5pt; color: #4C1D95; background: #F3E8FF; border-radius: 20px; padding: 5px 12px; font-weight: 700; }
+      .portada .pie { margin-top: auto; }
+      .indice { break-after: page; } .indice h2 { border: none; font-size: 16pt; color: #0F172A; margin-top: 0; }
+      .indice ol { list-style: none; padding: 0; margin: 10px 0 0; counter-reset: i; }
+      .indice li { display: flex; gap: 12px; padding: 9px 0; border-bottom: 1px solid #E2E8F0; font-size: 11pt; }
+      .indice li b { color: #7C3AED; width: 9mm; }
+      h2 .n { color: #7C3AED; margin-right: 8px; }
+      blockquote { border-left-color: #7C3AED; }`;
+    inicio = `
+    <div class="portada"><div class="logo">${_LOGO_ATDC_SVG}</div>
+      <div class="cuerpo"><span class="etiqueta">Plan Premium</span>
+        <h1>Informe Final<br>de Transición de Carrera</h1><p class="sub">Diagnóstico de empleabilidad y plan de acción</p>
         <div class="barra"></div>
-        <dl>
-          <dt>Participante</dt><dd>${nombre}</dd>
-          ${cargo ? `<dt>Cargo objetivo</dt><dd>${cargo}</dd>` : ''}
-          <dt>Fecha</dt><dd>${fecha}</dd>
-          <dt>Revisión</dt><dd>Revisado por el consultor</dd>
-        </dl>
-      </div>
-      <div class="pie">${_ISO_ATDC_SVG}<span>ATDC — Asistente de Transición y Desarrollo de Carrera · outplacement.atdc.app<br>
-        Documento confidencial, preparado para uso exclusivo de ${nombre}.</span></div>
-    </div>
-    <div class="cabecera">${_ISO_ATDC_SVG}<span><b>Informe Final ATDC</b> · ${nombre}${cargo ? ' · ' + cargo : ''} · ${fecha}</span></div>
+        <dl><dt>Participante</dt><dd>${nombre}</dd>${cargo ? `<dt>Cargo objetivo</dt><dd>${cargo}</dd>` : ''}${sector ? `<dt>Sector</dt><dd>${sector}</dd>` : ''}<dt>Fecha</dt><dd>${fecha}</dd></dl>
+        <div class="inds">${indicador(ats, 'Puntaje ATS del CV')}${indicador(disc, 'Perfil DISC' + (discPat ? ' · ' + discPat : ''))}${kMax ? indicador(kMax[1] + '/9', 'Kostick · ' + kMax[0]) : ''}</div>
+        <div class="sello">✓ Revisado y aprobado por el consultor</div></div>
+      <div class="pie">${_ISO_ATDC_SVG}<span>ATDC — Asistente de Transición y Desarrollo de Carrera · outplacement.atdc.app<br>Documento confidencial, preparado para uso exclusivo de ${nombre}.</span></div></div>
+    <div class="indice"><div class="cabecera">${_ISO_ATDC_SVG}<span><b>Informe Final ATDC</b> · ${nombre} · ${fecha}</span></div>
+      <h2>Contenido</h2><ol>${secciones.map((sec, i) => `<li><b>${String(i + 1).padStart(2, '0')}</b><span>${escHtml(sec.titulo || '')}</span></li>`).join('')}</ol></div>
+    <div class="cabecera">${_ISO_ATDC_SVG}<span><b>Informe Final ATDC</b> · ${nombre}${cargo ? ' · ' + cargo : ''} · ${fecha}</span></div>`;
+  }
+  const titulo = plan === 'Esencial' ? 'Informe de Resultados' : plan === 'Profesional' ? 'Informe Profesional' : 'Informe Final';
+  const html = `<!doctype html><html lang="es"><head><meta charset="utf-8"><title>${titulo} ATDC — ${nombre}</title>
+    <style>${estilos}</style></head><body>${inicio}
     ${secs}</body></html>`;
   const fr = document.createElement('iframe');
   fr.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;';
@@ -5778,6 +5909,46 @@ function _pintarSelectorPaisMercado() {
   }).join('');
 }
 
+/* REQ-PLANES-LANDING: análisis de avisos en portales chilenos (Esencial+) */
+async function _abrirAvisos() {
+  const overlay = _modalPassword('_avisosModal', `${icono('search',18)} Analizar un aviso de empleo`, `
+    <p style="font-size:.8rem;color:var(--muted);margin:0 0 10px;">Copia el texto completo del aviso (desde Laborum, Trabajando.com, LinkedIn, BNE u otro portal) y pégalo aquí. Lo comparo con tu CV y te digo qué tan bien calzas y qué ajustar antes de postular.</p>
+    <label for="_av_texto" style="display:block;font-size:.78rem;font-weight:600;color:var(--text2);margin-bottom:4px;">Texto del aviso</label>
+    <textarea id="_av_texto" maxlength="15000" style="width:100%;min-height:150px;padding:8px 10px;border-radius:8px;border:1px solid var(--border2);background:var(--bg);color:var(--text);font-size:.8rem;box-sizing:border-box;margin-bottom:8px;" placeholder="Ej.: Jefe de Logística — Empresa de retail — Santiago. Requisitos: 5 años de experiencia…"></textarea>
+    <label for="_av_url" style="display:block;font-size:.78rem;font-weight:600;color:var(--text2);margin-bottom:4px;">Enlace al aviso (opcional)</label>
+    <input id="_av_url" maxlength="500" style="width:100%;padding:8px 10px;border-radius:8px;border:1px solid var(--border2);background:var(--bg);color:var(--text);font-size:.8rem;box-sizing:border-box;margin-bottom:10px;">
+    <button id="_av_btn" onclick="_analizarAviso()" style="width:100%;padding:9px 12px;border-radius:8px;border:none;background:var(--blue2);color:#fff;font-weight:700;cursor:pointer;">Analizar calce con mi CV</button>
+    <div id="_av_res" role="status" style="margin-top:12px;font-size:.84rem;line-height:1.55;"></div>
+    <div id="_av_hist" style="margin-top:12px;"></div>`);
+  const caja = overlay.querySelector('div');
+  if (caja) { caja.style.maxWidth = '660px'; caja.style.maxHeight = '86vh'; caja.style.overflowY = 'auto'; }
+  try {
+    const r = await fetch(`${_BACKEND}/api/avisos`, { headers: { 'Authorization': `Bearer ${_obtenerToken()}` } });
+    const d = await r.json();
+    const av = (d.avisos || []).slice(0, 8);
+    const h = document.getElementById('_av_hist');
+    if (h && av.length) h.innerHTML = `<div style="font-weight:700;font-size:.74rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;">Avisos analizados</div>` +
+      av.map((a, i) => `<details style="border:1px solid var(--border);border-radius:8px;padding:7px 10px;margin-bottom:6px;font-size:.8rem;"><summary style="cursor:pointer;">${a.calce != null ? `<strong>${a.calce}%</strong> · ` : ''}${escHtml(a.titulo || 'Aviso')} <span style="color:var(--muted)">· ${escHtml(String(a.fecha || '').slice(0, 10))}</span></summary><div style="margin-top:8px;">${renderMdInforme(a.analisis_md || '')}</div></details>`).join('');
+  } catch (e) {}
+}
+async function _analizarAviso() {
+  const texto = (document.getElementById('_av_texto')?.value || '').trim();
+  const res = document.getElementById('_av_res'), btn = document.getElementById('_av_btn');
+  if (texto.length < 120) { res.innerHTML = '<span style="color:var(--amber)">Pega el texto completo del aviso (al menos un par de párrafos con el cargo y los requisitos).</span>'; return; }
+  btn.disabled = true; btn.textContent = 'Analizando el aviso…';
+  res.innerHTML = '<span style="color:var(--muted)">Comparando el aviso con tu CV (puede tardar unos 30 segundos)…</span>';
+  try {
+    const r = await fetch(`${_BACKEND}/api/avisos/analizar`, { method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${_obtenerToken()}` },
+      body: JSON.stringify({ texto, url: (document.getElementById('_av_url')?.value || '').trim() }), signal: AbortSignal.timeout(90000) });
+    const d = await r.json();
+    if (!r.ok) throw new Error(_textoErrorApi(d.detail) || 'No se pudo analizar el aviso.');
+    res.innerHTML = `<div style="border:1px solid var(--border2);border-radius:10px;padding:12px 14px;">${renderMdInforme(d.analisis_md || '')}</div>`;
+  } catch (e) {
+    res.innerHTML = `<span style="color:var(--amber)">⚠️ ${escHtml(e.message)}</span>`;
+  } finally { btn.disabled = false; btn.textContent = 'Analizar calce con mi CV'; }
+}
+
 async function _abrirMercado(pais) {
   const _planM = getPlanActual();
   if (_planM === 'Inicial' && !IS_ADMIN) return;          // no incluido
@@ -5845,6 +6016,9 @@ async function _abrirMercado(pais) {
       <div id="_mercadoCuerpo">
         ${data.posicionamiento_md ? `<div style="font-size:.85rem;line-height:1.55;margin-bottom:18px;">${renderMdInforme(data.posicionamiento_md)}</div>` : ''}
         ${portalesHtml ? `<div style="font-weight:700;font-size:.82rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin:4px 0 10px;">Portales recomendados para ${escHtml(paisSel)}</div>${portalesHtml}` : ''}
+        <div style="margin-top:12px;padding:12px 14px;border-radius:10px;border:1px dashed var(--border2);font-size:.82rem;">
+          ¿Encontraste un aviso que te interesa? <button onclick="document.getElementById('_mercadoModal')?.remove();_abrirAvisos()" style="margin-left:4px;padding:5px 10px;border-radius:7px;border:none;background:var(--blue2);color:#fff;font-weight:700;font-size:.78rem;cursor:pointer;">Analizar el aviso</button>
+        </div>
         ${fuentesHtml}
       </div>`;
   } catch (e) {
@@ -6077,6 +6251,31 @@ window.addEventListener('resize', () => {
    ================================================================ */
 
 /* REQ-ANTECEDENTES: antecedentes personales y bienestar */
+/* REQ-PLANES-LANDING (Premium): retroalimentación post-sesión y CV final */
+function _pintarEntregasPremium() {
+  const el = document.getElementById('premiumEntregas');
+  if (!el) return;
+  const r = PARTICIPANTE.retroalimentacion || {}, c = PARTICIPANTE.cv_consultor || {};
+  if (!r.texto && !c.fecha) { el.style.display = 'none'; return; }
+  el.style.display = '';
+  el.innerHTML = `
+    ${r.texto ? `<details style="border:1px solid var(--border2);border-radius:8px;padding:7px 9px;margin-bottom:8px;font-size:.78rem;" open>
+      <summary style="cursor:pointer;font-weight:700;color:var(--text);">Retroalimentación de tu sesión</summary>
+      <div style="margin-top:6px;color:var(--text2);white-space:pre-wrap;line-height:1.5;">${escHtml(r.texto)}</div></details>` : ''}
+    ${c.fecha ? `<button onclick="_descargarCvConsultor()" style="width:100%;padding:8px 10px;border-radius:8px;border:1px solid var(--border2);background:transparent;color:var(--text);font-weight:700;font-size:.76rem;cursor:pointer;">⬇ Descargar mi CV revisado por el consultor</button>
+      ${c.nota ? `<div style="font-size:.74rem;color:var(--muted);margin-top:5px;">${escHtml(c.nota)}</div>` : ''}` : ''}`;
+}
+async function _descargarCvConsultor() {
+  try {
+    const res = await fetch(`${_BACKEND}/api/mi-perfil/cv-consultor`, { headers: { 'Authorization': `Bearer ${_obtenerToken()}` } });
+    if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(_textoErrorApi(d.detail) || 'No se pudo descargar.'); }
+    const blob = await res.blob();
+    const nombre = ((res.headers.get('Content-Disposition') || '').match(/filename="([^"]+)"/) || [])[1] || 'CV_revisado';
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = nombre; document.body.appendChild(a); a.click();
+    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+  } catch (e) { agentMsg(`⚠️ ${e.message}`); }
+}
+
 /* REQ-SIMULACION-01: próxima entrevista laboral */
 function _pintarEntrevistaAgendada() {
   const el = document.getElementById('entrevistaAgendadaTxt');
@@ -7158,7 +7357,9 @@ async function _subirCV() {
     // Actualizar la fuente única de verdad y re-sincronizar el panel lateral
     PARTICIPANTE.ats_score = data.ats_score;
     PARTICIPANTE.kw_faltantes = data.kw_faltantes || [];
-    (PARTICIPANTE.cv_versiones = PARTICIPANTE.cv_versiones || []).push({ cargo: _cvCargoSel, ats_score: data.ats_score, fecha: new Date().toISOString(), tiene_mejorado: false });
+    PARTICIPANTE.cv_categorias = data.categorias || [];
+    (PARTICIPANTE.cv_versiones = PARTICIPANTE.cv_versiones || []).push({ cargo: _cvCargoSel, ats_score: data.ats_score, fecha: new Date().toISOString(), tiene_mejorado: false,
+      categorias: data.categorias || [], mejoras: data.mejoras || [] });
     _refrescarATSsidebar();
     etapaRegistrarHito('cv'); // Fix NAV-ETAPAS-01: marca la etapa "CV + ATS" como completada
 
@@ -7166,7 +7367,7 @@ async function _subirCV() {
       status.innerHTML = `${icono('check-circle',12)} CV analizado — ATS: <strong>${data.ats_score}/100</strong>. ${data.resumen || ''}`;
       status.style.color = 'var(--green)';
     }
-    agentMsg(`✅ **Tu CV fue analizado.** Puntaje ATS: **${data.ats_score}/100**.\n\n${data.resumen || ''}\n\n**Fortalezas:** ${(data.fortalezas||[]).join(', ')}\n\n**Palabras clave faltantes:** ${(data.kw_faltantes||[]).join(', ') || 'ninguna relevante'}`);
+    agentMsg(_textoResultadoCV(data));
   } catch (e) {
     if (status) { status.innerHTML = `${icono('warning',12)} ${e.message || 'Error al subir el CV. Intenta nuevamente.'}`; status.style.color = 'var(--amber)'; }
   } finally {
@@ -7183,11 +7384,67 @@ function _cargosObjetivo() {
   const c = PARTICIPANTE.cargo;
   return (Array.isArray(c) ? c : (c && c !== 'Por definir' ? [c] : [])).filter(Boolean);
 }
+/* REQ-PLANES-LANDING: resultado del análisis ATS por plan. Inicial ve el
+   puntaje y sus categorías débiles; las mejoras sugeridas son desde Esencial. */
+function _textoResultadoCV(data) {
+  const cats = data.categorias || [];
+  const debiles = cats.filter(c => c.debil);
+  const lineaCat = c => `${c.debil ? '🔴' : c.puntaje >= 80 ? '🟢' : '🟡'} ${c.nombre}: **${c.puntaje}/100**${c.debil ? ' — débil' : ''}`;
+  let t = `✅ **Tu CV fue analizado.** Puntaje ATS: **${data.ats_score}/100**.\n\n${data.resumen || ''}`;
+  if (cats.length) {
+    t += `\n\n**Puntaje por categoría**\n${cats.map(lineaCat).join('\n')}`;
+    t += debiles.length ? `\n\n**Categorías débiles:** ${debiles.map(c => c.nombre).join(', ')}.` : `\n\nNo tienes categorías débiles (todas sobre 60).`;
+  }
+  t += `\n\n**Fortalezas:** ${(data.fortalezas || []).join(', ')}`;
+  if (data.mejoras_incluidas === false) {
+    t += `\n\n🔒 Las **mejoras sugeridas** para subir tu puntaje están incluidas desde el plan **Esencial**, junto con el agente en todas las etapas. Puedes cambiar de plan desde **Mi cuenta**.`;
+  } else {
+    t += `\n\n**Palabras clave faltantes:** ${(data.kw_faltantes || []).join(', ') || 'ninguna relevante'}`;
+    if ((data.mejoras || []).length) t += `\n\n📝 Te propongo **${data.mejoras.length} mejoras** para tu CV. Revísalas una por una con el botón **Revisar mejoras sugeridas** del panel lateral: las que apruebes se aplicarán a tu CV mejorado en Word.`;
+  }
+  return t;
+}
+
+function _abrirMejorasCV(idx) {
+  const v = (PARTICIPANTE.cv_versiones || [])[idx];
+  if (!v) return;
+  const ms = v.mejoras || [];
+  const fila = m => `
+    <div style="border:1px solid var(--border2);border-radius:9px;padding:10px 12px;margin-bottom:8px;" id="_mej_${m.id}">
+      <div style="font-size:.82rem;color:var(--text);margin-bottom:8px;"><strong>${m.id}.</strong> ${escHtml(m.texto)}</div>
+      <div style="display:flex;gap:6px;align-items:center;">
+        <button onclick="_decidirMejora(${idx},${m.id},'aprobada')" aria-pressed="${m.estado === 'aprobada'}" style="padding:5px 10px;border-radius:7px;border:1px solid ${m.estado === 'aprobada' ? '#15803d' : 'var(--border2)'};background:${m.estado === 'aprobada' ? '#15803d' : 'transparent'};color:${m.estado === 'aprobada' ? '#fff' : 'var(--text)'};font-size:.76rem;font-weight:600;cursor:pointer;">✓ Aprobar</button>
+        <button onclick="_decidirMejora(${idx},${m.id},'descartada')" aria-pressed="${m.estado === 'descartada'}" style="padding:5px 10px;border-radius:7px;border:1px solid var(--border2);background:${m.estado === 'descartada' ? 'var(--border2)' : 'transparent'};color:var(--text);font-size:.76rem;cursor:pointer;">✕ Descartar</button>
+        <span style="font-size:.74rem;color:var(--muted);margin-left:auto;">${m.estado === 'aprobada' ? 'Aprobada' : m.estado === 'descartada' ? 'Descartada' : 'Por decidir'}</span>
+      </div>
+    </div>`;
+  const pend = ms.filter(m => m.estado === 'pendiente').length;
+  _modalPassword('_mejModal', `${icono('document',18)} Mejoras sugeridas para tu CV`, `
+    <p style="font-size:.8rem;color:var(--muted);margin:0 0 12px;">Decide una por una. Las que apruebes se aplicarán cuando crees tu CV mejorado en Word; las que descartes no se tocarán. Nunca se agregan datos que no estén en tu CV.</p>
+    ${ms.map(fila).join('')}
+    <div id="_mej_msg" role="status" style="font-size:.78rem;margin:6px 0;color:var(--muted)">${pend ? `Te quedan ${pend} por decidir.` : 'Ya decidiste todas. Puedes crear tu CV mejorado en Word desde el panel.'}</div>`);
+}
+
+async function _decidirMejora(idx, id, estado) {
+  try {
+    const r = await fetch(`${_BACKEND}/api/cv/mejoras`, { method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${_obtenerToken()}` },
+      body: JSON.stringify({ id, estado, version: idx }) });
+    const d = await r.json();
+    if (!r.ok) throw new Error(_textoErrorApi(d.detail) || 'No se pudo guardar tu decisión.');
+    PARTICIPANTE.cv_versiones[idx].mejoras = d.mejoras || [];
+    _abrirMejorasCV(idx);
+    _pintarVersionesCV();
+  } catch (e) { const m = document.getElementById('_mej_msg'); if (m) { m.textContent = e.message; m.style.color = 'var(--amber)'; } }
+}
+
 function _pintarVersionesCV() {
   const box = document.getElementById('cvVersionesBox');
   if (!box) return;
   const plan = getPlanActual();
   const cargos = _cargosObjetivo();
+  const _ba = document.getElementById('btnAvisos');
+  if (_ba) _ba.style.display = (!IS_ADMIN && plan !== 'Inicial') ? '' : 'none';
   if (IS_ADMIN || plan === 'Inicial' || !cargos.length) { box.style.display = 'none'; return; }
   if (!cargos.includes(_cvCargoSel)) _cvCargoSel = cargos[0];
   const lim = typeof PARTICIPANTE.cv_versiones_limite === 'number' ? PARTICIPANTE.cv_versiones_limite : 0;
@@ -7200,7 +7457,14 @@ function _pintarVersionesCV() {
   const conteo = lim
     ? `Versiones de CV para «${escHtml(_cvCargoSel)}»: <strong>${Math.min(usadas, lim)} de ${lim}</strong>`
     : `Versiones de CV para «${escHtml(_cvCargoSel)}»: <strong>${usadas}</strong> (ilimitadas)`;
-  box.innerHTML = selector + conteo;
+  // REQ-PLANES-LANDING: mejoras de CV aprobadas paso a paso (Esencial+)
+  const _iv = _idxUltimaVersion(_cvCargoSel);
+  const _ms = _iv >= 0 ? (PARTICIPANTE.cv_versiones[_iv].mejoras || []) : [];
+  const _pend = _ms.filter(m => m.estado === 'pendiente').length, _apr = _ms.filter(m => m.estado === 'aprobada').length;
+  const botonMejoras = _ms.length ? `
+    <button onclick="_abrirMejorasCV(${_iv})" style="width:100%;margin-top:6px;padding:6px 8px;border-radius:7px;border:1px solid var(--border2);background:transparent;color:var(--text);font-size:.75rem;font-weight:600;cursor:pointer;">
+      ${_pend ? `Revisar mejoras sugeridas (${_pend} por decidir)` : `Mejoras revisadas: ${_apr} aprobada${_apr === 1 ? '' : 's'}`}</button>` : '';
+  box.innerHTML = selector + conteo + botonMejoras;
   box.style.display = '';
   // REQ-CV-WORD: CV mejorado del último CV aprobado para este cargo
   const bw = document.getElementById('btnCvWord');
@@ -7280,6 +7544,17 @@ function _refrescarATSsidebar() {
       : 'CV optimizado';
     elAtsNote.textContent = `Objetivo: 85+ · ${kw}`;
   }
+  // REQ-PLANES-LANDING: categorías del análisis, con las débiles marcadas
+  const elCats = document.getElementById('sidePanelAtsCats');
+  if (elCats) {
+    const cats = Array.isArray(P.cv_categorias) ? P.cv_categorias : [];
+    elCats.style.display = cats.length ? '' : 'none';
+    elCats.innerHTML = cats.map(c => `
+      <div style="display:flex;justify-content:space-between;gap:6px;padding:2px 0;color:${c.debil ? 'var(--text)' : 'var(--muted)'};">
+        <span>${c.debil ? '<strong>' : ''}${escHtml(c.nombre)}${c.debil ? '</strong>' : ''}</span>
+        <span style="font-weight:700;color:${c.debil ? 'var(--amber)' : 'var(--green)'};white-space:nowrap;">${Number(c.puntaje)}${c.debil ? ' · débil' : ''}</span>
+      </div>`).join('');
+  }
 }
 
 /* ================================================================
@@ -7313,6 +7588,10 @@ function _pintarAgenda() {
   if (ses.estado === 'aceptada') {
     estadoEl.innerHTML = `${icono('check-circle',12)} <strong>Sesión confirmada</strong>: ${escHtml(leg(ses.fecha, ses.hora))} (${d.duracion || 45} min).`
       + (ses.meet_link ? `<br><a href="${escHtml(ses.meet_link)}" target="_blank" rel="noopener" style="color:var(--blue2);font-weight:700;">Entrar a la videollamada (Google Meet)</a>` : '<br>El consultor te enviará el enlace de la videollamada.');
+    estadoEl.style.color = 'var(--text2)'; formEl.style.display = 'none'; return;
+  }
+  if (ses.estado === 'realizada') {   // REQ-PLANES-LANDING: 1 sesión incluida
+    estadoEl.innerHTML = `${icono('check-circle',12)} <strong>Sesión realizada</strong>${ses.fecha ? ' el ' + escHtml(leg(ses.fecha, ses.hora)) : ''}. Tu retroalimentación aparece abajo cuando el consultor la registre.`;
     estadoEl.style.color = 'var(--text2)'; formEl.style.display = 'none'; return;
   }
   if (ses.estado === 'solicitada') {
@@ -7377,6 +7656,7 @@ async function init() {
   _aplicarGateoPorPlan();
 
   cargarHistorial();
+  await _sincronizarHistorialServidor();   // REQ-PLANES-LANDING: memoria entre equipos
   renderHistPanel();
   initQuickTopics(); /* Fix CHAT4-UX-02 */
   etapaCargar(); /* Fix NAV-ETAPAS-01: restaura hitos y pinta la barra de etapas */
@@ -7535,6 +7815,9 @@ async function init() {
     sep.textContent=`— Retomando sesión · ${online?'IA activa':'modo local'} —`;
     body.appendChild(sep);
     body.scrollTop = body.scrollHeight;
+    // REQ-PLANES-LANDING: "Agente proactivo: te indica qué hacer al ingresar"
+    const _pro = _mensajeProactivo(true);
+    if (_pro) agentMsg(_pro);
   } else {
     let bienvenida;
     if (IS_ADMIN) {
@@ -7553,7 +7836,9 @@ async function init() {
         ? `\n\n📅 Tu acceso al plan **${_planB}** vence el **${_fechaCorta(PARTICIPANTE.plan_vence_en)}** (${_dRest <= 1 ? 'mañana o antes' : 'en ' + _dRest + ' días'}).`
         : '';
       bienvenida = (_planB === 'Inicial')
-        ? `¡Bienvenido, **${PARTICIPANTE.nombre.split(' ')[0]}**! Tu plan **Inicial** incluye **1 análisis ATS** (Sistema de Seguimiento de Candidatos) de tu CV: súbelo con el botón **Subir mi CV** del panel lateral (en el teléfono, en el menú ☰) y verás tu puntaje, tus categorías débiles y las mejoras sugeridas.${_avisoPago}`
+        ? `¡Bienvenido, **${PARTICIPANTE.nombre.split(' ')[0]}**! Tu plan **Inicial** incluye **1 análisis ATS** (Sistema de Seguimiento de Candidatos) de tu CV: súbelo con el botón **Subir mi CV** del panel lateral (en el teléfono, en el menú ☰) y verás tu puntaje y tus categorías débiles.${_avisoPago}`
+        : (_mensajeProactivo(false) && !_pagoPendiente() && !_planVencido())
+        ? _mensajeProactivo(false) + _avisoPago
         : online
         ? `¡Bienvenido, **${PARTICIPANTE.nombre.split(' ')[0]}**! Soy tu agente ATDC con IA activa. Puedo responder cualquier pregunta sobre tu proceso de transición de carrera usando tus datos reales.\n\nCuando estés listo, también puedes generar tu **Informe Final ${_planB}** con el botón de abajo. ¿Por dónde empezamos?${_avisoPago}`
         : `Hola **${PARTICIPANTE.nombre.split(' ')[0]}**, soy tu agente ATDC. Estoy en modo local — las respuestas son más básicas que con IA completa.\n\nPuedes generar tu **Informe Final ${_planB}** con el botón de abajo.${_avisoPago}`;
