@@ -5965,7 +5965,7 @@ async function _calcularRenta() {
       ${fila('Renta bruta total', x.bruto)}${fila(`Haberes exentos (${Math.round(su.pct_exento * 100)}%)`, x.exento)}${fila('Haberes imponibles', x.imponible)}
       ${fila(`AFP (${pc(su.tasa_afp, 1)}%)`, x.afp, 1)}${fila(`Salud (${Math.round(su.tasa_salud * 100)}%)`, x.salud, 1)}${fila(`Seguro de cesantía (${pc(su.tasa_cesantia, 1)}%)`, x.cesantia, 1)}${fila('Impuesto único', x.impuesto, 1)}
       <tr><td style="padding:4px 8px 0 0;font-weight:700;border-top:1px solid var(--border2);">Líquido aproximado</td><td style="text-align:right;font-weight:700;border-top:1px solid var(--border2);padding-top:4px;">${f(x.liquido)}</td></tr></table>
-      <div style="font-size:.72rem;color:var(--muted);margin-top:4px;">Supuestos: ${Math.round(su.pct_exento * 100)}% de haberes exentos, contrato indefinido, AFP con comisión promedio, salud 7%, topes de ${String(su.tope_afp_uf).replace('.', ',')} UF y ${String(su.tope_cesantia_uf).replace('.', ',')} UF. UF ${f(su.uf)} · UTM ${f(su.utm)}.</div>`;
+      <div style="font-size:.72rem;color:var(--muted);margin-top:4px;">Supuestos: ${Math.round(su.pct_exento * 100)}% de haberes exentos, contrato indefinido, AFP con comisión promedio, salud 7%, topes de ${String(su.tope_afp_uf).replace('.', ',')} UF y ${String(su.tope_cesantia_uf).replace('.', ',')} UF. UF del último día del mes ${f(su.uf)}${su.uf_fecha ? ' (' + su.uf_fecha.split('-').reverse().join('-') + ')' : ''} · UTM ${f(su.utm)}.</div>`;
   } catch (e) { out.innerHTML = `<span style="color:var(--amber)">${escHtml(e.message)}</span>`; }
 }
 
