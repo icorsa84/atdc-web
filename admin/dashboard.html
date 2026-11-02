@@ -1800,7 +1800,7 @@ function _renderDetalle(p) {
       </div>
       <div class="field-row">
         <div class="field"><label>Sector</label>${_multiSelectConOtro('_d_sector', CATALOGO_SECTORES, p.sector || [])}</div>
-        <div class="field"><label>Renta objetivo</label>${_multiSelectConOtro('_d_renta', CATALOGO_RENTAS, p.renta_objetivo || [])}</div>
+        <div class="field"><label>Renta objetivo (líquida mensual${p.renta_objetivo_base === 'liquida' ? '' : ' · declarada antes sin indicar base'})</label>${_multiSelectConOtro('_d_renta', CATALOGO_RENTAS, p.renta_objetivo || [])}</div>
       </div>
       <div class="field-row">
         <div class="field">

@@ -1724,7 +1724,7 @@
       </div>
       <div class="s-row"><span class="s-key">Cargo objetivo</span><span class="s-val" id="sidePanelCargo">Jefe de Operaciones</span></div>
       <div class="s-row"><span class="s-key">Sector</span><span class="s-val" id="sidePanelSector">Retail / Logística</span></div>
-      <div class="s-row"><span class="s-key">Renta objetivo</span><span class="s-val" id="sidePanelRenta">$3.5M CLP</span></div>
+      <div class="s-row"><span class="s-key">Renta líquida objetivo</span><span class="s-val" id="sidePanelRenta">$3.5M CLP</span></div>
       <button id="btnAntecedentes" onclick="_abrirAntecedentes()" title="Cuéntanos tu situación para adaptar las recomendaciones"
         style="margin-top:8px;width:100%;padding:7px 10px;border-radius:8px;border:1px solid var(--border2);
         background:transparent;color:var(--text2);font-weight:600;font-size:.75rem;cursor:pointer;gap:6px;display:none;align-items:center;justify-content:center;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg> <span id="btnAntecedentesTxt">Mi situación</span></button>
@@ -2650,7 +2650,7 @@ function _mostrarOnboarding(planPreseleccionado) {
           <div style="margin-bottom:8px;">${_multiSelectConOtro('_ob_cargo', CATALOGO_CARGOS, [])}</div>
           <label style="display:block;font-size:11.5px;color:var(--muted);margin-bottom:3px;">Sector <span style="color:var(--red);">*</span></label>
           <div style="margin-bottom:8px;">${_multiSelectConOtro('_ob_sector', CATALOGO_SECTORES, [])}</div>
-          <label style="display:block;font-size:11.5px;color:var(--muted);margin-bottom:3px;">Renta objetivo <span style="color:var(--red);">*</span></label>
+          <label style="display:block;font-size:11.5px;color:var(--muted);margin-bottom:3px;">Renta líquida mensual que buscas <span style="color:var(--red);">*</span><span style="display:block;font-size:10.5px;color:var(--muted);margin-top:1px;">Lo que te llega a tu cuenta cada mes, después de AFP, salud e impuesto.</span></label>
           <div>${_multiSelectConOtro('_ob_renta', CATALOGO_RENTAS, [])}</div>
         </div>
       </div>
@@ -2781,7 +2781,7 @@ async function _registrarParticipante(plan) {
   // (el usuario puede elegir múltiples valores por campo)
   if (cargo_objetivo.length < 1) { _mostrarErrorAuth('Elige al menos un cargo objetivo.'); document.getElementById('_ob_cargo')?.focus(); return; }
   if (sector.length < 1)         { _mostrarErrorAuth('Elige al menos un sector.'); document.getElementById('_ob_sector')?.focus(); return; }
-  if (renta_objetivo.length < 1) { _mostrarErrorAuth('Elige al menos una renta objetivo.'); document.getElementById('_ob_renta')?.focus(); return; }
+  if (renta_objetivo.length < 1) { _mostrarErrorAuth('Elige la renta líquida mensual que buscas.'); document.getElementById('_ob_renta')?.focus(); return; }
 
   document.getElementById('_ob_error').style.display = 'none';
   if (btn) { btn.textContent = 'Creando tu cuenta…'; btn.disabled = true; }
@@ -4686,7 +4686,7 @@ Incorporar en la sección de experiencia del cargo más reciente, usando context
 **Nombre:** ${P.nombre}
 **Cargo objetivo:** ${P.cargo}
 **Sector:** ${P.sector}
-**Renta objetivo:** ${P.renta_objetivo}
+**Renta líquida objetivo:** ${P.renta_objetivo}
 
 **Perfil DISC — ${P.disc.codigo}:** ${P.disc.patron}
 
@@ -4747,7 +4747,7 @@ Empresas que valoran el perfil estructurado-orientado a resultados:
 **Nombre:** ${P.nombre}
 **Cargo objetivo:** ${P.cargo}
 **Sector:** ${P.sector}
-**Renta objetivo:** ${P.renta_objetivo} · Proceso día ${P.dia_proceso}
+**Renta líquida objetivo:** ${P.renta_objetivo} · Proceso día ${P.dia_proceso}
 
 **DISC — ${P.disc.codigo}:** ${P.disc.patron}
 
@@ -6723,7 +6723,7 @@ async function _abrirMiCuenta() {
     <div id="_mc_cargo_wrap" style="margin-bottom:8px;"></div>
     <label style="display:block;font-size:11.5px;color:var(--muted);margin-bottom:3px;">Sector</label>
     <div id="_mc_sector_wrap" style="margin-bottom:8px;"></div>
-    <label style="display:block;font-size:11.5px;color:var(--muted);margin-bottom:3px;">Renta objetivo</label>
+    <label style="display:block;font-size:11.5px;color:var(--muted);margin-bottom:3px;">Renta líquida mensual que buscas<span style="display:block;font-size:10.5px;color:var(--muted);margin-top:1px;">Lo que te llega a tu cuenta cada mes, después de AFP, salud e impuesto.</span></label>
     <div id="_mc_renta_wrap" style="margin-bottom:8px;"></div>
     <div id="_mc_perfil_msg" style="display:none;margin:4px 0 10px 0;padding:9px 12px;border-radius:7px;font-size:13px;"></div>
     <button id="_mc_guardar_btn" onclick="_guardarMiPerfil()" style="
