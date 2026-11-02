@@ -1805,6 +1805,13 @@
       </div>
     </div>
 
+    <!-- REQ-SIMULACION-01: próxima entrevista laboral (Profesional y Premium) -->
+    <div class="s-sec" id="secEntrevistaAgendada" style="display:none">
+      <div class="s-lbl">Mi próxima entrevista</div>
+      <div id="entrevistaAgendadaTxt" style="font-size:.78rem;color:var(--muted);margin-bottom:8px">¿Te llamaron a una entrevista? Regístrala y el agente te ayudará a prepararla.</div>
+      <button onclick="_abrirEntrevistaAgendada()" style="width:100%;padding:7px 10px;border-radius:8px;border:1px solid var(--border2);background:transparent;color:var(--text);font-weight:600;font-size:.78rem;cursor:pointer;">Registrar entrevista</button>
+    </div>
+
     <!-- SESIÓN CON EL CONSULTOR (solo Plan Premium) -->
     <div class="s-sec" id="premiumSesionSec" style="display:none">
       <div class="s-lbl" style="display:flex;align-items:center;gap:5px;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg> Sesión con el Consultor</div>
@@ -2935,6 +2942,7 @@ function _aplicarPerfilAlEstado(d) {
   if (Array.isArray(d.cv_versiones)) PARTICIPANTE.cv_versiones = d.cv_versiones;
   if (d.antecedentes && typeof d.antecedentes === 'object') PARTICIPANTE.antecedentes = d.antecedentes;
   if (typeof d.cv_versiones_limite === 'number') PARTICIPANTE.cv_versiones_limite = d.cv_versiones_limite;
+  if (d.entrevista_agendada && typeof d.entrevista_agendada === 'object') { PARTICIPANTE.entrevista_agendada = d.entrevista_agendada; try { _pintarEntrevistaAgendada(); } catch (e) {} }
   PARTICIPANTE.cargo          = d.cargo_objetivo || 'Por definir';
   PARTICIPANTE.sector         = d.sector || 'Por definir';
   PARTICIPANTE.renta_objetivo = d.renta_objetivo || 'Por definir';
@@ -5887,7 +5895,7 @@ function _aplicarGateoPorPlan() {
   // solo desde Profesional; el Informe Final no existe en el plan Inicial).
   const _r = PLAN_RESTRICCIONES[plan] || PLAN_RESTRICCIONES['Inicial'];
   const _tests = !!_r.tests_psicometricos || IS_ADMIN;
-  ['secDiagnostico', 'secKostick'].forEach(id => {
+  ['secDiagnostico', 'secKostick', 'secEntrevistaAgendada'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.style.display = _tests ? '' : 'none';
   });
@@ -6069,6 +6077,56 @@ window.addEventListener('resize', () => {
    ================================================================ */
 
 /* REQ-ANTECEDENTES: antecedentes personales y bienestar */
+/* REQ-SIMULACION-01: próxima entrevista laboral */
+function _pintarEntrevistaAgendada() {
+  const el = document.getElementById('entrevistaAgendadaTxt');
+  if (!el) return;
+  const e = PARTICIPANTE.entrevista_agendada || {};
+  const btn = el.parentElement.querySelector('button');
+  if (e.empresa) {
+    const f = e.fecha ? new Date(e.fecha + 'T12:00:00').toLocaleDateString('es-CL', { weekday: 'long', day: 'numeric', month: 'long' }) : '';
+    el.innerHTML = `<strong style="color:var(--text)">${escHtml(e.empresa)}</strong>${e.cargo ? ` · ${escHtml(e.cargo)}` : ''}${f ? `<br>${escHtml(f)}` : ''}${e.etapa ? ` · ${escHtml(e.etapa)}` : ''}`;
+    if (btn) btn.textContent = 'Editar entrevista';
+  } else {
+    el.textContent = '¿Te llamaron a una entrevista? Regístrala y el agente te ayudará a prepararla.';
+    if (btn) btn.textContent = 'Registrar entrevista';
+  }
+}
+function _abrirEntrevistaAgendada() {
+  const e = PARTICIPANTE.entrevista_agendada || {};
+  const est = 'width:100%;padding:8px 10px;border-radius:8px;border:1px solid var(--border2);background:var(--bg);color:var(--text);margin-bottom:10px;box-sizing:border-box;';
+  const lbl = (f, t) => `<label for="${f}" style="display:block;font-size:.78rem;font-weight:600;color:var(--text2);margin-bottom:4px;">${t}</label>`;
+  _modalPassword('_eaModal', `${icono('calendar',18)} Mi próxima entrevista`, `
+    <p style="font-size:.8rem;color:var(--muted);margin:0 0 12px;">El agente y tu Informe Final la usarán para prepararte para esa empresa y ajustar tu carta de presentación.</p>
+    ${lbl('_ea_empresa','Empresa')}<input id="_ea_empresa" maxlength="120" value="${escHtml(e.empresa || '')}" style="${est}">
+    ${lbl('_ea_cargo','Cargo al que postulas (opcional)')}<input id="_ea_cargo" maxlength="120" value="${escHtml(e.cargo || '')}" style="${est}">
+    ${lbl('_ea_fecha','Fecha (opcional)')}<input id="_ea_fecha" type="date" value="${escHtml(e.fecha || '')}" style="${est}">
+    ${lbl('_ea_etapa','Etapa (opcional)')}<input id="_ea_etapa" maxlength="60" value="${escHtml(e.etapa || '')}" placeholder="Ej.: primera entrevista, entrevista con gerencia" style="${est}">
+    <div id="_ea_msg" role="status" style="font-size:.78rem;margin-bottom:8px;"></div>
+    <div style="display:flex;gap:8px;">
+      <button onclick="_guardarEntrevistaAgendada()" style="flex:1;padding:9px 12px;border-radius:8px;border:none;background:var(--blue2);color:#fff;font-weight:700;cursor:pointer;">Guardar</button>
+      ${e.empresa ? `<button onclick="_guardarEntrevistaAgendada(true)" style="padding:9px 12px;border-radius:8px;border:1px solid var(--border2);background:transparent;color:var(--text);cursor:pointer;">Borrar</button>` : ''}
+    </div>`);
+  setTimeout(() => document.getElementById('_ea_empresa')?.focus(), 50);
+}
+async function _guardarEntrevistaAgendada(borrar) {
+  const v = id => borrar ? '' : (document.getElementById(id)?.value || '').trim();
+  const body = { empresa: v('_ea_empresa'), cargo: v('_ea_cargo'), fecha: v('_ea_fecha'), etapa: v('_ea_etapa') };
+  const msg = document.getElementById('_ea_msg');
+  if (!borrar && !body.empresa) { if (msg) { msg.textContent = 'Escribe el nombre de la empresa.'; msg.style.color = 'var(--amber)'; } return; }
+  try {
+    const r = await fetch(`${_BACKEND}/api/mi-perfil/entrevista-agendada`, { method: 'PUT',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${_obtenerToken()}` }, body: JSON.stringify(body) });
+    const d = await r.json();
+    if (!r.ok) throw new Error(_textoErrorApi(d.detail) || 'No se pudo guardar.');
+    PARTICIPANTE.entrevista_agendada = d.entrevista_agendada || {};
+    _pintarEntrevistaAgendada();
+    document.getElementById('_eaModal')?.remove();
+    agentMsg(borrar ? 'Listo, borré la entrevista registrada.' :
+      `✅ Registré tu entrevista en **${body.empresa}**. Cuando quieras, pídeme ayuda para prepararla.`);
+  } catch (e) { if (msg) { msg.textContent = e.message; msg.style.color = 'var(--amber)'; } }
+}
+
 async function _abrirAntecedentes() {
   let info;
   try {

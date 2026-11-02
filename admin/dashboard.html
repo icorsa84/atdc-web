@@ -1657,6 +1657,17 @@ async function _extenderAcceso(id) {
     cargarListado();
   } catch (e) { _mostrarMsg('_sop_msg', e.message, true); }
 }
+/* REQ-SIMULACION-01: próxima entrevista laboral del participante */
+async function _guardarEntrevistaAgendada(id, borrar) {
+  const val = k => borrar ? '' : (document.getElementById('_ea_' + k)?.value || '').trim();
+  const body = { empresa: val('empresa'), cargo: val('cargo'), fecha: val('fecha'), etapa: val('etapa') };
+  if (!borrar && !body.empresa) { _mostrarMsg('_ea_msg', 'Escribe al menos el nombre de la empresa.', true); return; }
+  try {
+    await _apiSend('PUT', `/api/admin/participantes/${id}/entrevista-agendada`, body);
+    _mostrarMsg('_ea_msg', borrar ? 'Entrevista borrada.' : 'Entrevista guardada.', false);
+    setTimeout(() => abrirDetalle(id), 600);
+  } catch (e) { _mostrarMsg('_ea_msg', e.message, true); }
+}
 /* REQ-ANTECEDENTES */
 const _ANT_TXT = {
   situacion: { cesante: 'Sin trabajo actualmente', empleado: 'Con trabajo, busca cambiar', independiente: 'Independiente', otra: 'Otra' },
@@ -1841,6 +1852,24 @@ function _renderDetalle(p) {
       <div class="sec-title">Informe Final</div>
       ${informe ? _htmlInformeAdmin(p, informe) : '<div style="color:var(--muted);font-size:12.5px;">Este participante aún no ha generado su Informe Final.</div>'}
     </div>
+
+    ${(p.plan === 'Profesional' || p.plan === 'Premium') ? (() => { const ea = (p.mercado && p.mercado.entrevista_agendada) || {}; return `
+    <div class="sec">
+      <div class="sec-title">Próxima entrevista laboral</div>
+      <div style="font-size:12.5px;color:var(--muted);margin-bottom:8px;">La usan el agente y el Informe Final (preparación para esa entrevista y carta de presentación). El participante también puede registrarla desde su proceso.</div>
+      <div class="field-row" style="margin-bottom:8px;">
+        <div class="field"><label for="_ea_empresa">Empresa</label><input id="_ea_empresa" maxlength="120" value="${escHtml(ea.empresa || '')}" placeholder="Ej.: Montajes Industriales del Norte"></div>
+        <div class="field"><label for="_ea_cargo">Cargo</label><input id="_ea_cargo" maxlength="120" value="${escHtml(ea.cargo || '')}" placeholder="Ej.: Gerente de Operaciones"></div>
+      </div>
+      <div class="field-row" style="margin-bottom:8px;">
+        <div class="field"><label for="_ea_fecha">Fecha</label><input id="_ea_fecha" type="date" value="${escHtml(ea.fecha || '')}"></div>
+        <div class="field"><label for="_ea_etapa">Etapa</label><input id="_ea_etapa" maxlength="60" value="${escHtml(ea.etapa || '')}" placeholder="Ej.: Segunda entrevista"></div>
+      </div>
+      <button class="btn-primary" onclick="_guardarEntrevistaAgendada('${escHtml(p.id)}')">${icono('check',14)} Guardar</button>
+      ${ea.empresa ? `<button class="btn-secondary" onclick="_guardarEntrevistaAgendada('${escHtml(p.id)}', true)">Borrar</button>` : ''}
+      ${ea.actualizado_en ? `<div style="font-size:11.5px;color:var(--muted);margin-top:6px;">Última actualización: ${escHtml(String(ea.actualizado_en).slice(0,16).replace('T',' '))} por ${ea.actualizado_por === 'admin' ? 'el consultor' : 'el participante'}</div>` : ''}
+      <div id="_ea_msg" class="msg"></div>
+    </div>`; })() : ''}
 
     <div class="sec">
       <div class="sec-title">Entrevistas por competencias analizadas</div>
