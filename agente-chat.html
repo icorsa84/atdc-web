@@ -1403,6 +1403,17 @@
 .test-result-chip.ot{border-color:#14B8A6;color:#5EEAD4}
 .test-result-chip.mr{border-color:#F97316;color:#FDBA74}
 .test-result-chip.rp{border-color:#6366F1;color:#A5B4FC}
+/* Kostick: grupos del informe del corrector */
+.kg{margin-bottom:7px}
+.kg-t{font-size:.66rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:3px}
+.kg-l{display:flex;flex-wrap:wrap;gap:4px}
+.kg-f{position:relative;overflow:hidden;display:inline-flex;align-items:center;gap:4px;min-width:42px;padding:3px 7px 5px;border:1px solid var(--border2);border-radius:6px;font-size:.74rem;color:var(--text);background:var(--bg3)}
+.kg-f b{color:var(--accent,#A78BFA)}
+.kg-f i{position:absolute;left:0;bottom:0;height:2px;background:var(--green)}
+.kg-f.crit{border-color:rgba(245,158,11,.6)}
+.kg-f.crit i{background:var(--amber)}
+.kg-vacio{font-size:.78rem;color:var(--muted)}
+.kostick-res{text-align:left;margin:10px 0}
 /* Indicador de estado en proceso-bar */
 .paso.test-pendiente{color:var(--amber)!important;border-color:rgba(245,158,11,.35)!important}
 /* Chip de inicio de test en chat */
@@ -1689,7 +1700,7 @@
           <div class="test-progress-fill" id="kostickProgressFill" style="width:0%"></div>
         </div>
         <div class="test-progress-lbl">
-          <span id="kostickProgressLbl">Par 1 de 90</span>
+          <span id="kostickProgressLbl">Ítem 1 de 90</span>
           <span id="kostickProgressPct">0%</span>
         </div>
       </div>
@@ -1786,27 +1797,8 @@
 
     <!-- KOSTICK -->
     <div class="s-sec" id="secKostick">
-      <div class="s-lbl">Kostick — Clusters</div>
-      <div class="s-bar">
-        <div class="s-bar-hdr"><span>Liderazgo (LD)</span><span id="skLD" style="color:var(--green);font-weight:700">7</span></div>
-        <div class="s-track"><div class="s-fill fill-hi" id="skbLD" style="width:78%"></div></div>
-      </div>
-      <div class="s-bar">
-        <div class="s-bar-hdr"><span>Rel. Interpersonales (RI)</span><span id="skRI" style="color:var(--amber);font-weight:700">5</span></div>
-        <div class="s-track"><div class="s-fill fill-mid" id="skbRI" style="width:55%"></div></div>
-      </div>
-      <div class="s-bar">
-        <div class="s-bar-hdr"><span>Orientación Tarea (OT)</span><span id="skOT" style="color:var(--green);font-weight:700">8</span></div>
-        <div class="s-track"><div class="s-fill fill-hi" id="skbOT" style="width:89%"></div></div>
-      </div>
-      <div class="s-bar">
-        <div class="s-bar-hdr"><span>Motivación (MR)</span><span id="skMR" style="color:var(--amber);font-weight:700">6</span></div>
-        <div class="s-track"><div class="s-fill fill-mid" id="skbMR" style="width:67%"></div></div>
-      </div>
-      <div class="s-bar">
-        <div class="s-bar-hdr"><span>Regulación (RP)</span><span id="skRP" style="color:var(--amber);font-weight:700">5</span></div>
-        <div class="s-track"><div class="s-fill fill-mid" id="skbRP" style="width:55%"></div></div>
-      </div>
+      <div class="s-lbl">Kostick — 20 factores (0 a 9)</div>
+      <div id="kostickPanel"><div class="kg-vacio">Sin evaluar.</div></div>
     </div>
 
     <!-- REQ-SIMULACION-01: próxima entrevista laboral (Profesional y Premium) -->
@@ -2399,7 +2391,7 @@ const PARTICIPANTE = {
   dia_proceso: 1,
   disc: { codigo: '—', patron: 'Sin evaluar' },
   ats_score: 0,
-  kostick: { ld: 0, ri: 0, ot: 0, mr: 0, rp: 0 },
+  kostick: {},
   entrevista: '',
   kw_faltantes: []
 };
@@ -2925,15 +2917,15 @@ async function _procesarRetornoGoogle() {
    (si no, se preservan los placeholders "Sin evaluar" / 0, que es el
    comportamiento correcto para quien de verdad no ha rendido el test). */
 function _kostickDesdeBackend(k) {
-  if (!k || !k.clusters) return null;
-  const c = k.clusters;
-  return {
-    ld: (c.LD && c.LD.score) || 0,
-    ri: (c.RI && c.RI.score) || 0,
-    ot: (c.OT && c.OT.score) || 0,
-    mr: (c.MR && c.MR.score) || 0,
-    rp: (c.RP && c.RP.score) || 0,
-  };
+  if (!k) return null;
+  if (k.escalas && Object.keys(k.escalas).length) {
+    const out = {};
+    Object.keys(KOSTICK_ESCALAS).forEach(l => out[l] = Number((k.escalas[l] || {}).score) || 0);
+    return out;
+  }
+  // Resultado de la versión anterior (5 clusters): se pide rendirlo de nuevo
+  const viejo = Object.values(k.clusters || {}).some(c => (c && c.score) > 0 && !(c.letras));
+  return viejo ? { _version_anterior: true } : null;
 }
 
 function _aplicarPerfilAlEstado(d) {
@@ -3419,14 +3411,14 @@ function _pasosProceso() {
   const pendMej = ult ? (ult.mejoras || []).filter(m => m.estado === 'pendiente').length : 0;
   const discOk = !!(P.disc && P.disc.natural && Object.values(P.disc.natural).some(v => v > 0));
   const k = P.kostick || {};
-  const kostOk = ['ld', 'ri', 'ot', 'mr', 'rp'].some(x => Number(k[x]) > 0);
+  const kostOk = _kostickCompleto(k);
   const ea = P.entrevista_agendada || {};
   const pasos = [
     { ok: (P.ats_score || 0) > 0 && vs.length > 0, txt: 'Sube tu CV con el botón **Subir mi CV** del panel lateral para conocer tu puntaje ATS.' },
     { ok: !pendMej, txt: `Revisa las **${pendMej} mejoras sugeridas** para tu CV (botón **Revisar mejoras sugeridas** del panel) y aprueba las que quieras aplicar.` },
     { ok: !!(P.antecedentes && P.antecedentes.situacion), txt: 'Cuéntame tu situación con el botón **Mi situación**: así ajusto metas y ritmo a tu realidad.' },
     { ok: discOk, txt: 'Haz el **test DISC** (unos 10 minutos) para conocer tu estilo de comportamiento laboral.' },
-    { ok: kostOk, txt: 'Haz el **test Kostick** para identificar tus competencias laborales más fuertes.' },
+    { ok: kostOk, txt: k._version_anterior ? 'Vuelve a rendir el **test Kostick**: ahora entrega tus 20 factores con la clave de corrección del consultor.' : 'Haz el **test Kostick** para conocer tus 20 factores de preferencias en el trabajo.' },
     { ok: !!P.mercado_analizado, txt: 'Revisa el **mercado laboral para tu perfil**: rangos de renta, empresas y portales.' },
   ];
   if (plan === 'Premium') {
@@ -3832,8 +3824,12 @@ function respuestaLocal(msg) {
   const t = msg.toLowerCase();
   if (/(disc|d6|dominancia|influencia|estabilidad|conciencia)/.test(t))
     return `Tu perfil DISC es **${CTX_LOCAL.disc_codigo}** — patrón **${CTX_LOCAL.disc_patron}**.\n\nD6 significa alta Dominancia: orientado a resultados, decisivo, toma iniciativa. C6 (Conciencia alta) lo complementa: analiza antes de decidir, riguroso con la calidad. Juntos forman el perfil ideal para Jefe de Operaciones.\n\n⚠️ Para interpretación detallada, conecta el servidor ATDC.`;
-  if (/(kostick|cluster|liderazgo|tarea|interpersonal)/.test(t))
-    return `Tu puntaje más alto en Kostick es **Orientación a la Tarea (OT: 8/9)** — riguroso, organizado, seguimiento. Tu cluster de Liderazgo (LD: 7/9) también es alto.\n\nÁrea de desarrollo: Relaciones Interpersonales (RI: 5/9). Prepara 2 ejemplos de trabajo colaborativo para compensarlo en entrevistas.`;
+  if (/(kostick|factor|liderazgo|tarea|interpersonal)/.test(t)) {
+    const km = _kostickMarcados(PARTICIPANTE.kostick, 3);
+    return km.length
+      ? `Tus factores Kostick más marcados son: ${km.map(l => `**${KOSTICK_ESCALAS[l]}** (${l} ${PARTICIPANTE.kostick[l]}/9)`).join(', ')}.\n\nCuando vuelva la conexión te doy la interpretación completa de los 20 factores.`
+      : 'Aún no tienes resultados Kostick. Puedes rendir el test desde el panel lateral.';
+  }
   if (/(cv|ats|palabras clave|keyword)/.test(t))
     return `Tu ATS está en **74/100** (objetivo 85+). Las palabras clave críticas que faltan son:\n- "gestión de inventarios"\n- "KPI logístico"\n- "mejora continua"\n- "planificación de demanda"\n\nIncorpóralas en la sección de experiencia de tu cargo más reciente.`;
   if (/(entrevista|walmart|preparar|presentar)/.test(t))
@@ -4432,7 +4428,7 @@ function generarInformeDesdeOverlay() {
 async function generarInforme() {
   // Fix QA-INFORME-01: el backend rechaza /api/informe-final con 400 para el
   // Plan Inicial (solo Esencial/Profesional/Premium lo incluyen) — pero ese
-  // 400 caía en el catch() de más abajo, que recurre a generarInformeFallback()
+  // 400 caía en el catch() de más abajo, que recurría al informe simulado local (ya eliminado)
   // para no dejar al usuario sin nada ante un fallo transitorio de la IA. El
   // resultado era que un participante del Plan Inicial SÍ obtenía un Informe
   // Final completo (generado localmente), saltándose por completo el gateo
@@ -4487,12 +4483,8 @@ async function generarInforme() {
 
   let informe;
   try {
-    if (modoOnline) {
-      informe = await llamarAPIInforme();
-    } else {
-      // Fallback local con simulación de pasos
-      informe = await generarInformeFallback();
-    }
+    if (!modoOnline) throw new Error('sin conexión');
+    informe = await llamarAPIInforme();
   } catch(e) {
     // Fix QA-PREMIUM-GATE-01: un 403 es un bloqueo deliberado del backend
     // (plan sin pago confirmado, o Premium sin entrevista por competencias
@@ -4514,10 +4506,10 @@ async function generarInforme() {
         </div>`;
       return;
     }
-    // REQ-INFORME-01: el informe Premium nunca se reemplaza por uno simulado
-    // (debe pasar por la revisión del consultor). Para los demás planes se
-    // mantiene el respaldo local, marcado como "Datos locales".
-    if (PARTICIPANTE.plan === 'Premium') {
+    // REQ-INFORME-01: ningún informe se reemplaza por uno simulado (el
+    // respaldo local inventaba empresa, puntajes y perfil); se avisa y se
+    // puede reintentar.
+    {
       cancelarTimersLoading();
       if (btnPrincipal) { btnPrincipal.classList.remove('generando'); btnPrincipal.disabled = false; }
       document.getElementById('informeBody').innerHTML = `
@@ -4528,8 +4520,6 @@ async function generarInforme() {
         </div>`;
       return;
     }
-    console.warn('Error API informe, usando fallback:', e.message);
-    informe = await generarInformeFallback();
   }
 
   informeGenerado = informe;
@@ -4634,259 +4624,6 @@ async function llamarAPIInforme() {
     throw e;
   }
   return await r.json();
-}
-
-/* ---- INFORME FALLBACK (estructura local por plan) ---- */
-async function generarInformeFallback() {
-  // Simular tiempo de generación
-  const delay = PARTICIPANTE.plan==='Premium' ? 4000 : PARTICIPANTE.plan==='Profesional' ? 2800 : 1800;
-  await new Promise(r=>setTimeout(r,delay));
-
-  const P = PARTICIPANTE;
-  const ts = new Date().toLocaleDateString('es-CL',{day:'2-digit',month:'long',year:'numeric'});
-
-  const base = {
-    plan: P.plan,
-    timestamp: Date.now(),
-    fecha: ts,
-    participante: P.nombre,
-    cargo: P.cargo,
-    fallback: true
-  };
-
-  if (P.plan === 'Esencial') {
-    return { ...base, secciones: [
-      { id:'cv', titulo:'Análisis del CV', icono:'📄', contenido: `
-**Puntaje ATS: ${P.ats_score}/100** — Nivel intermedio, requiere optimización.
-
-El CV presenta una estructura clara y experiencia relevante para el cargo de **${P.cargo}**, sin embargo no alcanza el umbral recomendado de 85 puntos para superar los filtros automáticos de la mayoría de los sistemas ATS (Sistema de Seguimiento de Candidatos) en empresas del sector ${P.sector}.
-
-**Fortalezas identificadas:**
-- Experiencia comprobada en gestión de equipos de operaciones
-- Logros cuantificables presentes en al menos 2 cargos anteriores
-- Coherencia entre objetivo de carrera y trayectoria
-
-**Brechas detectadas:**
-- Ausencia de palabras clave críticas del sector
-- Sección de habilidades técnicas no optimizada
-- Descripción del cargo actual demasiado genérica` },
-      { id:'kw', titulo:'Palabras Clave Prioritarias', icono:'🔑', contenido: `
-Las siguientes palabras clave deben incorporarse en el CV para mejorar el puntaje ATS:
-
-**Prioridad ALTA** (faltantes críticos):
-- "gestión de inventarios" — aparece en +78% de las ofertas del cargo
-- "KPI logístico" — criterio de filtro en Walmart, Falabella, Ripley
-- "mejora continua" — valorado en el sector retail/logística
-- "planificación de demanda" — diferenciador para cargos de jefatura
-
-**Recomendación de integración:**
-Incorporar en la sección de experiencia del cargo más reciente, usando contexto real de logros. Ejemplo: "Implementé sistema de **gestión de inventarios** reduciendo quiebre de stock 23%, usando **KPIs logísticos** semanales."` },
-      { id:'rec', titulo:'Recomendaciones', icono:'✅', contenido: `
-**Acciones prioritarias (próximos 5 días):**
-
-1. **Reescribir descripción del cargo actual** — Incluir las 4 palabras clave prioritarias con contexto de logros medibles
-2. **Agregar sección "Competencias técnicas"** — Lista de herramientas y metodologías (Excel avanzado, SAP, Lean, etc.)
-3. **Optimizar headline** — Cambiar a "Jefe de Operaciones | Retail & Logística | Gestión de inventarios y KPIs"
-4. **Revisar formato** — Asegurar que el CV sea legible por parsers ATS (sin tablas complejas, sin headers/footers)
-
-**Proyección post-optimización:** ATS estimado 87-91/100` }
-    ]};
-  }
-
-  if (P.plan === 'Profesional') {
-    return { ...base, secciones: [
-      { id:'perfil', titulo:'Perfil Integral', icono:'👤', contenido: `
-**Nombre:** ${P.nombre}
-**Cargo objetivo:** ${P.cargo}
-**Sector:** ${P.sector}
-**Renta líquida objetivo:** ${P.renta_objetivo}
-
-**Perfil DISC — ${P.disc.codigo}:** ${P.disc.patron}
-
-Tu perfil combina alta **Dominancia** con alta **Conciencia**, lo que te posiciona como un profesional exigente con los resultados y riguroso en la ejecución. Este patrón ${P.disc.patron} es especialmente valorado en jefaturas operativas de alta complejidad, donde se requiere tanto tomar decisiones rápidas como mantener estándares de calidad.
-
-**Kostick — Orientación dominante: Tarea (OT: ${P.kostick.ot}/9)**
-
-Tu mayor fortaleza psicológica es la orientación a la tarea: perseverante, metódico, con alta tolerancia a la presión. Complementado por un sólido perfil de liderazgo (LD: ${P.kostick.ld}/9), eres un ejecutor que también inspira a su equipo.` },
-      { id:'competencias', titulo:'Competencias Clave', icono:'⚡', contenido: `
-**Fortalezas diferenciadas:**
-
-- **Liderazgo operacional** — DISC ${P.disc.codigo.split('-')[0]} + Kostick LD${P.kostick.ld}: perfil de líder que toma decisiones y ejecuta con rigor
-- **Orientación a resultados** — El patrón ${P.disc.patron} indica que mides todo, buscas eficiencia y toleras mal la mediocridad
-- **Gestión de equipos bajo presión** — ${P.disc.codigo.split('-')[0]}-OT${P.kostick.ot} indica alta tolerancia al estrés productivo
-- **Análisis y control** — ${P.disc.codigo.split('-')[3]} + Kostick RP${P.kostick.rp}: estructura procesos, establece controles, verifica cumplimiento
-
-**Áreas de desarrollo:**
-
-- **Influencia y persuasión (${P.disc.codigo.split('-')[1]})** — Nivel moderado; en entrevistas y negociaciones, compensar con preparación de argumentos basados en datos
-- **Relaciones interpersonales (RI${P.kostick.ri})** — Preparar 2-3 ejemplos de trabajo colaborativo y gestión de conflictos para compensar en entrevistas
-- **Estabilidad bajo cambio (${P.disc.codigo.split('-')[2]})** — Nivel medio; frente a preguntas sobre adaptabilidad, enfatizar flexibilidad estratégica` },
-      { id:'mercado', titulo:'Posicionamiento de Mercado', icono:'📊', contenido: `
-**Cargo objetivo:** Jefe de Operaciones — ${P.sector}
-
-**Rango de renta estimado (mercado 2025-2026):**
-
-| Percentil | Renta bruta mensual |
-|-----------|---------------------|
-| P25 (entrada) | $2.800.000 – $3.200.000 CLP |
-| P50 (mercado) | $3.200.000 – $3.800.000 CLP |
-| P75 (senior) | $3.800.000 – $4.500.000 CLP |
-
-*Tu objetivo de ${P.renta_objetivo} se ubica en el rango P25-P50, lo que es alcanzable y razonable.*
-
-**Empresas objetivo por ajuste de perfil D/C:**
-
-Empresas que valoran el perfil estructurado-orientado a resultados:
-- **Walmart Chile / Lider** — Cultura de procesos y KPIs (muy compatible)
-- **Falabella Retail** — Alta demanda de gestión de inventarios y logística
-- **SMU (Unimarc)** — Procesos de mejora continua activos
-- **DHL / Fedex Chile** — Logística pura, requiere exactamente el perfil OT8
-
-**Nivel de competitividad:** Tu perfil DISC+Kostick es atractivo para el sector. El principal gap es el CV (ATS 74 vs. ideal 85+).` },
-      { id:'rec', titulo:'Próximos Pasos', icono:'🎯', contenido: `
-**Plan de acción — próximas 2 semanas:**
-
-1. **Optimizar CV** (días 1-3): Incorporar 4 palabras clave prioritarias + sección de habilidades técnicas → meta ATS 87+
-2. **Activar LinkedIn** (días 2-5): Actualizar headline con palabras clave; publicar 1 post de logro operacional para ampliar visibilidad
-3. **Postular con estrategia** (días 4-10): Priorizar Walmart Chile, Falabella, SMU. Postulación directa en sus portales de empleo + LinkedIn
-4. **Preparar entrevista** (días 5-10): Usar estructura STAR para los 3 ejemplos más fuertes (peak navideño, reducción de merma, gestión de equipo)
-5. **Red de contactos** (ongoing): Identificar 5 jefes de RRHH o gerentes de operaciones en LinkedIn de empresas objetivo` }
-    ]};
-  }
-
-  // Plan Premium — el más completo
-  return { ...base, secciones: [
-    { id:'perfil', titulo:'Perfil Integral Consolidado', icono:'👤', contenido: `
-**Nombre:** ${P.nombre}
-**Cargo objetivo:** ${P.cargo}
-**Sector:** ${P.sector}
-**Renta líquida objetivo:** ${P.renta_objetivo} · Proceso día ${P.dia_proceso}
-
-**DISC — ${P.disc.codigo}:** ${P.disc.patron}
-
-Tu combinación D6-C6 define a un profesional orientado a resultados con rigor analítico. En el contexto del cargo de **${P.cargo}** en el sector **${P.sector}**, este perfil es altamente compatible con las demandas del mercado: capacidad de tomar decisiones bajo presión, rigor en el control de procesos y orientación a KPIs.
-
-La tensión natural de este perfil (Dominancia vs. Conciencia) puede manifestarse en sobreexigencia propia o con el equipo. Consciente de esto, ${P.nombre.split(' ')[0]} ha demostrado capacidad reflexiva durante el proceso.
-
-**Kostick — Vector dominante: OT${P.kostick.ot} / LD${P.kostick.ld}**
-
-Perfil ejecutor-líder. Alta orientación a la tarea con liderazgo funcional establecido. El área de desarrollo más relevante es RI${P.kostick.ri} (Relaciones Interpersonales), aspecto que debe compensarse con narrativa en entrevistas.` },
-    { id:'cv', titulo:'CV y Posicionamiento ATS', icono:'📄', contenido: `
-**Puntaje ATS actual: ${P.ats_score}/100** — Gap de 11 puntos hacia el umbral recomendado (85+).
-
-El CV tiene bases sólidas con logros cuantificables en al menos 2 posiciones anteriores. La brecha principal no es de contenido sino de **optimización de lenguaje**: el sistema ATS penaliza la ausencia de términos específicos del sector.
-
-**Palabras clave críticas faltantes:**
-- "gestión de inventarios" — presencia requerida en 78% de las JDs (Descripciones de Trabajo) objetivo
-- "KPI logístico" / "indicadores de gestión" — filtro en empresas Tier 1 del sector
-- "mejora continua" / "Lean" — valorado especialmente en retail
-- "planificación de demanda" — diferenciador para Jefaturas senior
-
-**Proyección post-optimización:** ATS estimado 87-93/100
-
-**Acciones concretas:**
-1. Reescribir bullet principal del cargo actual incorporando las 4 KW
-2. Crear sección "Stack técnico" (SAP, Excel avanzado, herramientas de BI)
-3. Optimizar headline: "Jefe de Operaciones | Retail & Logística | KPIs | Mejora Continua"` },
-    { id:'disc_kostick', titulo:'Análisis Psicométrico Integrado', icono:'🧠', contenido: `
-**Integración DISC + Kostick — Síntesis ejecutiva:**
-
-El cruce de ambas evaluaciones confirma un perfil coherente:
-
-| Dimensión | DISC | Kostick | Síntesis |
-|-----------|------|---------|---------|
-| Liderazgo | D6 (alto) | LD7 (alto) | Liderazgo operacional establecido |
-| Resultados | D6 | OT8 | Orientación a tarea muy alta |
-| Análisis | C6 | RP5 | Rigor analítico con capacidad regulatoria |
-| Influencia | I4 (medio) | RI5 (medio) | Área de desarrollo — compensar en entrevistas |
-| Estabilidad | S5 (medio) | MR6 (medio-alto) | Motivación sostenida, adaptabilidad funcional |
-
-**Implicancias para el cargo objetivo:**
-
-El perfil es altamente compatible con Jefaturas de Operaciones en retail/logística. El patrón D-C con OT alto indica un profesional que estructura bien los procesos, mide resultados y tolera la presión operacional del sector.
-
-**Recomendación de posicionamiento:**
-En entrevistas, usar la narrativa "orientación a resultados con rigor de proceso" como hilo conductor. Compensar el I4-RI5 con ejemplos explícitos de gestión de equipos y resolución de conflictos.` },
-    { id:'mercado', titulo:'Posicionamiento de Mercado y Renta', icono:'📊', contenido: `
-**Mercado laboral — ${P.cargo} · ${P.sector} · Chile 2025-2026:**
-
-**Rangos de renta bruta mensual:**
-
-| Segmento | Renta mensual | Contexto |
-|----------|---------------|---------|
-| Entrada (P25) | $2.800.000 – $3.200.000 | Empresa mediana, sector secundario |
-| Mercado (P50) | $3.200.000 – $3.800.000 | Retail establecido, logística regional |
-| Senior (P75) | $3.800.000 – $4.500.000 | Empresa grande, proceso complejo |
-| Top (P90+) | $4.500.000+ | Multinacional, gerencia funcional |
-
-*Tu objetivo (${P.renta_objetivo}) se ubica en el rango P25-P50, que es alcanzable con tu experiencia y perfil.*
-
-**Empresas objetivo con mejor fit de perfil D/C-OT8:**
-
-1. **Walmart Chile / Lider** — Cultura KPI-driven, valora el perfil estructurado (entrevista activa)
-2. **Falabella** — Operaciones complejas, gestión de inventarios central
-3. **SMU Group** — Procesos de mejora continua activos, perfil Lean demandado
-4. **SOPROLE / Nestlé Chile** — Logística de consumo masivo
-5. **DHL Supply Chain Chile** — Logística pura, perfil OT8 ideal
-
-**Oportunidad de diferenciación:** Tu combinación D6+C6+OT8 es un perfil escaso en el mercado. Pocas personas tienen tanto la capacidad de decisión rápida (D) como el rigor en la ejecución (C+OT).` },
-    { id:'entrevista', titulo:'Análisis de Preparación para Entrevista', icono:'🎤', contenido: `
-**Entrevista programada:** ${P.entrevista}
-
-**Análisis de ajuste perfil ↔ empresa:**
-
-Walmart Chile busca perfiles con orientación a procesos, capacidad de trabajo bajo presión y experiencia en KPIs de inventario. Tu perfil DISC D/C y Kostick OT8 encaja directamente con esta demanda.
-
-**Narrativa recomendada para la entrevista:**
-
-*"Soy un jefe de operaciones que combina orientación a resultados (D/C) con rigor en la ejecución. Mi foco está en los KPIs operacionales y en construir procesos que funcionen incluso cuando no estoy presente."*
-
-**3 ejemplos STAR preparados:**
-
-1. **Peak navideño 2024** → liderazgo bajo presión extrema, equipo de 62 personas → resultado de quiebre de stock reducido
-2. **Reducción de merma 18%** → proceso de control que implementaste → impacto financiero cuantificable
-3. **Implementación de sistema de inventarios** → cambio de proceso → adopción del equipo y resultados medibles
-
-**Preguntas difíciles y respuestas recomendadas:**
-
-- *"¿Cuál es tu mayor debilidad?"* → "Tiendo a ser muy exigente con los procesos — lo compenso con comunicación clara de expectativas y revisiones periódicas con mi equipo."
-- *"¿Cómo manejas conflictos en el equipo?"* → Usar ejemplo 3 (gestión de cambio) que muestra RI aunque no sea tu perfil dominante.` },
-    { id:'plan_accion', titulo:'Plan de Acción Personalizado', icono:'🎯', contenido: `
-**Plan de acción — próximas 3 semanas:**
-
-**Semana 1 — Optimización:**
-- [ ] Días 1-2: Reescribir CV con 4 palabras clave prioritarias → validar ATS target 87+
-- [ ] Días 2-3: Actualizar LinkedIn headline + sección "Acerca de" con narrativa D/C
-- [ ] Días 3-5: Preparar 3 ejemplos STAR completos (peak navideño, merma, sistema)
-
-**Semana 2 — Activación:**
-- [ ] Postular activamente a Walmart Chile, Falabella, SMU (portales + LinkedIn)
-- [ ] Contactar 3-5 reclutadores de operaciones/logística en LinkedIn (mensaje personalizado)
-- [ ] Investigar proyectos recientes de Walmart Chile (apertura de tiendas, iniciativas logísticas)
-
-**Semana 3 — Preparación entrevista:**
-- [ ] Simular entrevista con foco en compensar RI5 (ejemplos de trabajo en equipo)
-- [ ] Preparar preguntas inteligentes para hacerle al entrevistador
-- [ ] Revisar noticias y contexto de Walmart Chile (cultura, proyectos, resultados)
-
-**Indicadores de éxito:**
-- ATS ≥ 87/100 antes de postular
-- 3+ entrevistas en las primeras 2 semanas de postulación activa
-- Renta negociada ≥ $3.500.000 CLP` },
-    { id:'revision', titulo:'Estado de Revisión', icono:'🔍', contenido: `
-**Este informe está sujeto a revisión humana por tu Consultor antes de la entrega final.**
-
-El informe fue generado automáticamente integrando tus evaluaciones DISC (${P.disc.codigo}), Kostick, puntaje ATS (${P.ats_score}/100) y datos de mercado disponibles.
-
-**Proceso de validación Premium:**
-1. ✓ Generación automática — completada
-2. ⟳ Revisión por el consultor — pendiente
-3. ○ Entrega validada al participante — pendiente
-
-El consultor puede complementar, ajustar o agregar observaciones basadas en su interacción directa contigo durante el proceso. El informe revisado te será enviado directamente.
-
-**Si tienes preguntas antes de recibir el informe validado**, puedes preguntarle al agente ATDC o comunicarte directamente con tu Consultor.` }
-  ]};
 }
 
 /* ---- RENDERIZAR INFORME COMPLETO ---- */
@@ -5697,8 +5434,8 @@ function exportarInformePDF() {
     : (_nat && Object.values(_nat).some(v => v > 0)) ? Object.entries(_nat).sort((a, b) => b[1] - a[1]).slice(0, 2).map(e => e[0]).join('') : '';
   const discPat = (P.disc && P.disc.patron && P.disc.patron !== 'Sin evaluar') ? escHtml(String(P.disc.patron).split('—')[0].trim()) : '';
   const k = P.kostick || {};
-  const kMax = Object.entries({ 'Liderazgo': k.ld, 'Relaciones': k.ri, 'Orientación a la tarea': k.ot, 'Motivación': k.mr, 'Regulación': k.rp })
-    .filter(([, v]) => Number(v) > 0).sort((a, b) => b[1] - a[1])[0];
+  const _km = _kostickMarcados(k, 1)[0];
+  const kMax = _km ? [escHtml(KOSTICK_ESCALAS[_km]), k[_km]] : null;
   const indicador = (v, t) => v ? `<div class="ind"><b>${v}</b><span>${t}</span></div>` : '';
 
   // Estilos comunes a los tres niveles
@@ -7820,19 +7557,7 @@ async function init() {
       });
     }
     // --- Kostick ---
-    const kost = P.kostick;
-    const kostMax = 9;
-    const pctK = v => Math.min(100, Math.round((v/kostMax)*100));
-    const colorK = v => v >= 7 ? 'var(--green)' : 'var(--amber)';
-    [['LD',kost.ld],['RI',kost.ri],['OT',kost.ot],['MR',kost.mr],['RP',kost.rp]].forEach(([k,v]) => {
-      const sp = document.getElementById(`sk${k}`);
-      if (sp) { sp.textContent = v; sp.style.color = colorK(v); }
-      const bar = document.getElementById(`skb${k}`);
-      if (bar) {
-        bar.style.width = `${pctK(v)}%`;
-        bar.className = 's-fill ' + (v >= 7 ? 'fill-hi' : 'fill-mid');
-      }
-    });
+    kostickActualizarPanel();
   } catch(e) { console.warn('ATDC CHAT-UX-01: error sincronizando panel lateral', e); }
 
   // Verificar conexión
@@ -8239,125 +7964,108 @@ const DISC_ITEMS = [
 ];
 
 /* ================================================================
-   MÓDULO KOSTICK PAPI-I — 90 PARES A/B
+   MÓDULO KOSTICK PAPI — 90 ÍTEMS A/B
+   Letras, clave de corrección (qué letra suma cada opción), grupos y
+   rangos tomados del corrector del consultor (Corrector DISC - Kostick).
+   Cada factor tiene 9 ítems: puntaje 0 a 9; los 20 suman 90.
+   El servidor vuelve a corregir con la misma clave (kostick_papi.py).
    ================================================================ */
-/* Escalas: N(Necesidad de ser notado), G(Necesidad de ser directivo),
-   A(Necesidad de logro), B(Control de detalle), C(Trabajo organizado),
-   S(Velocidad de trabajo), P(Búsqueda de orden), K(Autoridad),
-   F(Conformidad), T(Dureza), V(Vigor), X(Evaluación práctica),
-   W(Necesidad de pertenencia), E(Apoyo emocional), L(Empatía),
-   I(Orientación al papel), O(Liderazgo estilo laissez-faire),
-   R(Búsqueda de relaciones cercanas), Z(Necesidad de certeza), D(Toma de decisiones) */
-const KOSTICK_ESCALAS = {
-  N:'Necesidad de ser notado',G:'Necesidad liderazgo directivo',A:'Necesidad de logro',
-  B:'Control de detalle',C:'Trabajo organizado',S:'Velocidad de trabajo',
-  P:'Búsqueda de orden',K:'Respeto a la autoridad',F:'Conformidad con normas',
-  T:'Dureza interpersonal',V:'Vigor y energía',X:'Evaluación práctica',
-  W:'Necesidad de pertenencia',E:'Apoyo emocional al equipo',L:'Empatía',
-  I:'Orientación al rol formal',O:'Estilo laissez-faire',R:'Relaciones cercanas',
-  Z:'Necesidad de certeza',D:'Toma de decisiones'
-};
-// Clusters (5 áreas)
-const KOSTICK_CLUSTERS = {
-  LD: ['G','D','A','K','F'],   // Liderazgo
-  RI: ['N','W','E','L','R'],   // Rel. Interpersonales
-  OT: ['V','X','I','B','C'],   // Orientación Tarea
-  MR: ['S','P','Z','T','O'],   // Motivación y Regulación
-  RP: ['A','V','D','N','G']    // Rendimiento Personal (comparte algunas)
-};
-
-// 90 pares A/B (escala_A, escala_B, txt_A, txt_B)
+const KOSTICK_ESCALAS = {"N": "Necesidad de Acabar una Labor", "G": "Necesidad de Trabajar Duro e Intensamente", "A": "Necesidad de Realización en el Trabajo", "L": "Rol de Dirigente (Liderazgo)", "P": "Necesidad de controlar a otras personas", "I": "Capacidad para Tomar Decisiones", "T": "Tipo en “Movimiento”", "V": "Tipo Vigoroso", "X": "Necesidad de Ser Notado", "S": "Expansión Social (Sociable)", "B": "Necesidad de Pertenecer a Grupos", "O": "Necesidad de Intimidad y Afecto", "R": "Tipo Teórico", "D": "Interés en Trabajar con Detalle", "C": "Tipo Organizado", "Z": "Necesidad de cambio (+) o de que las cosas sigan igual (-)", "E": "Tipo Emocionalmente Controlado", "K": "Necesidad de Agresividad Defensiva (+) / Pasivo (-)", "F": "Necesidad de Consultar con Superiores", "W": "Necesidad de Normas y Supervisión"};
+const KOSTICK_TIPO = {"N": "Necesidad", "G": "Rol", "A": "Necesidad", "L": "Rol", "P": "Necesidad", "I": "Rol", "T": "Rol", "V": "Rol", "X": "Necesidad", "S": "Rol", "B": "Necesidad", "O": "Necesidad", "R": "Rol", "D": "Rol", "C": "Rol", "Z": "Necesidad", "E": "Rol", "K": "Necesidad", "F": "Necesidad", "W": "Necesidad"};
+const KOSTICK_GRUPOS = [["Capacidad de trabajo", ["N", "G", "A"]], ["Dotes de mando", ["L", "P", "I"]], ["Dinamismo", ["T", "V"]], ["Sociabilidad", ["X", "S", "B", "O"]], ["Actitud ante el trabajo", ["R", "D", "C"]], ["Naturaleza emocional", ["Z", "E"]], ["Subordinación", ["K", "F", "W"]]];
+const KOSTICK_RANGO = {"G": [1, 8], "O": [1, 7], "A": [1, 8], "R": [1, 8], "L": [1, 8], "D": [3, 7], "P": [1, 7], "C": [3, 8], "I": [1, 8], "Z": [3, 8], "T": [1, 8], "E": [3, 8], "V": [1, 8], "K": [2, 7], "X": [1, 8], "F": [2, 7], "S": [1, 8], "W": [3, 8], "B": [1, 8], "N": [2, 8]};
+// 90 ítems: a/b = letra que suma cada opción según el corrector
 const KOSTICK_PARES = [
-  {a:'N',b:'G',tA:'Me gusta ser reconocido por mis logros',tB:'Prefiero dar instrucciones al equipo'},
-  {a:'A',b:'B',tA:'Me fijo metas exigentes para superarme',tB:'Cuido mucho los detalles en mi trabajo'},
-  {a:'C',b:'S',tA:'Organizo mis tareas antes de ejecutarlas',tB:'Prefiero trabajar rápido aunque deba reajustar'},
-  {a:'P',b:'K',tA:'Necesito que todo esté ordenado y claro',tB:'Respeto y sigo las instrucciones de mis superiores'},
-  {a:'F',b:'T',tA:'Cumplo las normas aunque no las comparta',tB:'Soy directo incluso si eso incomoda a alguien'},
-  {a:'V',b:'X',tA:'Trabajo con alta energía durante todo el día',tB:'Evalúo opciones antes de comprometerme'},
-  {a:'W',b:'E',tA:'Prefiero trabajar en equipo que solo',tB:'Apoyo emocionalmente a mis compañeros'},
-  {a:'L',b:'I',tA:'Me importa entender cómo se sienten los demás',tB:'Cumplo bien mi rol antes de ir más allá'},
-  {a:'O',b:'R',tA:'Dejo que el equipo tome sus propias decisiones',tB:'Construyo relaciones personales sólidas'},
-  {a:'Z',b:'D',tA:'Necesito información suficiente antes de actuar',tB:'Tomo decisiones con agilidad'},
-  {a:'G',b:'A',tA:'Me gusta dirigir y orientar a otros',tB:'Me enfoco en superar mis propios récords'},
-  {a:'B',b:'C',tA:'Reviso mi trabajo antes de entregarlo',tB:'Planifico mis actividades con anticipación'},
-  {a:'S',b:'P',tA:'Soy ágil y eficiente con mi tiempo',tB:'Busco que los procesos sean predecibles'},
-  {a:'K',b:'F',tA:'Sigo las decisiones de quienes mandan',tB:'Prefiero regirme por las reglas establecidas'},
-  {a:'T',b:'V',tA:'No me afecta el rechazo de otros',tB:'Mantengo alta energía en situaciones difíciles'},
-  {a:'X',b:'W',tA:'Soy pragmático al evaluar alternativas',tB:'Valoro el sentido de pertenencia al grupo'},
-  {a:'E',b:'L',tA:'Brindo apoyo cuando el equipo lo necesita',tB:'Entiendo y valido las emociones ajenas'},
-  {a:'I',b:'O',tA:'Cumplo con mi rol de manera consistente',tB:'Permito que el equipo sea autónomo'},
-  {a:'R',b:'Z',tA:'Disfruto las relaciones personales profundas',tB:'Me incomoda la ambigüedad o incertidumbre'},
-  {a:'D',b:'N',tA:'Decido sin demora cuando es necesario',tB:'Busco visibilidad y reconocimiento'},
-  {a:'I',b:'R',tA:'Defino bien mi función y la cumplo',tB:'Invierto en relaciones laborales cercanas'},
-  {a:'D',b:'O',tA:'Tomo decisiones con rapidez y confianza',tB:'Delego y doy espacio a la iniciativa propia'},
-  {a:'Z',b:'N',tA:'Prefiero certeza antes de comprometerme',tB:'Busco ser visible en mi organización'},
-  {a:'G',b:'D',tA:'Me satisface coordinar y dar dirección',tB:'Tomo la iniciativa en decisiones clave'},
-  {a:'A',b:'C',tA:'Me propongo metas altas y las persigo',tB:'Trabajo de manera organizada y planificada'},
-  {a:'B',b:'S',tA:'Soy cuidadoso con los errores',tB:'Priorizo la velocidad de ejecución'},
-  {a:'L',b:'O',tA:'Me preocupo por el bienestar de los demás',tB:'Facilito la autonomía en mi equipo'},
-  {a:'D',b:'A',tA:'Actúo con rapidez ante oportunidades',tB:'Me motivo al superar mis propios límites'},
-  {a:'G',b:'C',tA:'Me agrada liderar iniciativas',tB:'Planificar me da seguridad y control'},
-  {a:'B',b:'P',tA:'Detecto errores antes de que escalen',tB:'Me molesta el desorden y la falta de método'},
-  {a:'S',b:'F',tA:'Soy eficiente y no me demoro en exceso',tB:'Cumplo con las normas sin cuestionarlas'},
-  {a:'K',b:'T',tA:'Me apoyo en la autoridad para decidir',tB:'Soy directo y sin rodeos'},
-  {a:'V',b:'W',tA:'Mantengo altos niveles de actividad',tB:'Prefiero los entornos colaborativos'},
-  {a:'E',b:'X',tA:'Brindo apoyo emocional activamente',tB:'Busco soluciones prácticas y eficientes'},
-  {a:'L',b:'Z',tA:'Empatizo fácilmente con los demás',tB:'Necesito claridad antes de avanzar'},
-  {a:'I',b:'N',tA:'Cumplo mi función con precisión',tB:'Valoro el reconocimiento externo'},
-  {a:'R',b:'A',tA:'Valoro las relaciones sobre los logros',tB:'Mi principal motor es alcanzar metas'},
-  {a:'Z',b:'G',tA:'Me incomoda actuar en la incertidumbre',tB:'Me siento bien al dirigir a otros'},
-  {a:'C',b:'K',tA:'Organizo mi agenda con antelación',tB:'Sigo las directrices de quienes lideran'},
-  {a:'B',b:'T',tA:'Soy meticuloso y cuidadoso en mis entregas',tB:'Digo lo que pienso aunque sea difícil'},
-  {a:'S',b:'V',tA:'Termino las tareas rápidamente',tB:'Mantengo energía y empuje en el trabajo'},
-  {a:'P',b:'F',tA:'Trabajo mejor con procesos claros',tB:'Me apego a las políticas de la empresa'},
-  {a:'N',b:'E',tA:'Disfruto ser reconocido por mis aportes',tB:'Me satisface apoyar a los demás'},
-  {a:'W',b:'L',tA:'El trabajo en equipo me energiza',tB:'Comprender a las personas es clave para mí'},
-  {a:'O',b:'Z',tA:'Me gusta que el equipo sea autónomo',tB:'Prefiero tener certeza antes de delegar'},
-  {a:'X',b:'A',tA:'Evalúo opciones antes de comprometerme',tB:'Busco logros concretos y medibles'},
-  {a:'T',b:'W',tA:'Puedo ser contundente cuando es necesario',tB:'Valoro mucho pertenecer a un equipo'},
-  {a:'V',b:'P',tA:'Soy activo y energético',tB:'Necesito orden y estructura para funcionar bien'},
-  {a:'K',b:'B',tA:'Respeto la autoridad en la organización',tB:'Cuido los detalles de cada entrega'},
-  {a:'F',b:'L',tA:'Sigo las normas de la empresa fielmente',tB:'La empatía guía mis relaciones laborales'},
-  {a:'G',b:'O',tA:'Disfruto dar dirección a mi equipo',tB:'Prefiero que el equipo se autogestione'},
-  {a:'A',b:'E',tA:'El logro personal me motiva profundamente',tB:'Me importa el bienestar del equipo'},
-  {a:'Z',b:'I',tA:'Necesito información antes de actuar',tB:'Me enfoco en cumplir mi rol'},
-  {a:'R',b:'T',tA:'Construyo relaciones de confianza',tB:'Puedo ser duro si la situación lo requiere'},
-  {a:'W',b:'S',tA:'Trabajo mejor con otros',tB:'Soy rápido y eficiente'},
-  {a:'X',b:'C',tA:'Tomo decisiones pragmáticas',tB:'Planifico y organizo con detalle'},
-  {a:'E',b:'K',tA:'Apoyo emocionalmente a mi equipo',tB:'Sigo las directrices jerárquicas'},
-  {a:'I',b:'D',tA:'Cumplo bien el rol que me asignaron',tB:'Tomo decisiones de forma ágil'},
-  {a:'O',b:'N',tA:'Doy autonomía a quienes trabajan conmigo',tB:'Quiero que reconozcan mis contribuciones'},
-  {a:'R',b:'G',tA:'Valoro las relaciones personales en el trabajo',tB:'Me gusta liderar y dar dirección'},
-  {a:'Z',b:'A',tA:'La certeza es importante para mí',tB:'Me desafío con metas cada vez más altas'},
-  {a:'V',b:'F',tA:'Tengo mucha energía para trabajar',tB:'Sigo las normas de la empresa'},
-  {a:'T',b:'E',tA:'Soy directo aunque incomode a alguien',tB:'Me preocupa el bienestar del equipo'},
-  {a:'P',b:'W',tA:'Necesito procesos claros y ordenados',tB:'El equipo es mi fuente de energía'},
-  {a:'N',b:'L',tA:'Busco reconocimiento en mi trabajo',tB:'Me importa cómo se sienten los demás'},
-  {a:'G',b:'X',tA:'Lidero con dirección y claridad',tB:'Evalúo las cosas de forma objetiva'},
-  {a:'A',b:'K',tA:'Me fijo metas exigentes',tB:'Respeto la jerarquía de la organización'},
-  {a:'B',b:'O',tA:'Reviso los detalles cuidadosamente',tB:'Prefiero la autonomía del equipo'},
-  {a:'S',b:'R',tA:'Trabajo con velocidad y eficiencia',tB:'Las relaciones cercanas son importantes para mí'},
-  {a:'C',b:'T',tA:'Organizo bien mi trabajo',tB:'Soy directo y honesto'},
-  {a:'P',b:'E',tA:'Necesito orden para trabajar bien',tB:'Apoyo a mi equipo emocionalmente'},
-  {a:'K',b:'W',tA:'Respeto la autoridad formal',tB:'Disfruto del trabajo en equipo'},
-  {a:'T',b:'Z',tA:'Soy directo incluso si incomoda',tB:'Prefiero certeza y claridad'},
-  {a:'A',b:'F',tA:'Me propongo metas exigentes cada año',tB:'Sigo las normas establecidas por la organización'},
-  {a:'A',b:'I',tA:'Me esfuerzo por superar mis propios récords',tB:'Cumplo mi rol con responsabilidad antes de relacionarme'},
-  {a:'A',b:'L',tA:'Busco resultados concretos y medibles',tB:'Comprendo a las personas antes de juzgarlas'},
-  {a:'A',b:'N',tA:'Quiero logros que me diferencien',tB:'Me importa que mi aporte sea reconocido'},
-  {a:'A',b:'O',tA:'Me pongo a prueba con objetivos desafiantes',tB:'Prefiero que el equipo tome las decisiones importantes'},
-  {a:'A',b:'P',tA:'Avanzo aunque no tenga todo planificado',tB:'Me tranquiliza tener una estructura clara antes de actuar'},
-  {a:'A',b:'S',tA:'Actúo con urgencia cuando hay una meta',tB:'Prefiero avanzar a ritmo constante y sostenido'},
-  {a:'A',b:'W',tA:'Los retos personales me motivan más que el equipo',tB:'Trabajar en equipo es lo que más me satisface'},
-  {a:'B',b:'D',tA:'Verifico los detalles antes de tomar decisiones',tB:'Tomo decisiones rápidas con la información disponible'},
-  {a:'B',b:'E',tA:'Cuido la calidad de cada entrega',tB:'Me importa el bienestar de mis compañeros'},
-  {a:'B',b:'G',tA:'Soy preciso y minucioso en mis tareas',tB:'Me gusta orientar y dirigir a los demás'},
-  {a:'B',b:'I',tA:'Analizo cuidadosamente antes de actuar',tB:'Priorizo cumplir bien mi función asignada'},
-  {a:'B',b:'N',tA:'La exactitud en mi trabajo me define',tB:'Necesito que mi trabajo sea visible y valorado'},
-  {a:'B',b:'R',tA:'Prefiero calidad sobre velocidad',tB:'Las relaciones laborales son mi mayor fortaleza'},
-  {a:'B',b:'V',tA:'Reviso hasta el último detalle',tB:'Mantengo el ritmo alto durante toda la jornada'},
-  {a:'B',b:'W',tA:'Trabajo mejor de forma individual y metódica',tB:'Rindo más cuando colaboro con otros'},
-  {a:'T',b:'A',tA:'Puedo ser frontal incluso si genera tensión',tB:'Me enfoco en alcanzar metas concretas'}
+  {a:'G',b:'E',tA:"Trabajo duro, sin escatimar esfuerzo",tB:"Mantengo la calma aunque esté molesto"},
+  {a:'A',b:'N',tA:"Quiero destacar en lo que hago",tB:"Termino lo que empiezo antes de pasar a otra cosa"},
+  {a:'P',b:'A',tA:"Me gusta orientar a otros sobre cómo hacer su trabajo",tB:"Me pongo metas altas"},
+  {a:'X',b:'P',tA:"Me gusta que noten mi trabajo",tB:"Me hago responsable del desempeño de las personas a mi cargo"},
+  {a:'B',b:'X',tA:"Me gusta sentirme parte de un grupo",tB:"Disfruto ser el centro de atención"},
+  {a:'O',b:'B',tA:"Me importa caerles bien a mis compañeros",tB:"Prefiero trabajar en equipo antes que solo"},
+  {a:'Z',b:'O',tA:"Me gustan los cambios y las cosas nuevas",tB:"Establezco relaciones cercanas con las personas con que trabajo"},
+  {a:'K',b:'Z',tA:"Defiendo mis ideas con firmeza",tB:"Me aburre la rutina"},
+  {a:'F',b:'K',tA:"Consulto con mi jefe antes de tomar decisiones importantes",tB:"Digo lo que pienso aunque genere discusión"},
+  {a:'W',b:'F',tA:"Me gusta seguir las normas y procedimientos",tB:"Me importa contar con la aprobación de mi superior"},
+  {a:'G',b:'C',tA:"Me motivan los trabajos que exigen gran esfuerzo",tB:"Mantengo mi trabajo ordenado"},
+  {a:'L',b:'E',tA:"Asumo el liderazgo del grupo con naturalidad",tB:"No dejo que mis emociones se noten en el trabajo"},
+  {a:'P',b:'N',tA:"Me gusta influir en lo que piensan los demás",tB:"Me cuesta dejar una tarea a medias"},
+  {a:'X',b:'A',tA:"Me agrada que me reconozcan públicamente",tB:"Me esfuerzo por ser el mejor en mi área"},
+  {a:'B',b:'P',tA:"Tomo en cuenta la opinión del grupo antes de actuar",tB:"Superviso de cerca el trabajo de mi equipo"},
+  {a:'O',b:'X',tA:"Me afecta cuando alguien del trabajo está molesto conmigo",tB:"Me gusta contar a otros lo que he logrado"},
+  {a:'Z',b:'B',tA:"Me entusiasma probar formas distintas de hacer el trabajo",tB:"Me importa que el grupo me acepte"},
+  {a:'K',b:'O',tA:"Si algo me parece injusto, lo enfrento",tB:"Me gusta tener un trato cálido y personal"},
+  {a:'F',b:'Z',tA:"Me gusta saber qué espera mi jefatura de mí",tB:"Me adapto rápido cuando cambian las cosas"},
+  {a:'W',b:'K',tA:"Prefiero tener instrucciones claras",tB:"No me cuesta discutir con quien está equivocado"},
+  {a:'G',b:'D',tA:"Puedo trabajar intensamente durante largos periodos",tB:"Me fijo en los detalles"},
+  {a:'L',b:'C',tA:"Me siento cómodo a cargo de un equipo",tB:"Organizo mi tiempo y mis tareas"},
+  {a:'I',b:'E',tA:"Decido rápido",tB:"Controlo bien mis reacciones"},
+  {a:'X',b:'N',tA:"Me gusta destacarme en las reuniones",tB:"Prefiero cerrar personalmente cada trabajo que inicio"},
+  {a:'B',b:'A',tA:"Me adapto a lo que decide la mayoría",tB:"Quiero progresar y lograr cada vez más"},
+  {a:'O',b:'P',tA:"Necesito sentir el aprecio de las personas que me rodean",tB:"Me agrada que otros hagan las cosas a mi manera"},
+  {a:'Z',b:'X',tA:"Busco variedad en mis tareas",tB:"Me importa causar una buena impresión"},
+  {a:'K',b:'B',tA:"Me opongo abiertamente cuando no estoy de acuerdo",tB:"Me siento bien cuando el equipo está unido"},
+  {a:'F',b:'O',tA:"Busco el apoyo de mi jefe cuando tengo dudas",tB:"Me gusta compartir aspectos personales con mis colegas"},
+  {a:'W',b:'Z',tA:"Trabajo mejor con reglas definidas",tB:"Disfruto los proyectos que parten desde cero"},
+  {a:'G',b:'R',tA:"Me entrego por completo cuando hay mucho trabajo",tB:"Me gusta pensar y planificar antes de actuar"},
+  {a:'L',b:'D',tA:"La gente suele seguir mis indicaciones",tB:"Reviso con cuidado cada dato"},
+  {a:'I',b:'C',tA:"Tomo decisiones con facilidad",tB:"Me gusta tener un sistema para cada cosa"},
+  {a:'T',b:'E',tA:"Trabajo a un ritmo rápido",tB:"Prefiero tratar los temas de trabajo de forma racional"},
+  {a:'B',b:'N',tA:"Me gusta participar en grupos de trabajo",tB:"No descanso hasta ver terminado un encargo"},
+  {a:'O',b:'A',tA:"Valoro mucho la confianza y el afecto en el trabajo",tB:"Me exijo estándares de resultado muy altos"},
+  {a:'Z',b:'P',tA:"Me gusta cambiar de actividad con frecuencia",tB:"Me gusta convencer a otros de mi punto de vista"},
+  {a:'K',b:'X',tA:"Hago saber cuando algo me molesta",tB:"Me agrada que la gente hable de mí"},
+  {a:'F',b:'B',tA:"Me esfuerzo por cumplir las expectativas de mis superiores",tB:"Me cuesta ir contra la opinión del grupo"},
+  {a:'W',b:'O',tA:"Me gusta saber exactamente qué se espera de mí",tB:"Me interesa cómo se sienten mis compañeros"},
+  {a:'G',b:'S',tA:"Prefiero las tareas difíciles a las fáciles",tB:"Hago amigos con facilidad"},
+  {a:'L',b:'R',tA:"Me gusta conducir a un grupo hacia la meta",tB:"Disfruto analizar ideas y teorías"},
+  {a:'I',b:'D',tA:"No me complica decidir aunque falte información",tB:"Me gusta el trabajo que requiere precisión"},
+  {a:'T',b:'C',tA:"Me preocupo mucho de cumplir los plazos",tB:"Archivo y clasifico la información de forma ordenada"},
+  {a:'V',b:'E',tA:"Prefiero un trabajo con actividad física y movimiento",tB:"En el trabajo me guardo lo que siento"},
+  {a:'O',b:'N',tA:"Busco amistades verdaderas en el trabajo",tB:"Me incomoda tener varios pendientes abiertos a la vez"},
+  {a:'Z',b:'A',tA:"Prefiero lo novedoso a lo conocido",tB:"Me motiva alcanzar objetivos ambiciosos"},
+  {a:'K',b:'P',tA:"No retrocedo fácilmente en una discusión",tB:"Corrijo a las personas cuando no hacen bien su parte"},
+  {a:'F',b:'X',tA:"Valoro la opinión de mi jefe sobre mi trabajo",tB:"Me presento de forma que la gente me note"},
+  {a:'W',b:'B',tA:"Respeto los reglamentos de la organización",tB:"Busco que mis ideas coincidan con las del equipo"},
+  {a:'G',b:'V',tA:"Me esfuerzo más que la mayoría en lo que hago",tB:"Me cuesta estar sentado mucho tiempo"},
+  {a:'L',b:'S',tA:"Tomo el mando cuando el grupo lo necesita",tB:"Disfruto conversar con gente nueva"},
+  {a:'I',b:'R',tA:"Prefiero decidir hoy que esperar a mañana",tB:"Prefiero diseñar la estrategia que ejecutarla"},
+  {a:'T',b:'D',tA:"Me gusta tener varias cosas en marcha y moverme rápido",tB:"Detecto errores pequeños que otros no ven"},
+  {a:'V',b:'C',tA:"Disfruto los trabajos que me hacen moverme de un lugar a otro",tB:"Planifico mi día antes de empezar"},
+  {a:'S',b:'E',tA:"Me gusta organizar actividades sociales en el trabajo",tB:"Separo mis emociones de mis decisiones"},
+  {a:'Z',b:'N',tA:"Me atraen los trabajos que exigen creatividad",tB:"Cuando asumo un trabajo, lo llevo hasta el final"},
+  {a:'K',b:'A',tA:"Enfrento los conflictos directamente",tB:"Busco que mi trabajo deje un logro visible"},
+  {a:'F',b:'P',tA:"Me siento más seguro cuando mi jefe respalda lo que hago",tB:"Me gusta tener personas bajo mi responsabilidad"},
+  {a:'W',b:'X',tA:"Prefiero que me supervisen en tareas nuevas",tB:"Me gusta que me pidan opinión delante de otros"},
+  {a:'G',b:'T',tA:"No me asusta una jornada de trabajo pesada",tB:"Me siento impulsado a terminar dentro del tiempo"},
+  {a:'L',b:'V',tA:"Me veo a mí mismo como un líder",tB:"Tengo mucha energía física"},
+  {a:'I',b:'S',tA:"Me siento cómodo tomando decisiones difíciles",tB:"Me resulta fácil iniciar una conversación"},
+  {a:'T',b:'R',tA:"Trabajo bien con la presión de una fecha límite",tB:"Me interesa entender el porqué de las cosas"},
+  {a:'V',b:'D',tA:"Prefiero estar en terreno que en una oficina",tB:"Me esmero en que cada parte quede exacta"},
+  {a:'S',b:'C',tA:"Me gusta estar rodeado de personas",tB:"Me molesta trabajar en un lugar desordenado"},
+  {a:'R',b:'E',tA:"Dedico tiempo a planificar a largo plazo",tB:"Me mantengo sereno en situaciones tensas"},
+  {a:'K',b:'N',tA:"Argumento con energía cuando me contradicen",tB:"Me cuesta delegar algo que yo empecé"},
+  {a:'F',b:'A',tA:"Me gusta mantener informada a mi jefatura",tB:"Me gusta superar las metas que me ponen"},
+  {a:'W',b:'P',tA:"Sigo los procedimientos aunque existan atajos",tB:"Me gusta asignar tareas a los demás"},
+  {a:'G',b:'I',tA:"El esfuerzo intenso es parte de mi forma de trabajar",tB:"Resuelvo con agilidad cuando hay que elegir"},
+  {a:'L',b:'T',tA:"Me resulta natural representar al equipo",tB:"Paso a la acción sin demora"},
+  {a:'I',b:'V',tA:"Asumo las decisiones sin postergarlas",tB:"Hago deporte o actividad física con frecuencia"},
+  {a:'T',b:'S',tA:"Estoy siempre pendiente del reloj y de los plazos",tB:"Me esfuerzo por mantener un buen clima con todos"},
+  {a:'V',b:'R',tA:"Me siento mejor cuando estoy en movimiento",tB:"Me gusta resolver problemas complejos de forma conceptual"},
+  {a:'S',b:'D',tA:"Disfruto las reuniones sociales del trabajo",tB:"Disfruto los trabajos minuciosos"},
+  {a:'R',b:'C',tA:"Me atraen los trabajos de análisis y reflexión",tB:"Sigo un orden establecido en lo que hago"},
+  {a:'D',b:'E',tA:"Verifico varias veces antes de entregar",tB:"Rara vez pierdo la compostura"},
+  {a:'F',b:'N',tA:"Respeto las decisiones de mis superiores",tB:"Me molesta que me interrumpan antes de terminar"},
+  {a:'W',b:'A',tA:"Me tranquiliza contar con políticas escritas",tB:"Aspiro a crecer profesionalmente sin detenerme"},
+  {a:'G',b:'L',tA:"Pongo toda mi energía en sacar adelante el trabajo",tB:"Me gusta ser quien encabeza un proyecto"},
+  {a:'L',b:'I',tA:"Confío en mi capacidad para dirigir a otros",tB:"Confío en mi criterio para decidir con rapidez"},
+  {a:'I',b:'T',tA:"Me gusta ser quien toma la decisión final",tB:"Me impaciento si el trabajo avanza lento"},
+  {a:'T',b:'V',tA:"Prefiero actuar de inmediato que esperar",tB:"Me agradan las tareas que requieren resistencia física"},
+  {a:'V',b:'S',tA:"Prefiero recorrer y ver las cosas en persona",tB:"Me relaciono con facilidad con personas de distintas áreas"},
+  {a:'S',b:'R',tA:"Me gusta conocer a la gente con la que trabajo",tB:"Antes de hacer algo, pienso en cómo hacerlo mejor"},
+  {a:'R',b:'D',tA:"Disfruto proponer nuevos enfoques o modelos",tB:"Cuido la exactitud de cifras y documentos"},
+  {a:'D',b:'C',tA:"Me gusta trabajar con información detallada",tB:"Me gusta tener todo en su lugar"},
+  {a:'C',b:'E',tA:"Llevo un registro ordenado de mis pendientes",tB:"Prefiero que mis sentimientos no influyan en mi trabajo"},
+  {a:'W',b:'N',tA:"Me gusta trabajar con pautas establecidas",tB:"Me siento satisfecho solo cuando la tarea queda cerrada"}
 ];
 
 /* Estado Kostick */
@@ -8390,16 +8098,16 @@ function kostickRenderPar() {
   const pct = Math.round((idx / 90) * 100);
 
   document.getElementById('kostickProgressFill').style.width = pct + '%';
-  document.getElementById('kostickProgressLbl').textContent = `Par ${idx + 1} de 90`;
+  document.getElementById('kostickProgressLbl').textContent = `Ítem ${idx + 1} de 90`;
   document.getElementById('kostickProgressPct').textContent = pct + '%';
 
   const body = document.getElementById('kostickModalBody');
   body.innerHTML = `
     <div class="test-instruccion">
-      <strong>Instrucción:</strong> Elige la afirmación que <strong>mejor te describe</strong> en tu comportamiento laboral habitual.
-      No hay respuestas correctas ni incorrectas.
+      <strong>Instrucción:</strong> Elige la afirmación que <strong>más se parece a ti</strong> en el trabajo.
+      Aunque ninguna te represente del todo, o ambas lo hagan, escoge una. No hay respuestas correctas ni incorrectas.
     </div>
-    <div class="test-grupo-num">Par ${idx + 1}</div>
+    <div class="test-grupo-num">Ítem ${idx + 1}</div>
     <div class="kostick-par">
       <div class="kostick-opciones">
         <button class="kostick-opcion ${resp === 'a' ? 'selected' : ''}" onclick="kostickSeleccionar('a')">
@@ -8448,55 +8156,31 @@ function kostickNavegar(dir) {
 }
 
 function kostickCalcularYFinalizar() {
-  // Contar respuestas por escala
+  // Puntaje por factor: cuántas veces se eligió una opción de esa letra (0 a 9).
   const conteos = {};
   Object.keys(KOSTICK_ESCALAS).forEach(k => conteos[k] = 0);
-
   KOSTICK_PARES.forEach((par, i) => {
     const resp = kostickEstado.respuestas[i];
-    if (resp === 'a') conteos[par.a] = (conteos[par.a] || 0) + 1;
-    else if (resp === 'b') conteos[par.b] = (conteos[par.b] || 0) + 1;
+    if (resp === 'a') conteos[par.a]++;
+    else if (resp === 'b') conteos[par.b]++;
   });
+  PARTICIPANTE.kostick = conteos;
+  // El servidor vuelve a corregir con la misma clave del corrector y guarda el perfil con sus textos.
+  const respuestas = kostickEstado.respuestas.map(r => (r || '').toUpperCase()).join('');
+  _guardarResultadoTest('kostick', { respuestas });
 
-  // Calcular clusters (promedio de escalas del cluster)
-  function clusterScore(escalas) {
-    const suma = escalas.reduce((acc, e) => acc + (conteos[e] || 0), 0);
-    return Math.round(suma / escalas.length);
-  }
-  const clusters = {
-    ld: clusterScore(['G','D','A','K','F']),
-    ri: clusterScore(['N','W','E','L','R']),
-    ot: clusterScore(['V','X','I','B','C']),
-    mr: clusterScore(['S','P','Z','T','O']),
-    rp: clusterScore(['A','V','D','N','G'])
-  };
-
-  // Actualizar PARTICIPANTE
-  PARTICIPANTE.kostick = clusters;
-
-  // Fix QA-PERSIST-01: mismo problema que en DISC — el resultado Kostick
-  // solo quedaba en el navegador y nunca se guardaba en el backend.
-  _guardarResultadoTest('kostick', { ld: clusters.ld, ri: clusters.ri, ot: clusters.ot, mr: clusters.mr, rp: clusters.rp });
-
-  // Actualizar panel lateral
   kostickActualizarPanel();
   kostickEstado.completado = true;
 
-  // Interpretar perfil
-  const alto = (v) => v >= 6 ? '▲ Alto' : v >= 4 ? '◆ Medio' : '▼ Bajo';
+  const fuera = Object.keys(conteos).filter(l => _kostickCritico(l, conteos[l]));
   const body = document.getElementById('kostickModalBody');
   body.innerHTML = `
     <div class="test-result">
       <div class="test-result-icon">🧠</div>
       <h3>Perfil Kostick completado</h3>
-      <p>Tus 5 clusters han sido calculados y guardados en tu perfil.</p>
-      <div class="test-result-chips">
-        <span class="test-result-chip ld">LD: ${clusters.ld}</span>
-        <span class="test-result-chip ri">RI: ${clusters.ri}</span>
-        <span class="test-result-chip ot">OT: ${clusters.ot}</span>
-        <span class="test-result-chip mr">MR: ${clusters.mr}</span>
-        <span class="test-result-chip rp">RP: ${clusters.rp}</span>
-      </div>
+      <p>Tus 20 factores (0 a 9) quedaron guardados, ordenados en los 7 grupos del informe.</p>
+      <div class="kostick-res">${_kostickGruposHtml(conteos)}</div>
+      ${fuera.length ? `<p style="font-size:.8rem">⚠ Fuera del rango esperado: ${fuera.map(l => `${l} ${escHtml(KOSTICK_ESCALAS[l])}`).join(', ')}. Conversémoslo con el agente.</p>` : ''}
       <p style="font-size:.8rem">Los resultados están en tu panel lateral y el agente puede interpretarlos.</p>
       <button class="test-btn primary" onclick="cerrarTestKostick();etapaAvanzar('kostick_completado')" style="margin-top:4px">
         Ver interpretación con el agente ✓
@@ -8507,15 +8191,44 @@ function kostickCalcularYFinalizar() {
   etapaRegistrarHito('kostick');
 }
 
+function _kostickCritico(l, v) {
+  const r = KOSTICK_RANGO[l];
+  return !!r && (v < r[0] || v > r[1]);
+}
+
+/* Total de respuestas (90 = test completo) */
+function _kostickCompleto(k) {
+  if (!k || typeof k !== 'object') return false;
+  return Object.keys(KOSTICK_ESCALAS).reduce((a, l) => a + (Number(k[l]) || 0), 0) === 90;
+}
+
+/* Factores más marcados, para indicadores y mensajes */
+function _kostickMarcados(k, n) {
+  if (!_kostickCompleto(k)) return [];
+  const orden = KOSTICK_GRUPOS.flatMap(g => g[1]);
+  return orden.slice().sort((a, b) => (k[b] - k[a]) || (orden.indexOf(a) - orden.indexOf(b))).slice(0, n || 3);
+}
+
+function _kostickGruposHtml(k) {
+  return KOSTICK_GRUPOS.map(([g, ls]) => `
+    <div class="kg"><div class="kg-t">${escHtml(g)}</div><div class="kg-l">${ls.map(l => {
+      const v = Number(k[l]) || 0;
+      const crit = _kostickCritico(l, v);
+      return `<span class="kg-f${crit ? ' crit' : ''}" title="${escHtml(KOSTICK_ESCALAS[l])} (${escHtml(KOSTICK_TIPO[l])})${crit ? ' — fuera del rango esperado ' + KOSTICK_RANGO[l][0] + '–' + KOSTICK_RANGO[l][1] : ''}"><b>${l}</b> ${v}<i style="width:${Math.round(v / 9 * 100)}%"></i></span>`;
+    }).join('')}</div></div>`).join('');
+}
+
 function kostickActualizarPanel() {
+  const cont = document.getElementById('kostickPanel');
+  if (!cont) return;
   const k = PARTICIPANTE.kostick;
-  const mapa = [['LD',k.ld],['RI',k.ri],['OT',k.ot],['MR',k.mr],['RP',k.rp]];
-  mapa.forEach(([clave, val]) => {
-    const score = document.getElementById(`sk${clave}`);
-    const bar   = document.getElementById(`skb${clave}`);
-    if (score) score.textContent = val;
-    if (bar)   bar.style.width = Math.round((val/9)*100) + '%';
-  });
+  if (k && k._version_anterior) {
+    cont.innerHTML = '<div class="kg-vacio">Rendiste la versión anterior del test. Vuelve a rendirlo para ver tus 20 factores.</div>';
+  } else if (!_kostickCompleto(k)) {
+    cont.innerHTML = '<div class="kg-vacio">Sin evaluar.</div>';
+  } else {
+    cont.innerHTML = _kostickGruposHtml(k);
+  }
 }
 
 /* ================================================================
@@ -8545,7 +8258,7 @@ function etapaAvanzar(contexto) {
   // Construir mensaje contextual para el agente
   const msgs = {
     disc_completado: `Mi perfil DISC acaba de calcularse: ${PARTICIPANTE.disc.codigo} — ${PARTICIPANTE.disc.patron}. ¿Qué significa esto para mi búsqueda de empleo y cómo lo uso en entrevistas?`,
-    kostick_completado: `Acabo de completar el test Kostick. Mis clusters son: Liderazgo ${PARTICIPANTE.kostick.ld}, Rel. Interpersonales ${PARTICIPANTE.kostick.ri}, Orientación Tarea ${PARTICIPANTE.kostick.ot}, Motivación ${PARTICIPANTE.kostick.mr}, Rendimiento ${PARTICIPANTE.kostick.rp}. ¿Cómo interpreto estos resultados en mi contexto de ${PARTICIPANTE.sector}?`
+    kostick_completado: `Acabo de completar el test Kostick. Mis puntajes (0 a 9) son: ${KOSTICK_GRUPOS.map(([g, ls]) => g + ': ' + ls.map(l => l + ' ' + (PARTICIPANTE.kostick[l] || 0)).join(', ')).join('; ')}. ¿Cómo interpreto estos resultados en mi contexto de ${PARTICIPANTE.sector}?`
   };
   const msg = msgs[contexto] || `Continúemos con el proceso. Contexto: ${contexto}`;
   preguntar(msg);

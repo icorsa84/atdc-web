@@ -156,6 +156,7 @@
   .informe-sec p { font-size:12.5px; color:var(--text2); line-height:1.6; white-space:pre-wrap; }
   details summary { cursor:pointer; font-size:13px; color:var(--text2); margin-bottom:8px; }
   .loading { text-align:center; padding:40px; color:var(--muted); }
+.tabla-kostick th,.tabla-kostick td{border-bottom:1px solid var(--border);padding:5px 6px}
 </style>
 </head>
 <body>
@@ -1744,6 +1745,34 @@ async function _marcarRegalo(id, valor) {
   } catch (e) { _mostrarMsg('_sop_msg', e.message, true); }
 }
 
+/* REQ-KOSTICK-PAPI: misma lectura que el «Informe Kostick» del corrector:
+   grupo, factor, valor 0-9 y análisis; ⚠ = fuera del rango esperado. */
+function _kostickAdminHtml(kostick, clusters) {
+  const esc = kostick.escalas || {};
+  if (!Object.keys(esc).length) {
+    const viejos = Object.entries(clusters).filter(([, v]) => (v && v.score) > 0);
+    return viejos.length
+      ? '<div style="color:var(--amber);font-size:12.5px;margin-bottom:6px;">Resultado de la versión anterior del test (5 clusters). Pídele que lo rinda de nuevo.</div>'
+        + viejos.map(([k, v]) => _barraInterp(`${k} — ${escHtml(v.nombre)}`, v.score, 9, v.interp)).join('')
+      : '<div style="color:var(--muted);font-size:12.5px;">Sin evaluar.</div>';
+  }
+  const grupos = Object.values(clusters).filter(c => Array.isArray(c.letras));
+  const filas = grupos.map(g => g.letras.map((l, i) => {
+    const v = esc[l] || {};
+    const crit = v.critico ? ` <span title="Fuera del rango esperado ${v.rango_esperado ? v.rango_esperado.join('–') : ''}" style="color:var(--amber);">⚠</span>` : '';
+    return `<tr>${i === 0 ? `<td rowspan="${g.letras.length}" style="font-weight:700;vertical-align:top;">${escHtml(g.nombre)}</td>` : ''}
+      <td><b>${escHtml(l)}</b> ${escHtml(v.nombre || '')}<div style="color:var(--muted);font-size:11px;">${escHtml(v.tipo || '')}</div></td>
+      <td style="text-align:center;font-weight:700;">${v.score ?? '—'}${crit}</td>
+      <td>${escHtml(v.interp || '')}${v.riesgo ? `<div style="color:var(--amber);font-size:11.5px;margin-top:2px;">Riesgo: ${escHtml(v.riesgo)}</div>` : ''}</td></tr>`;
+  }).join('')).join('');
+  const rel = (kostick.relaciones || []).map(r => `<li><b>${escHtml(r.factores)}</b>: ${escHtml(r.texto)}</li>`).join('');
+  return `<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:12.5px;" class="tabla-kostick">
+      <thead><tr><th style="text-align:left;">Grupo</th><th style="text-align:left;">Factor</th><th>Valor</th><th style="text-align:left;">Análisis</th></tr></thead>
+      <tbody>${filas}</tbody></table></div>
+    ${rel ? `<div style="margin-top:8px;font-size:12.5px;"><b>Factores relacionados</b><ul style="margin:4px 0 0 18px;">${rel}</ul></div>` : ''}
+    ${kostick.sintesis ? `<div style="margin-top:6px;font-size:12.5px;color:var(--text2);">${escHtml(kostick.sintesis)}</div>` : ''}`;
+}
+
 function _renderDetalle(p) {
   const fotoSrc = p.foto_b64 ? `data:${escHtml(p.foto_mime)};base64,${escHtml(p.foto_b64)}` : '';
   const disc = p.disc || {};
@@ -1841,8 +1870,8 @@ function _renderDetalle(p) {
     </div>
 
     <div class="sec">
-      <div class="sec-title">Kostick — Clusters</div>
-      ${Object.keys(clusters).length ? Object.entries(clusters).map(([k,v]) => _barraInterp(`${k} — ${escHtml(v.nombre)}`, v.score, 9, v.interp)).join('') : '<div style="color:var(--muted);font-size:12.5px;">Sin evaluar.</div>'}
+      <div class="sec-title">Kostick — 20 factores (clave del corrector)</div>
+      ${_kostickAdminHtml(kostick, clusters)}
     </div>
 
     ${p.plan === 'Premium' ? `
