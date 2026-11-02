@@ -1408,6 +1408,9 @@
 .test-inicio h3{margin:0 0 10px;font-size:1.05rem}
 .test-inicio ul{margin:0 0 18px 18px;padding:0;line-height:1.6;font-size:.9rem}
 .test-inicio li{margin-bottom:6px}
+.test-aviso{background:var(--bg3);border:1px solid var(--border2);border-radius:8px;padding:8px 10px;font-size:.88rem;margin:0 0 14px}
+.test-timer{font-variant-numeric:tabular-nums;font-weight:700;margin-left:auto;margin-right:10px}
+.test-timer.poco{color:#B45309}
 /* Kostick: grupos del informe del corrector */
 .kg{margin-bottom:7px}
 .kg-t{font-size:.66rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:3px}
@@ -7690,7 +7693,8 @@ const _TEST_INICIO = {
       'En cada grupo elige la que <strong>MÁS</strong> te describe (se marca en azul) y luego la que <strong>MENOS</strong> te describe (se marca en violeta) en el trabajo.',
       'Responde con tu primera impresión: no hay respuestas correctas ni incorrectas.',
       'Te tomará unos <strong>10 minutos</strong>. Puedes volver atrás con «Anterior».',
-      'Hazlo de una vez: si cierras la ventana antes de terminar, se pierde lo avanzado.'
+      'Tienes <strong>90 minutos</strong> desde que pulses «Comenzar». El reloj no se detiene, aunque cierres la ventana.',
+      'Se rinde <strong>una sola vez</strong>. Si necesitas repetirlo, tu consultor debe habilitarlo.'
     ]
   },
   kostick: {
@@ -7701,30 +7705,132 @@ const _TEST_INICIO = {
       'Elige siempre una, aunque ninguna te represente del todo o ambas lo hagan.',
       'Responde con tu primera impresión: no hay respuestas correctas ni incorrectas.',
       'Te tomará unos <strong>15 a 20 minutos</strong>. Puedes volver atrás con «Anterior».',
-      'Hazlo de una vez: si cierras la ventana antes de terminar, se pierde lo avanzado.'
+      'Tienes <strong>90 minutos</strong> desde que pulses «Comenzar». El reloj no se detiene, aunque cierres la ventana.',
+      'Se rinde <strong>una sola vez</strong>. Si necesitas repetirlo, tu consultor debe habilitarlo.'
     ]
   }
 };
-function _testPantallaInicio(tipo) {
+/* REQ-TEST-90MIN: el plazo lo lleva el servidor (/api/test/*). Aquí solo se
+   muestra la cuenta regresiva y se guardan las respuestas en este navegador
+   para retomar si se cierra la ventana (el reloj sigue corriendo). */
+const _testReloj = { disc: null, kostick: null };
+const _testFin = { disc: 0, kostick: 0 };
+function _testClaveLocal(tipo) { return `atdc_test_${tipo}_${CONFIG.participante_id}`; }
+function _testGuardarLocal(tipo) {
+  if (!_testFin[tipo]) return;
+  const est = tipo === 'disc' ? discEstado : kostickEstado;
+  try { localStorage.setItem(_testClaveLocal(tipo), JSON.stringify({ fin: _testFin[tipo], est })); } catch (e) {}
+}
+function _testLeerLocal(tipo, fin) {
+  try {
+    const d = JSON.parse(localStorage.getItem(_testClaveLocal(tipo)) || 'null');
+    return d && d.fin === fin ? d.est : null;
+  } catch (e) { return null; }
+}
+function _testBorrarLocal(tipo) { try { localStorage.removeItem(_testClaveLocal(tipo)); } catch (e) {} }
+function _testDetenerReloj(tipo) { if (_testReloj[tipo]) { clearInterval(_testReloj[tipo]); _testReloj[tipo] = null; } }
+function _testSpanReloj(tipo) {
+  let el = document.getElementById(tipo + 'Timer');
+  if (!el) {
+    el = document.createElement('span');
+    el.id = tipo + 'Timer'; el.className = 'test-timer';
+    el.setAttribute('role', 'timer'); el.setAttribute('aria-live', 'off');
+    const lbl = document.getElementById(tipo + 'ProgressPct');
+    lbl.parentNode.insertBefore(el, lbl);
+  }
+  return el;
+}
+function _testIniciarReloj(tipo) {
+  _testDetenerReloj(tipo);
+  const el = _testSpanReloj(tipo);
+  const tick = () => {
+    const seg = Math.max(0, Math.round((_testFin[tipo] - Date.now()) / 1000));
+    el.textContent = `⏱ ${String(Math.floor(seg / 60)).padStart(2, '0')}:${String(seg % 60).padStart(2, '0')}`;
+    el.classList.toggle('poco', seg <= 15 * 60);
+    if (seg === 15 * 60 || seg === 5 * 60) el.setAttribute('aria-label', `Quedan ${seg / 60} minutos`);
+    if (seg <= 0) _testTiempoAgotado(tipo);
+  };
+  tick();
+  _testReloj[tipo] = setInterval(tick, 1000);
+}
+function _testMensaje(tipo, icono, titulo, texto) {
+  _testDetenerReloj(tipo);
+  const r = document.getElementById(tipo + 'Timer'); if (r) r.textContent = '';
+  document.getElementById(tipo + 'Overlay').querySelector('.test-nav').style.display = 'none';
+  document.getElementById(tipo + 'ModalBody').innerHTML = `
+    <div class="test-inicio" style="text-align:center">
+      <div style="font-size:2rem">${icono}</div>
+      <h3>${titulo}</h3>
+      <p style="color:var(--muted);font-size:.9rem">${texto}</p>
+      <button class="test-btn secondary" onclick="${tipo === 'disc' ? 'cerrarTestDisc' : 'cerrarTestKostick'}()">Cerrar</button>
+    </div>`;
+}
+function _testTiempoAgotado(tipo) {
+  _testBorrarLocal(tipo);
+  _testFin[tipo] = 0;
+  _testMensaje(tipo, '⌛', 'Se acabaron los 90 minutos',
+    'El tiempo para responder este test terminó y las respuestas no se guardaron. Si necesitas rendirlo de nuevo, pídele a tu consultor que lo habilite.');
+}
+
+async function _testPantallaInicio(tipo) {
   const t = _TEST_INICIO[tipo];
   const ov = document.getElementById(tipo + 'Overlay');
   ov.querySelector('.test-nav').style.display = 'none';
   document.getElementById(tipo + 'ProgressFill').style.width = '0%';
   document.getElementById(tipo + 'ProgressLbl').textContent = 'Instrucciones';
   document.getElementById(tipo + 'ProgressPct').textContent = '';
-  document.getElementById(tipo + 'ModalBody').innerHTML = `
+  _testSpanReloj(tipo).textContent = '';
+  const body = document.getElementById(tipo + 'ModalBody');
+  const pintar = (extra, boton) => {
+    body.innerHTML = `
     <div class="test-inicio">
       <h3>${t.titulo}</h3>
       <ul>${t.lineas.map(l => `<li>${l}</li>`).join('')}</ul>
-      <button class="test-btn primary" id="${tipo}BtnComenzar" onclick="_testComenzar('${tipo}')">Comenzar →</button>
+      ${extra || ''}
+      <button class="test-btn primary" id="${tipo}BtnComenzar" onclick="_testComenzar('${tipo}')">${boton || 'Comenzar →'}</button>
     </div>`;
+  };
+  if (IS_ADMIN) { pintar('<p style="font-size:.82rem;color:var(--muted)">Vista de administrador: sin reloj y sin guardar.</p>'); return; }
+  body.innerHTML = '<div class="test-inicio"><p style="color:var(--muted)">Cargando…</p></div>';
+  let e = null;
+  try {
+    const r = await fetch(`${_BACKEND}/api/test/estado?tipo=${tipo}`, { headers: { 'Authorization': `Bearer ${_obtenerToken()}` } });
+    if (r.ok) e = await r.json();
+  } catch (_) {}
+  if (e && e.test_estado === 'completado') {
+    return _testMensaje(tipo, '✅', 'Ya rendiste este test', 'Tu resultado está guardado y lo ves en el panel lateral. Si necesitas repetirlo, pídele a tu consultor que lo habilite.');
+  }
+  if (e && e.test_estado === 'expirado') {
+    return _testMensaje(tipo, '⌛', 'Se acabaron los 90 minutos', 'El plazo de este test terminó sin que se guardara el resultado. Si necesitas rendirlo de nuevo, pídele a tu consultor que lo habilite.');
+  }
+  if (e && e.test_estado === 'en_progreso') {
+    const m = Math.floor((e.segundos_restantes || 0) / 60);
+    return pintar(`<p class="test-aviso">⏱ Tienes este test en curso: te quedan <strong>${m} minutos</strong>.</p>`, 'Continuar →');
+  }
+  pintar();
 }
-function _testComenzar(tipo) {
+async function _testComenzar(tipo) {
+  const btn = document.getElementById(tipo + 'BtnComenzar');
+  if (!IS_ADMIN) {
+    if (btn) { btn.disabled = true; btn.textContent = 'Iniciando…'; }
+    let d = null, err = '';
+    try {
+      const r = await fetch(`${_BACKEND}/api/test/iniciar/${tipo}`, { method: 'POST', headers: { 'Authorization': `Bearer ${_obtenerToken()}` } });
+      d = await r.json().catch(() => ({}));
+      if (!r.ok) { err = _textoErrorApi(d.detail) || `HTTP ${r.status}`; d = null; }
+    } catch (x) { err = 'No hay conexión con el servidor. Revisa tu internet e inténtalo de nuevo.'; }
+    if (!d) return _testMensaje(tipo, '🔒', 'No se pudo iniciar el test', escHtml(err));
+    _testFin[tipo] = Date.parse(d.test_fin);
+    const previo = _testLeerLocal(tipo, _testFin[tipo]);
+    if (previo) { if (tipo === 'disc') discEstado = previo; else kostickEstado = previo; }
+    _testIniciarReloj(tipo);
+  }
   document.getElementById(tipo + 'Overlay').querySelector('.test-nav').style.display = '';
   if (tipo === 'disc') discRenderGrupo(); else kostickRenderPar();
 }
 
 function cerrarTestDisc() {
+  _testDetenerReloj('disc');
   document.getElementById('discOverlay').classList.remove('visible');
 }
 
@@ -7765,6 +7871,7 @@ function discRenderGrupo() {
     </div>`;
 
   discActualizarNav();
+  _testGuardarLocal('disc');
 }
 
 function discSeleccionar(opIdx) {
@@ -7873,6 +7980,7 @@ function discCalcularYFinalizar() {
   // REQ-DISC-01: se envía el código de PERFIL ("DC"), que es el que acepta el
   // servidor; antes se mandaba el de puntajes ("D11-I5-…"), el servidor
   // respondía 400 y el resultado nunca se guardaba (sin que nadie lo viera).
+  _testDetenerReloj('disc'); _testBorrarLocal('disc'); _testFin.disc = 0;
   _guardarResultadoTest('disc', { codigo: `${max1}${max2}`, patron, natural: contadores.natural, adaptado: contadores.adaptado, nuclear });
 
   // Actualizar panel lateral
@@ -8137,6 +8245,7 @@ function abrirTestKostick() {
   document.getElementById('kostickOverlay').classList.add('visible');
 }
 function cerrarTestKostick() {
+  _testDetenerReloj('kostick');
   document.getElementById('kostickOverlay').classList.remove('visible');
 }
 
@@ -8169,6 +8278,7 @@ function kostickRenderPar() {
     </div>`;
 
   kostickActualizarNav();
+  _testGuardarLocal('kostick');
 }
 
 function kostickSeleccionar(opcion) {
@@ -8216,6 +8326,7 @@ function kostickCalcularYFinalizar() {
   PARTICIPANTE.kostick = conteos;
   // El servidor vuelve a corregir con la misma clave del corrector y guarda el perfil con sus textos.
   const respuestas = kostickEstado.respuestas.map(r => (r || '').toUpperCase()).join('');
+  _testDetenerReloj('kostick'); _testBorrarLocal('kostick'); _testFin.kostick = 0;
   _guardarResultadoTest('kostick', { respuestas });
 
   kostickActualizarPanel();

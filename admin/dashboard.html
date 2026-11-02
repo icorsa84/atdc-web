@@ -1631,12 +1631,29 @@ async function _devolverIntentosCv(id) {
     _mostrarMsg('_sop_msg', d.mensaje || 'Intentos devueltos.', false);
   } catch (e) { _mostrarMsg('_sop_msg', /no tiene rechazos/i.test(e.message) ? 'Este participante no tiene CV rechazados: no hay intentos que devolver.' : e.message, true); }
 }
+/* REQ-TEST-90MIN: estado de cada test (se rinde una vez, 90 minutos) */
+function _estadoTestsTxt(p) {
+  const tp = p.tests_psico || {};
+  const hecho = { disc: (p.disc || {}).codigo && p.disc.codigo !== '—', kostick: !!((p.kostick || {}).escalas && Object.keys(p.kostick.escalas).length) };
+  return ['disc', 'kostick'].map(t => {
+    const e = tp[t] || {};
+    let txt = 'no iniciado';
+    if (e.estado === 'en_progreso') {
+      const fin = e.fin ? new Date(e.fin) : null;
+      txt = 'en curso' + (fin ? ` (vence ${fin.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })})` : '');
+    } else if (e.estado === 'expirado') txt = 'venció sin guardar resultado';
+    else if (e.estado === 'completado' || (hecho[t] && !e.habilitado)) txt = 'rendido';
+    else if (e.habilitado) txt = 'habilitado para rendir de nuevo';
+    return `Test ${t === 'disc' ? 'DISC' : 'Kostick'}: <strong>${txt}</strong>${e.intentos ? ` · intentos: ${e.intentos}` : ''}`;
+  }).join(' &nbsp;·&nbsp; ');
+}
 async function _reiniciarTest(id, tipo) {
   const razon = prompt(`Motivo para reiniciar el test ${tipo === 'disc' ? 'DISC' : 'Kostick'} (queda en auditoría):`, 'Se desconectó a mitad del test');
   if (razon === null) return;
   try {
     const d = await _apiSend('POST', `/api/admin/test/resetear/${id}/${tipo}`, { razon: razon.trim() || 'Reset administrativo' });
     _mostrarMsg('_sop_msg', d.mensaje || 'Test reiniciado: la persona puede rendirlo de nuevo.', false);
+    try { abrirDetalle(id); } catch (_) {}
   } catch (e) { _mostrarMsg('_sop_msg', e.message, true); }
 }
 async function _revisarVencimientos() {
@@ -1900,6 +1917,7 @@ function _renderDetalle(p) {
       <div class="sec-title">Acciones de soporte</div>
       ${_textoVigencia(p) ? `<div style="font-size:13px;margin-bottom:8px;">${_textoVigencia(p)}</div>` : ''}
       ${(Array.isArray(p.cv_versiones) && p.cv_versiones.length) ? `<div style="font-size:12.5px;color:var(--text2);margin-bottom:8px;">Versiones de CV aprobadas: ${p.cv_versiones.map(v => `${escHtml(v.cargo || '—')} (${escHtml(String(v.ats_score ?? ''))}/100)`).join(' · ')}</div>` : ''}
+      <div style="font-size:12.5px;color:var(--text2);margin-bottom:8px;">${_estadoTestsTxt(p)}</div>
       <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
         ${p.plan !== 'Inicial' && (p.pago_estado || 'confirmado') !== 'pendiente' ? `<button class="btn-secondary" onclick="_extenderAcceso('${escHtml(p.id)}')">${icono('calendar',14)} Extender acceso…</button>` : ''}
         <button class="btn-secondary" onclick="_devolverIntentosCv('${escHtml(p.id)}')">${icono('paperclip',14)} Devolver intentos de CV</button>
