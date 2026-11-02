@@ -1403,6 +1403,11 @@
 .test-result-chip.ot{border-color:#14B8A6;color:#5EEAD4}
 .test-result-chip.mr{border-color:#F97316;color:#FDBA74}
 .test-result-chip.rp{border-color:#6366F1;color:#A5B4FC}
+/* Pantalla de inicio de los tests */
+.test-inicio{max-width:560px;margin:0 auto;padding:6px 2px}
+.test-inicio h3{margin:0 0 10px;font-size:1.05rem}
+.test-inicio ul{margin:0 0 18px 18px;padding:0;line-height:1.6;font-size:.9rem}
+.test-inicio li{margin-bottom:6px}
 /* Kostick: grupos del informe del corrector */
 .kg{margin-bottom:7px}
 .kg-t{font-size:.66rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:3px}
@@ -7672,9 +7677,53 @@ function abrirTestDisc() {
     return;
   }
   discEstado = { grupoActual:0, respuestas: new Array(28).fill(null).map(()=>({most:null,least:null})), modoSeleccion:null, completado:false };
-  discRenderGrupo();
+  _testPantallaInicio('disc');
   document.getElementById('discOverlay').classList.add('visible');
 }
+/* REQ-TEST-INICIO: pantalla de instrucciones antes de la primera pregunta
+   (DISC y Kostick). La navegación aparece recién al pulsar «Comenzar». */
+const _TEST_INICIO = {
+  disc: {
+    titulo: 'Antes de empezar',
+    lineas: [
+      'Verás <strong>28 grupos de cuatro palabras</strong>.',
+      'En cada grupo elige la que <strong>MÁS</strong> te describe (se marca en azul) y luego la que <strong>MENOS</strong> te describe (se marca en violeta) en el trabajo.',
+      'Responde con tu primera impresión: no hay respuestas correctas ni incorrectas.',
+      'Te tomará unos <strong>10 minutos</strong>. Puedes volver atrás con «Anterior».',
+      'Hazlo de una vez: si cierras la ventana antes de terminar, se pierde lo avanzado.'
+    ]
+  },
+  kostick: {
+    titulo: 'Antes de empezar',
+    lineas: [
+      'Verás <strong>90 pares de frases</strong>.',
+      'En cada par elige la que <strong>mejor te describe</strong> en tu comportamiento laboral habitual.',
+      'Elige siempre una, aunque ninguna te represente del todo o ambas lo hagan.',
+      'Responde con tu primera impresión: no hay respuestas correctas ni incorrectas.',
+      'Te tomará unos <strong>15 a 20 minutos</strong>. Puedes volver atrás con «Anterior».',
+      'Hazlo de una vez: si cierras la ventana antes de terminar, se pierde lo avanzado.'
+    ]
+  }
+};
+function _testPantallaInicio(tipo) {
+  const t = _TEST_INICIO[tipo];
+  const ov = document.getElementById(tipo + 'Overlay');
+  ov.querySelector('.test-nav').style.display = 'none';
+  document.getElementById(tipo + 'ProgressFill').style.width = '0%';
+  document.getElementById(tipo + 'ProgressLbl').textContent = 'Instrucciones';
+  document.getElementById(tipo + 'ProgressPct').textContent = '';
+  document.getElementById(tipo + 'ModalBody').innerHTML = `
+    <div class="test-inicio">
+      <h3>${t.titulo}</h3>
+      <ul>${t.lineas.map(l => `<li>${l}</li>`).join('')}</ul>
+      <button class="test-btn primary" id="${tipo}BtnComenzar" onclick="_testComenzar('${tipo}')">Comenzar →</button>
+    </div>`;
+}
+function _testComenzar(tipo) {
+  document.getElementById(tipo + 'Overlay').querySelector('.test-nav').style.display = '';
+  if (tipo === 'disc') discRenderGrupo(); else kostickRenderPar();
+}
+
 function cerrarTestDisc() {
   document.getElementById('discOverlay').classList.remove('visible');
 }
@@ -8084,7 +8133,7 @@ function abrirTestKostick() {
     return;
   }
   kostickEstado = { parActual:0, respuestas: new Array(90).fill(null), completado:false };
-  kostickRenderPar();
+  _testPantallaInicio('kostick');
   document.getElementById('kostickOverlay').classList.add('visible');
 }
 function cerrarTestKostick() {
