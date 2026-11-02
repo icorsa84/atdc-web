@@ -5949,7 +5949,7 @@ async function _analizarAviso() {
   } finally { btn.disabled = false; btn.textContent = 'Analizar calce con mi CV'; }
 }
 
-async function _abrirMercado(pais) {
+async function _abrirMercado(pais, actualizar) {
   const _planM = getPlanActual();
   if (_planM === 'Inicial' && !IS_ADMIN) return;          // no incluido
   const _soloPortales = (_planM === 'Esencial' && !IS_ADMIN);  // portales chilenos
@@ -5963,7 +5963,7 @@ async function _abrirMercado(pais) {
     </div>
     <div id="_mercadoSelectorPais" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;"></div>`}
     <div id="_mercadoCuerpo" style="min-height:120px;display:flex;align-items:center;justify-content:center;">
-      <span style="color:var(--muted);font-size:.85rem;">${_soloPortales ? 'Buscando los portales de empleo para tu perfil…' : `Analizando tu perfil y el mercado de ${escHtml(paisSel)}…`}</span>
+      <span style="color:var(--muted);font-size:.85rem;">${_soloPortales ? 'Buscando los portales de empleo para tu perfil…' : `Preparando tu análisis del mercado de ${escHtml(paisSel)}… ${actualizar ? '(puede tardar unos 40 segundos)' : ''}`}</span>
     </div>
   `);
   // El modal de contraseñas es angosto (380px) — el de mercado necesita más
@@ -5977,8 +5977,8 @@ async function _abrirMercado(pais) {
     const res = await fetch(CONFIG.mercado_url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${_obtenerToken()}` },
-      body: JSON.stringify({ incluir_portales: true, incluir_posicionamiento: !_soloPortales, pais: paisSel }),
-      signal: AbortSignal.timeout(70000)
+      body: JSON.stringify({ incluir_portales: true, incluir_posicionamiento: !_soloPortales, pais: paisSel, actualizar: !!actualizar }),
+      signal: AbortSignal.timeout(110000)
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(_textoErrorApi(data.detail) || 'No se pudo cargar la información de mercado.');
@@ -6014,6 +6014,10 @@ async function _abrirMercado(pais) {
 
     document.getElementById('_mercadoCuerpo').outerHTML = `
       <div id="_mercadoCuerpo">
+        ${(!_soloPortales && data.fecha_analisis) ? `<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;font-size:.76rem;color:var(--muted);margin-bottom:12px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;">
+          <span>${data.desde_cache ? 'Análisis guardado' : 'Análisis generado'} el ${escHtml(new Date(data.fecha_analisis).toLocaleDateString('es-CL', { day: 'numeric', month: 'long', year: 'numeric' }))}${data.desde_cache ? ' · se mantiene 7 días para que tus cifras no cambien' : ''}</span>
+          ${data.actualizaciones_restantes > 0 ? `<button onclick="_abrirMercado('${escHtml(paisSel)}', true)" style="padding:5px 10px;border-radius:7px;border:1px solid var(--border2);background:transparent;color:var(--text);font-size:.76rem;font-weight:600;cursor:pointer;">↻ Actualizar análisis</button>` : '<span>Podrás actualizarlo mañana.</span>'}
+        </div>` : ''}
         ${data.posicionamiento_md ? `<div style="font-size:.85rem;line-height:1.55;margin-bottom:18px;">${renderMdInforme(data.posicionamiento_md)}</div>` : ''}
         ${portalesHtml ? `<div style="font-weight:700;font-size:.82rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin:4px 0 10px;">Portales recomendados para ${escHtml(paisSel)}</div>${portalesHtml}` : ''}
         <div style="margin-top:12px;padding:12px 14px;border-radius:10px;border:1px dashed var(--border2);font-size:.82rem;">
