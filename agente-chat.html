@@ -1504,9 +1504,9 @@
     <div class="input-area">
       <div class="input-row">
         <div class="input-wrap">
-          <textarea id="msgInput" rows="1"
-            placeholder="Escribe tu pregunta…"
-            onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
+          <textarea id="msgInput" rows="1" maxlength="2000"
+            placeholder="Escribe tu pregunta…" aria-describedby="usoChatTxt msgCont"
+            onkeydown="handleKey(event)" oninput="autoResize(this);_contarCaracteres(this)"></textarea>
         </div>
         <button class="btn-mic" id="btnMic" onclick="toggleVoice()" title="Dictado por voz" aria-label="Activar entrada por voz">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></svg>
@@ -1517,6 +1517,8 @@
       </div>
       <div class="input-hint">
         <span>Enter para enviar · <span class="kbd">⇧ Enter</span> nueva línea</span>
+        <span id="msgCont" style="font-size:.7rem;color:var(--muted)"></span>
+        <span id="usoChatTxt" role="status" style="font-size:.7rem;color:var(--muted)"></span>
         <span id="modeLabel" class="fallback-note" style="display:none">modo local</span>
         <span style="color:var(--purple);font-size:.7rem;letter-spacing:.01em">🧠 Memoria activa</span>
       </div>
@@ -2524,9 +2526,9 @@ function _mostrarOnboarding(planPreseleccionado) {
 
   const PLANES_LABEL = {
     Inicial:      { color: '#10B981', desc: 'Gratuito — análisis ATS básico' },
-    Esencial:     { color: '#3B82F6', desc: 'Hasta 20 conversaciones por día' },
-    Profesional:  { color: '#A78BFA', desc: 'Conversaciones ilimitadas + informe' },
-    Premium:      { color: '#F59E0B', desc: 'Todo + sesión con Consultor' },
+    Esencial:     { color: '#3B82F6', desc: 'Hasta 15 mensajes diarios' },
+    Profesional:  { color: '#A78BFA', desc: '30 mensajes diarios + DISC, Kostick e informe' },
+    Premium:      { color: '#F59E0B', desc: '50 mensajes diarios + sesión con el consultor' },
   };
   const pl = PLANES_LABEL[planPreseleccionado] || PLANES_LABEL['Inicial'];
 
@@ -2946,6 +2948,7 @@ function _aplicarPerfilAlEstado(d) {
   if (d.antecedentes && typeof d.antecedentes === 'object') PARTICIPANTE.antecedentes = d.antecedentes;
   if (typeof d.cv_versiones_limite === 'number') PARTICIPANTE.cv_versiones_limite = d.cv_versiones_limite;
   PARTICIPANTE.mercado_analizado = !!d.mercado_analizado;
+  if (d.uso_chat) { PARTICIPANTE.uso_chat = d.uso_chat; try { _pintarUsoChat(); } catch (e) {} }
   PARTICIPANTE.retroalimentacion = d.retroalimentacion || {};
   PARTICIPANTE.cv_consultor = d.cv_consultor || {};
   try { _pintarEntregasPremium(); } catch (e) {}
@@ -3645,9 +3648,9 @@ function setOnline(online) {
    guardarlas nunca. */
 const PLAN_RESTRICCIONES = {
   Inicial:      { chat: false, msgs_dia: 0,     memoria: false, tests_psicometricos: false },
-  Esencial:     { chat: true,  msgs_dia: 20,    memoria: false, tests_psicometricos: false },
-  Profesional:  { chat: true,  msgs_dia: 9999,  memoria: true,  tests_psicometricos: true  },
-  Premium:      { chat: true,  msgs_dia: 9999,  memoria: true,  tests_psicometricos: true  },
+  Esencial:     { chat: true,  msgs_dia: 15,    memoria: false, tests_psicometricos: false },
+  Profesional:  { chat: true,  msgs_dia: 30,    memoria: true,  tests_psicometricos: true  },
+  Premium:      { chat: true,  msgs_dia: 50,    memoria: true,  tests_psicometricos: true  },
 };
 
 function getPlanActual() {
@@ -3687,28 +3690,35 @@ function verificarRestriccionPlan() {
   const plan = getPlanActual();
   const restriccion = PLAN_RESTRICCIONES[plan] || PLAN_RESTRICCIONES['Inicial'];
   if (!restriccion.chat) {
-    return { permitido: false, razon: `El plan <strong>${plan}</strong> no incluye conversación con el agente. Actualiza tu plan para acceder al chat completo.` };
+    return { permitido: false, razon: `El plan **${plan}** no incluye conversación con el agente. Actualiza tu plan para acceder al chat completo.` };
   }
-  if (restriccion.msgs_dia < 9999) {
-    const hoy = new Date().toISOString().slice(0,10);
-    const key = `atdc_msgs_${CONFIG.participante_id}_${hoy}`;
-    const usados = parseInt(localStorage.getItem(key)||'0', 10);
-    if (usados >= restriccion.msgs_dia) {
-      return { permitido: false, razon: `Alcanzaste el límite de <strong>${restriccion.msgs_dia} mensajes diarios</strong> del plan ${plan}. Vuelve mañana o actualiza a Plan Profesional.` };
-    }
+  // REQ-LIMITES-CHAT: el cupo lo lleva el servidor (persistente, hora de Chile)
+  const u = PARTICIPANTE.uso_chat;
+  if (!IS_ADMIN && u && u.limite_diario && u.restantes_hoy <= 0) {
+    const subir = plan === 'Esencial' ? ' Si necesitas más, puedes subir al plan Profesional desde «Mi cuenta».'
+      : plan === 'Profesional' ? ' Si necesitas más, puedes subir al plan Premium desde «Mi cuenta».' : '';
+    return { permitido: false, razon: (u.restantes_periodo <= 0
+      ? `Usaste los **${u.limite_periodo} mensajes** con el agente que incluye tu plan para todo su período. Sigues teniendo acceso a tu CV, resultados e informe.`
+      : `Usaste tus **${u.limite_diario} mensajes de hoy** con el agente. Se renuevan a las 00:00 (hora de Chile).`) + subir };
   }
   return { permitido: true };
 }
 
-function registrarMensajePlan() {
-  const plan = getPlanActual();
-  const restriccion = PLAN_RESTRICCIONES[plan] || {};
-  if (restriccion.msgs_dia && restriccion.msgs_dia < 9999) {
-    const hoy = new Date().toISOString().slice(0,10);
-    const key = `atdc_msgs_${CONFIG.participante_id}_${hoy}`;
-    const usados = parseInt(localStorage.getItem(key)||'0', 10);
-    try { localStorage.setItem(key, String(usados + 1)); } catch(e) {}
-  }
+function registrarMensajePlan() { /* REQ-LIMITES-CHAT: lo cuenta el servidor */ }
+function _contarCaracteres(t) {
+  const el = document.getElementById('msgCont'); if (!el) return;
+  const n = (t.value || '').length;
+  el.textContent = n > 1500 ? `${n}/2000` : '';
+  el.style.color = n >= 1900 ? 'var(--amber)' : 'var(--muted)';
+}
+
+function _pintarUsoChat() {
+  const el = document.getElementById('usoChatTxt');
+  const u = PARTICIPANTE.uso_chat;
+  if (!el) return;
+  if (IS_ADMIN || !u || !u.limite_diario) { el.textContent = ''; return; }
+  el.textContent = `Te quedan ${u.restantes_hoy} de ${u.limite_diario} mensajes hoy · ${u.restantes_periodo} en tu plan`;
+  el.style.color = u.restantes_hoy <= 3 ? 'var(--amber)' : 'var(--muted)';
 }
 
 // ── SSE STREAMING — llamarAPI con EventSource-like via fetch + ReadableStream ──
@@ -3766,6 +3776,7 @@ async function llamarAPI(mensaje) {
     body.scrollTop = body.scrollHeight;
     const textEl = w.querySelector('.streaming-text');
 
+    let errorStream = '';
     async function pump() {
       try {
         while (true) {
@@ -3784,13 +3795,15 @@ async function llamarAPI(mensaje) {
                 body.scrollTop = body.scrollHeight;
               } else if (evt.type === 'done') {
                 w.classList.remove('streaming');
+                if (evt.uso) { PARTICIPANTE.uso_chat = evt.uso; _pintarUsoChat(); }
               } else if (evt.type === 'error') {
-                throw new Error(evt.message || 'Error en stream');
+                errorStream = evt.message || 'No se pudo completar la respuesta.';
               }
             } catch(parseErr) {}
           }
         }
         w.classList.remove('streaming');
+        if (!textoCompleto && errorStream) throw new Error(errorStream);
         resolve(textoCompleto || '(sin respuesta)');
       } catch(e) {
         w.remove(); // quitar burbuja parcial si hay error
