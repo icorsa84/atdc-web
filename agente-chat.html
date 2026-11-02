@@ -8060,24 +8060,26 @@ function discCalcularYFinalizar() {
     S: contadores.natural.S - contadores.adaptado.S,
     C: contadores.natural.C - contadores.adaptado.C
   };
-  // Generar código DISC (ordenado por puntuación natural)
+  // REQ-DISC-02: perfil integrado (MÁS − MENOS), igual que el servidor.
+  // Antes se usaba solo MÁS y los empates se resolvían por orden alfabético.
   const dims = ['D','I','S','C'];
   const codigo = dims.map(d => `${d}${contadores.natural[d]}`).join('-');
-  // Determinar patrón dominante
-  const max1 = dims.reduce((a,b) => contadores.natural[a] >= contadores.natural[b] ? a : b);
-  const otros = dims.filter(d => d !== max1);
-  const max2 = otros.reduce((a,b) => contadores.natural[a] >= contadores.natural[b] ? a : b);
+  const ordenDisc = dims.slice().sort((a, b) =>
+    (nuclear[b] - nuclear[a]) || (contadores.natural[b] - contadores.natural[a]) ||
+    (contadores.adaptado[a] - contadores.adaptado[b]) || (dims.indexOf(a) - dims.indexOf(b)));
+  const max1 = ordenDisc[0];
+  const max2 = nuclear[ordenDisc[1]] > 0 ? ordenDisc[1] : '';
   const PATRONES = {
     'D':  'Dominante — Orientado a resultados y poder','I':'Influyente — Orientado a las personas y comunicación',
     'S':  'Estable — Orientado al apoyo y consistencia','C':'Concienzudo — Orientado a la calidad y normas',
-    'DI': 'Inspirador — Lidera con energía y visión','DC':'Perfeccionista — Exige calidad y eficiencia',
+    'DI': 'Inspirador — Lidera con energía y visión','DC':'Creativo — Exige calidad y resultados',
     'DS': 'Investigador — Analiza y actúa con cautela','ID':'Promotor — Persuade y orienta a resultados',
     'IS': 'Consejero — Conecta con y cuida a las personas','IC':'Evaluador — Comunica con precisión y criterio',
     'SD': 'Especialista — Profundo, fiel y determinado','SI':'Agente — Servicial, motivador y empático',
     'SC': 'Conformista — Leal, detallista y consistente','CD':'Realizador — Analítico, exigente y eficiente',
     'CI': 'Objetivo — Preciso y persuasivo','CS':'Perfeccionista — Cauteloso, estable y cuidadoso'
   };
-  const patron = PATRONES[`${max1}${max2}`] || PATRONES[max1] || `Perfil ${max1}/${max2}`;
+  const patron = PATRONES[`${max1}${max2}`] || PATRONES[max1];
 
   // Actualizar PARTICIPANTE
   PARTICIPANTE.disc = {
