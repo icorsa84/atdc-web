@@ -2107,6 +2107,10 @@ function _renderDetalle(p) {
 
     <div class="sec">
       <div class="sec-title">Datos del participante</div>
+      <div style="font-size:13.5px;margin:-2px 0 12px;">Correo: ${p.email_contacto
+        ? `<a href="mailto:${escHtml(p.email_contacto)}">${escHtml(p.email_contacto)}</a>
+           <button class="btn-secondary" style="padding:3px 10px;font-size:12px;margin-left:6px;" onclick="_copiarTexto('${escHtml(p.email_contacto)}')">Copiar</button>`
+        : '<span style="color:var(--muted);">sin correo registrado</span>'}</div>
       <div class="field-row">
         <div class="field"><label for="_d_nombre">Nombre</label><input id="_d_nombre" value="${(p.nombre||'').replace(/"/g,'&quot;')}"></div>
         <!-- Fix QA-UX-CATALOGO-01: antes texto libre; mostraba literalmente
