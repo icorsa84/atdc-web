@@ -4613,13 +4613,41 @@ async function llamarAPIInforme() {
     },
     historial_resumen: historial.filter(m=>m.role==='user').slice(-6).map(m=>m.content).join(' | ')
   };
-  const r = await fetch(CONFIG.informe_url,{
-    method:'POST',
-    headers:{'Content-Type':'application/json', 'Authorization': `Bearer ${_obtenerToken()}`},
-    // REQ-INFORME-01: un informe Premium largo puede tardar más de 60 s; antes se
-    // cortaba y caía al informe SIMULADO local presentado como real.
-    body:JSON.stringify(payload), signal:AbortSignal.timeout(240000)
-  });
+  // Fix INFORME-CORTE: el informe tarda 30–90 s. Si algún intermediario corta
+  // la conexión (502/504/524 o red), el servidor igual lo termina y lo guarda:
+  // se espera y se recupera desde /api/mi-perfil en vez de mostrar un error.
+  const _previo = ((window._INFORME_SERVIDOR || {}).generado_en) || '';
+  const _recuperar = async () => {
+    for (let i = 0; i < 24; i++) {          // hasta ~4 minutos
+      await new Promise(res => setTimeout(res, 10000));
+      try {
+        const rp = await fetch(`${_BACKEND}/api/mi-perfil`, { headers: { 'Authorization': `Bearer ${_obtenerToken()}` } });
+        if (!rp.ok) continue;
+        const inf = (await rp.json()).informe_final;
+        // es nuevo si cambió respecto del informe que había al pedirlo
+        if (inf && (inf.secciones || inf.en_revision) && (inf.generado_en || '') !== _previo) return inf;
+      } catch (_) {}
+    }
+    return null;
+  };
+  let r;
+  try {
+    r = await fetch(CONFIG.informe_url,{
+      method:'POST',
+      headers:{'Content-Type':'application/json', 'Authorization': `Bearer ${_obtenerToken()}`},
+      // REQ-INFORME-01: un informe Premium largo puede tardar más de 60 s; antes se
+      // cortaba y caía al informe SIMULADO local presentado como real.
+      body:JSON.stringify(payload), signal:AbortSignal.timeout(240000)
+    });
+  } catch (eRed) {
+    const inf = await _recuperar();
+    if (inf) return inf;
+    throw eRed;
+  }
+  if (!r.ok && [502, 503, 504, 520, 522, 524].includes(r.status)) {
+    const inf = await _recuperar();
+    if (inf) return inf;
+  }
   if(!r.ok){
     const err=await r.json().catch(()=>({}));
     // Fix QA-PREMIUM-GATE-01: antes este Error perdía el código HTTP, así
