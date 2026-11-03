@@ -2919,7 +2919,7 @@ async function _pintarPilotoAuth(mensajeCerrado) {
     caja.style.display = 'block';
     caja.innerHTML = `<span style="display:inline-block;padding:2px 9px;border-radius:99px;background:#7C3AED;color:#fff;font-size:10.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;">Programa piloto</span><br>
       <strong>Plan ${escHtml(d.plan)} gratis por ${escHtml(d.dias)} días.</strong> Úsalo en tu búsqueda real y, al terminar tu Informe Final, cuéntanos qué mejorar. Quedan <strong>${escHtml(d.cupos_restantes)}</strong> cupos.
-      <span style="display:block;margin-top:4px;color:var(--text2);font-size:12px;">¿Ya tienes cuenta? Entra con «Ya tengo cuenta» y el regalo se activa solo.</span>`;
+      <span style="display:block;margin-top:4px;color:var(--text2);font-size:12px;">¿Ya tienes cuenta? <a href="#" onclick="_cambiarTabAuth('login');document.getElementById('_login_email')?.focus();return false;" style="color:var(--cyan2);font-weight:700;">Entra aquí</a> y el regalo se activa solo.</span>`;
   } catch (e) { /* sin conexión: el registro igual valida el código */ }
 }
 async function _canjearPilotoSiCorresponde() {

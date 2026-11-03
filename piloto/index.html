@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="es-CL">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Programa piloto ATDC — Plan Profesional gratis por 60 días</title>
+<meta name="description" content="Prueba ATDC gratis: plan Profesional por 60 días a cambio de tu opinión. CV con puntaje ATS (Sistema de Seguimiento de Candidatos), tests DISC y Kostick e informe de empleabilidad. Solo 50 cupos.">
+<!-- Vista previa al compartir (LinkedIn, WhatsApp, Facebook, X) -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="ATDC">
+<meta property="og:locale" content="es_CL">
+<meta property="og:url" content="https://outplacement.atdc.app/piloto/">
+<meta property="og:title" content="Programa piloto ATDC — Plan Profesional gratis por 60 días">
+<meta property="og:description" content="Outplacement con IA para Chile: CV con puntaje ATS, tests DISC y Kostick e informe de empleabilidad. Solo 50 cupos, a cambio de tu opinión.">
+<meta property="og:image" content="https://outplacement.atdc.app/brand/og-piloto.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Programa piloto ATDC: plan Profesional gratis por 60 días, solo 50 cupos">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Programa piloto ATDC — Plan Profesional gratis por 60 días">
+<meta name="twitter:description" content="CV con puntaje ATS, DISC y Kostick, informe de empleabilidad. Solo 50 cupos.">
+<meta name="twitter:image" content="https://outplacement.atdc.app/brand/og-piloto.png">
+<link rel="canonical" href="https://outplacement.atdc.app/piloto/">
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" type="image/svg+xml" href="/brand/favicon.svg">
+<script>
+  // Lleva a la landing con el código del piloto (por defecto PILOTO; otro canal: /piloto/?c=CODIGO)
+  (function () {
+    var q = new URLSearchParams(location.search);
+    var cod = (q.get('c') || q.get('piloto') || 'PILOTO').toUpperCase().replace(/[^A-Z0-9-]/g, '').slice(0, 30) || 'PILOTO';
+    q.delete('c'); q.set('piloto', cod);
+    location.replace('/landing.html?' + q.toString());
+  })();
+</script>
+<style>
+  :root { color-scheme: dark; }
+  body { margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center;
+         background: #0A0D14; color: #E2E8F0; font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; padding: 16px; }
+  a { color: #A78BFA; font-weight: 700; }
+</style>
+</head>
+<body>
+  <p>Abriendo el programa piloto de ATDC… Si no avanza, <a href="/landing.html?piloto=PILOTO">entra aquí</a>.</p>
+</body>
+</html>

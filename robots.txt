@@ -3,6 +3,7 @@ User-agent: *
 Allow: /landing.html
 Allow: /privacidad.html
 Allow: /terminos.html
+Allow: /piloto/
 Disallow: /admin/
 Disallow: /api/
 Disallow: /agente-chat.html
