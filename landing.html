@@ -161,6 +161,18 @@ ul{list-style:none}
   margin-bottom:20px;
 }
 .hero-eyebrow svg{flex-shrink:0}
+/* REQ-PILOTO: aviso del programa piloto (solo si se llega con ?piloto=CODIGO) */
+.piloto-aviso{display:none;margin:0 0 22px;padding:16px 18px;border-radius:14px;
+  background:linear-gradient(135deg,rgba(37,99,235,.10),rgba(124,58,237,.12));border:1px solid rgba(124,58,237,.35);
+  color:var(--text-primary);font-size:15px;line-height:1.5}
+.piloto-aviso.visible{display:block}
+.piloto-aviso strong{font-family:'Sora',sans-serif}
+.piloto-aviso .piloto-tag{display:inline-block;margin-bottom:6px;padding:3px 10px;border-radius:100px;background:#7C3AED;color:#fff;
+  font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
+.piloto-aviso .piloto-cta{display:inline-flex;margin-top:12px;padding:11px 18px;border-radius:10px;background:linear-gradient(135deg,#2563EB,#7C3AED);
+  color:#fff;font-weight:700;text-decoration:none}
+.piloto-aviso .piloto-cupos{display:block;margin-top:6px;font-size:13px;opacity:.85}
+.piloto-aviso.cerrado{background:rgba(148,163,184,.12);border-color:rgba(148,163,184,.4)}
 .hero-title{
   font-family:'Sora',sans-serif;
   font-size:clamp(36px,4.5vw,58px);
@@ -635,6 +647,7 @@ footer{
 <section class="hero" aria-labelledby="hero-title">
   <div class="hero-inner">
     <div class="hero-text">
+      <div class="piloto-aviso" id="pilotoAviso" role="status" aria-live="polite"></div>
       <div class="hero-eyebrow" aria-label="Outplacement con IA para Chile">
         <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
           <circle cx="6" cy="6" r="4" stroke="currentColor" stroke-width="1.5"/>
@@ -1185,5 +1198,36 @@ document.addEventListener('keydown', function(e) {
 });
 </script>
 
+<script>
+/* ── REQ-PILOTO: enlace del programa piloto (?piloto=CODIGO) ── */
+(function () {
+  var cod = (new URLSearchParams(location.search).get('piloto') || '').toUpperCase().replace(/[^A-Z0-9-]/g, '').slice(0, 30);
+  if (!cod) return;
+  var caja = document.getElementById('pilotoAviso');
+  // En atdc.app (sitio público) la API está en outplacement.atdc.app; en la app y en pruebas locales, en el mismo sitio
+  var API = /(^|\.)atdc\.app$/.test(location.hostname) && location.hostname !== 'outplacement.atdc.app' ? 'https://outplacement.atdc.app' : location.origin;
+  var esc = function (t) { var d = document.createElement('div'); d.textContent = String(t == null ? '' : t); return d.innerHTML; };
+  fetch(API + '/api/piloto/' + encodeURIComponent(cod)).then(function (r) { return r.json(); }).then(function (d) {
+    if (!caja) return;
+    if (!d.valido) { caja.className = 'piloto-aviso visible cerrado'; caja.textContent = 'El enlace del programa piloto no es válido. Igual puedes comenzar gratis con el plan Inicial.'; return; }
+    if (!d.disponible) {
+      caja.className = 'piloto-aviso visible cerrado';
+      caja.innerHTML = '<strong>Programa piloto ATDC</strong><br>' + esc(d.mensaje) + ' Igual puedes comenzar gratis con el plan Inicial.';
+      return;
+    }
+    var destino = API + '/agente-chat.html?piloto=' + encodeURIComponent(cod);
+    caja.className = 'piloto-aviso visible';
+    caja.innerHTML = '<span class="piloto-tag">Programa piloto</span><br>' +
+      '<strong>Plan ' + esc(d.plan) + ' gratis por ' + esc(d.dias) + ' días</strong> a cambio de tu opinión: ' +
+      'usa ATDC en tu búsqueda real y, al terminar tu Informe Final, cuéntanos qué mejorar.' +
+      '<span class="piloto-cupos">Quedan <b>' + esc(d.cupos_restantes) + '</b> de ' + esc(d.cupo) + ' cupos.</span>' +
+      '<a class="piloto-cta" href="' + destino + '">Quiero participar</a>';
+    // Todos los botones de registro llevan el código del piloto
+    document.querySelectorAll('a[href*="agente-chat.html"]').forEach(function (a) { a.href = destino; });
+  }).catch(function () {
+    if (caja) { caja.className = 'piloto-aviso visible cerrado'; caja.textContent = 'No pudimos revisar los cupos del programa piloto. Recarga la página en un momento.'; }
+  });
+})();
+</script>
 </body>
 </html>

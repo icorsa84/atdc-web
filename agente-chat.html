@@ -1760,6 +1760,11 @@
         style="margin-top:6px;width:100%;padding:7px 10px;border-radius:8px;border:1px solid var(--border2);
         background:transparent;color:var(--muted);font-weight:600;font-size:.75rem;cursor:pointer;gap:6px;display:flex;align-items:center;justify-content:center;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h9"></path><polyline points="14 17 19 12 14 7"></polyline><line x1="19" y1="12" x2="8" y2="12"></line></svg> Cerrar sesión</button>
 
+      <!-- REQ-PILOTO: encuesta final -->
+      <button id="btnOpinion" onclick="_abrirEncuestaFinal()" title="Cuéntanos cómo te fue con ATDC"
+        style="margin-top:6px;width:100%;padding:7px 10px;border-radius:8px;border:1px solid rgba(124,58,237,.5);
+        background:rgba(124,58,237,.10);color:var(--text);font-weight:700;font-size:.75rem;cursor:pointer;gap:6px;display:none;align-items:center;justify-content:center;">⭐ Dar mi opinión sobre ATDC</button>
+
       <!-- PRIVACIDAD Y DATOS PERSONALES -->
       <button id="btnPrivacidad" onclick="_abrirPrivacidad()" title="Gestiona tus datos personales, consentimientos y privacidad"
         style="margin-top:6px;width:100%;padding:7px 10px;border-radius:8px;border:1px solid var(--border2);
@@ -2571,7 +2576,10 @@ function _mostrarOnboarding(planPreseleccionado) {
            línea y se permite que el conjunto completo haga wrap (flex-wrap)
            como bloque, para que la descripción pase entera a la línea
            siguiente en vez de partirse por la mitad. -->
-      <div style="
+      <div id="_pilotoAuth" role="status" aria-live="polite" style="display:none;margin-bottom:16px;padding:12px 14px;border-radius:10px;
+        background:linear-gradient(135deg,rgba(37,99,235,.12),rgba(124,58,237,.14));border:1px solid rgba(124,58,237,.4);
+        font-size:13px;line-height:1.5;color:var(--text);"></div>
+      <div id="_planBadgeAuth" style="
         display:inline-flex;align-items:center;flex-wrap:wrap;gap:4px 6px;
         background:var(--bg3);border:1px solid var(--border);
         border-radius:8px;padding:6px 12px;margin-bottom:18px;
@@ -2701,6 +2709,7 @@ function _mostrarOnboarding(planPreseleccionado) {
     </div>
   `;
   document.body.appendChild(overlay);
+  _pintarPilotoAuth();   // REQ-PILOTO
 
   setTimeout(() => {
     document.getElementById('_ob_nombre')?.focus();
@@ -2793,13 +2802,21 @@ async function _registrarParticipante(plan) {
     const res = await fetch(CONFIG.auth_registro_url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ nombre, apellido, email, password, plan, cargo_objetivo, sector, renta_objetivo }),
+      body: JSON.stringify({ nombre, apellido, email, password, plan, cargo_objetivo, sector, renta_objetivo,
+                             codigo_piloto: _codigoPiloto() || null }),
       signal: AbortSignal.timeout(70000)   // Render free plan puede tardar 60s en despertar
     });
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      if (res.status === 409) throw new Error('Ya existe una cuenta con ese correo. Usa "Ya tengo cuenta" para ingresar.');
+      if (res.status === 409) throw new Error('Ya existe una cuenta con ese correo. Usa "Ya tengo cuenta" para ingresar' +
+        (_codigoPiloto() ? ': el regalo del piloto se activa al entrar.' : '.'));
+      if (_codigoPiloto() && (res.status === 410 || res.status === 404)) {
+        // REQ-PILOTO: sin cupo o código inválido → la persona decide si sigue con el plan gratuito
+        _olvidarPiloto();
+        _pintarPilotoAuth(_textoErrorApi(err.detail));
+        throw new Error(_textoErrorApi(err.detail) + ' Presiona de nuevo el botón para crear tu cuenta gratuita.');
+      }
       throw new Error(_textoErrorApi(err.detail) || `Error ${res.status}`);
     }
 
@@ -2854,6 +2871,229 @@ async function _iniciarSesionConCorreo() {
 }
 
 /* ================================================================
+   REQ-PILOTO — programa piloto con usuarios reales
+   El enlace ?piloto=CODIGO regala el plan de la campaña (Profesional,
+   60 días). El código se recuerda en este navegador hasta que se usa,
+   así sobrevive al ir y volver de Google. Al terminar el Informe Final
+   se ofrece la encuesta; el consultor ve todo en «Piloto» del panel.
+   ================================================================ */
+const _PILOTO_KEY = 'atdc_piloto_pend';
+function _codigoPiloto() {
+  try {
+    const u = (new URLSearchParams(location.search).get('piloto') || '').toUpperCase().replace(/[^A-Z0-9-]/g, '').slice(0, 30);
+    if (u && !window._pilotoDescartado) { localStorage.setItem(_PILOTO_KEY, u); return u; }
+    if (window._pilotoDescartado) return '';
+    return localStorage.getItem(_PILOTO_KEY) || '';
+  } catch (e) { return ''; }
+}
+function _olvidarPiloto() {
+  window._pilotoDescartado = true;
+  try { localStorage.removeItem(_PILOTO_KEY); } catch (e) {}
+  try {
+    const u = new URL(location.href);
+    if (u.searchParams.has('piloto')) { u.searchParams.delete('piloto'); history.replaceState({}, document.title, u.pathname + u.search); }
+  } catch (e) {}
+}
+async function _pintarPilotoAuth(mensajeCerrado) {
+  const caja = document.getElementById('_pilotoAuth');
+  const badge = document.getElementById('_planBadgeAuth');
+  if (!caja) return;
+  if (mensajeCerrado) {
+    caja.style.display = 'block';
+    caja.innerHTML = `<strong>Programa piloto</strong><br>${escHtml(mensajeCerrado)}`;
+    if (badge) badge.style.display = 'inline-flex';
+    return;
+  }
+  const cod = _codigoPiloto();
+  if (!cod) return;
+  try {
+    const r = await fetch(`${_BACKEND}/api/piloto/${encodeURIComponent(cod)}`);
+    const d = await r.json();
+    if (!d.valido || !d.disponible) {
+      _olvidarPiloto();
+      caja.style.display = 'block';
+      caja.innerHTML = `<strong>Programa piloto</strong><br>${escHtml(d.mensaje || 'Este enlace ya no está disponible.')} Puedes crear tu cuenta con el plan Inicial gratuito.`;
+      return;
+    }
+    if (badge) badge.style.display = 'none';
+    caja.style.display = 'block';
+    caja.innerHTML = `<span style="display:inline-block;padding:2px 9px;border-radius:99px;background:#7C3AED;color:#fff;font-size:10.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;">Programa piloto</span><br>
+      <strong>Plan ${escHtml(d.plan)} gratis por ${escHtml(d.dias)} días.</strong> Úsalo en tu búsqueda real y, al terminar tu Informe Final, cuéntanos qué mejorar. Quedan <strong>${escHtml(d.cupos_restantes)}</strong> cupos.
+      <span style="display:block;margin-top:4px;color:var(--text2);font-size:12px;">¿Ya tienes cuenta? Entra con «Ya tengo cuenta» y el regalo se activa solo.</span>`;
+  } catch (e) { /* sin conexión: el registro igual valida el código */ }
+}
+async function _canjearPilotoSiCorresponde() {
+  const cod = _codigoPiloto();
+  if (!cod || IS_ADMIN) return;
+  try {
+    const r = await fetch(`${_BACKEND}/api/piloto/canjear`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${_obtenerToken()}` },
+      body: JSON.stringify({ codigo: cod })
+    });
+    const d = await r.json().catch(() => ({}));
+    if (r.ok) {
+      if (!d.ya_inscrito) {
+        PARTICIPANTE.plan = PARTICIPANTE.plan_activo = d.plan;
+        PARTICIPANTE.plan_vence_en = d.plan_vence_en || '';
+        PARTICIPANTE.plan_vencido = false;
+        CONFIG.plan = d.plan;
+        try { const s = JSON.parse(localStorage.getItem(_SESION_KEY) || '{}'); s.plan = d.plan; localStorage.setItem(_SESION_KEY, JSON.stringify(s)); } catch (e) {}
+        _PERFIL_VALIDADO = null;   // se vuelve a pedir el perfil con el plan nuevo
+        window._avisoPiloto = `🎁 **¡Bienvenido al programa piloto!** Tienes el plan **${d.plan}** de regalo hasta el ${_fechaCorta(d.plan_vence_en)}. Úsalo en tu búsqueda real; al terminar tu Informe Final te pediremos tu opinión.`;
+      }
+      _olvidarPiloto();
+    } else if (r.status === 409 || r.status === 410 || r.status === 404) {
+      window._avisoPiloto = `ℹ️ ${_textoErrorApi(d.detail) || 'No se pudo activar el regalo del programa piloto.'}`;
+      _olvidarPiloto();
+    }
+    // otros errores (red, servidor despertando): se reintenta en el próximo ingreso
+  } catch (e) {}
+}
+function _fechaCorta(iso) {
+  try { return new Date(iso).toLocaleDateString('es-CL', { day: 'numeric', month: 'long', year: 'numeric' }); } catch (e) { return iso || ''; }
+}
+async function _pilotoInit() {
+  if (IS_ADMIN) return;
+  try {
+    const r = await fetch(`${_BACKEND}/api/piloto/mi-estado`, { headers: { 'Authorization': `Bearer ${_obtenerToken()}` } });
+    if (r.ok) window._PILOTO_ESTADO = await r.json();
+  } catch (e) {}
+  const st = window._PILOTO_ESTADO || {};
+  if (st.en_piloto && st.piloto && st.piloto.desde) {
+    // registro con código: el aviso de bienvenida se muestra una sola vez
+    try {
+      const k = `atdc_piloto_bienvenida_${PARTICIPANTE.id}`;
+      if (!localStorage.getItem(k) && !window._avisoPiloto) {
+        window._avisoPiloto = `🎁 **Estás en el programa piloto de ATDC.** Tienes el plan **${escHtml(PARTICIPANTE.plan_activo || PARTICIPANTE.plan)}** de regalo hasta el ${_fechaCorta(PARTICIPANTE.plan_vence_en)}. Úsalo en tu búsqueda real: al terminar tu Informe Final te pediremos tu opinión.`;
+      }
+      localStorage.setItem(k, '1');
+    } catch (e) {}
+  }
+  _pintarBotonOpinion();
+  if (window._avisoPiloto) { agentMsg(window._avisoPiloto); window._avisoPiloto = null; }
+}
+function _pintarBotonOpinion() {
+  const st = window._PILOTO_ESTADO || {};
+  const b = document.getElementById('btnOpinion');
+  if (!b) return;
+  const ver = st.en_piloto || st.informe_generado || !!window._INFORME_SERVIDOR;
+  b.style.display = ver ? 'flex' : 'none';
+  b.textContent = st.encuesta_respondida ? '⭐ Editar mi opinión sobre ATDC' : '⭐ Dar mi opinión sobre ATDC';
+}
+function _pilotoTrasInforme() {
+  const st = window._PILOTO_ESTADO = window._PILOTO_ESTADO || {};
+  st.informe_generado = true;
+  _pintarBotonOpinion();
+  if (st.encuesta_respondida) return;
+  let ofrecida = false;
+  try { ofrecida = !!localStorage.getItem(`atdc_encuesta_ofrecida_${PARTICIPANTE.id}`); localStorage.setItem(`atdc_encuesta_ofrecida_${PARTICIPANTE.id}`, '1'); } catch (e) {}
+  if (ofrecida) return;
+  agentMsg(`🎉 **¡Terminaste tu Informe Final!** ${st.en_piloto ? 'Como parte del programa piloto, ' : ''}¿nos regalas 3 minutos para contarnos cómo te fue? Tu opinión decide qué mejoramos primero.`,
+    [{ label: '⭐ Responder la encuesta', action: () => _abrirEncuestaFinal() }]);
+  if (st.en_piloto) window._encuestaAlCerrarInforme = true;   // se abre sola al cerrar el informe
+}
+function _abrirEncuestaFinal() {
+  window._encuestaAlCerrarInforme = false;
+  const st = window._PILOTO_ESTADO || {};
+  const e = st.encuesta || {};
+  const util = e.utilidad || {};
+  const mods = (st.modulos && st.modulos.length) ? st.modulos : [
+    { id: 'cv', nombre: 'CV y puntaje ATS' }, { id: 'mejoras', nombre: 'Mejoras sugeridas al CV' }, { id: 'disc', nombre: 'Test DISC' },
+    { id: 'kostick', nombre: 'Test Kostick' }, { id: 'mercado', nombre: 'Mercado laboral y renta' }, { id: 'avisos', nombre: 'Análisis de avisos' },
+    { id: 'chat', nombre: 'Conversación con el agente' }, { id: 'informe', nombre: 'Informe Final' }];
+  const lbl = (t, extra) => `<div style="font-size:.82rem;font-weight:700;color:var(--text);margin:14px 0 6px;">${t}${extra ? `<span style="display:block;font-weight:400;font-size:.74rem;color:var(--muted);">${extra}</span>` : ''}</div>`;
+  const escala = (nombre, desde, hasta, valor, extremos) => `
+    <div role="radiogroup" aria-label="${escHtml(nombre)}" style="display:flex;flex-wrap:wrap;gap:5px;">
+      ${Array.from({ length: hasta - desde + 1 }, (_, i) => desde + i).map(n => `
+        <label style="flex:1 0 34px;min-width:34px;">
+          <input type="radio" name="_enc_${nombre}" value="${n}" ${Number(valor) === n ? 'checked' : ''} style="position:absolute;opacity:0;width:1px;height:1px;">
+          <span class="_enc_op" style="display:block;text-align:center;padding:7px 0;border-radius:8px;border:1px solid var(--border2);cursor:pointer;font-weight:700;font-size:.85rem;color:var(--text);">${n}</span>
+        </label>`).join('')}
+    </div>
+    ${extremos ? `<div style="display:flex;justify-content:space-between;font-size:.7rem;color:var(--muted);margin-top:3px;"><span>${extremos[0]}</span><span>${extremos[1]}</span></div>` : ''}`;
+  const area = (id, ph, val) => `<textarea id="${id}" maxlength="2000" placeholder="${ph}" style="width:100%;min-height:62px;padding:8px 10px;border-radius:8px;border:1px solid var(--border2);background:var(--bg);color:var(--text);font:inherit;font-size:.85rem;box-sizing:border-box;">${escHtml(val || '')}</textarea>`;
+  const ov = _modalPassword('_encuestaModal', '⭐ ¿Cómo te fue con ATDC?', `
+    <p style="font-size:.8rem;color:var(--muted);margin:0 0 4px;">Toma unos 3 minutos. Solo la ve el equipo de ATDC y sirve para mejorar la plataforma.</p>
+    ${lbl('1. En general, ¿qué nota le pones a ATDC?', 'Escala de 1 a 7')}${escala('nota', 1, 7, e.nota, ['1 · muy malo', '7 · excelente'])}
+    ${lbl('2. ¿Qué tan probable es que recomiendes ATDC a un colega o amigo?')}${escala('recomendaria', 0, 10, e.recomendaria, ['0 · nada probable', '10 · muy probable'])}
+    ${lbl('3. ¿Qué tan fácil fue usarlo?')}${escala('facilidad', 1, 5, e.facilidad, ['1 · muy difícil', '5 · muy fácil'])}
+    ${lbl('4. ¿Qué tan útil te resultó cada parte?', '1 = nada útil · 5 = muy útil')}
+    <div style="display:grid;grid-template-columns:1fr auto;gap:6px 10px;align-items:center;">
+      ${mods.map(m => `<label for="_enc_u_${m.id}" style="font-size:.8rem;color:var(--text);">${escHtml(m.nombre)}</label>
+        <select id="_enc_u_${m.id}" data-mod="${m.id}" class="_enc_util" style="padding:6px 8px;border-radius:7px;border:1px solid var(--border2);background:var(--bg);color:var(--text);">
+          <option value="">Elegir</option><option value="0" ${util[m.id] === 0 ? 'selected' : ''}>No lo usé</option>
+          ${[1, 2, 3, 4, 5].map(n => `<option value="${n}" ${util[m.id] === n ? 'selected' : ''}>${n}</option>`).join('')}
+        </select>`).join('')}
+    </div>
+    ${lbl('5. ¿Pagarías por un servicio así?')}
+    <div role="radiogroup" aria-label="¿Pagarías?" style="display:flex;gap:6px;">
+      ${[['sí', 'Sí'], ['tal vez', 'Tal vez'], ['no', 'No']].map(([o, t]) => `<label style="flex:1;"><input type="radio" name="_enc_pagaria" value="${o}" ${e.pagaria === o ? 'checked' : ''} style="position:absolute;opacity:0;width:1px;height:1px;"><span class="_enc_op" style="display:block;text-align:center;padding:7px 0;border-radius:8px;border:1px solid var(--border2);cursor:pointer;font-weight:700;font-size:.82rem;color:var(--text);">${t}</span></label>`).join('')}
+    </div>
+    ${lbl('6. ¿Qué fue lo que más te sirvió?')}${area('_enc_mejor', 'Por ejemplo: las mejoras al CV, el informe, el chat…', e.lo_mejor)}
+    ${lbl('7. ¿Qué mejorarías o agregarías?')}${area('_enc_mejorar', 'Lo que te faltó o lo que cambiarías', e.mejorar)}
+    ${lbl('8. ¿Tuviste algún problema o error?', 'Cuéntanos qué estabas haciendo y qué pasó')}${area('_enc_problemas', 'Si todo funcionó bien, déjalo en blanco', e.problemas)}
+    ${lbl('9. Testimonio (opcional)', 'Una o dos frases sobre tu experiencia')}${area('_enc_testimonio', 'Ej.: «Con ATDC ordené mi búsqueda y mejoré mi CV en una semana»', e.testimonio)}
+    <label style="display:flex;gap:8px;align-items:flex-start;font-size:.78rem;color:var(--text);margin-top:8px;"><input type="checkbox" id="_enc_aut" ${e.autoriza_testimonio ? 'checked' : ''}><span>Autorizo que ATDC publique mi testimonio con mi nombre y cargo.</span></label>
+    <label style="display:flex;gap:8px;align-items:flex-start;font-size:.78rem;color:var(--text);margin-top:6px;"><input type="checkbox" id="_enc_contacto" ${e.acepta_contacto ? 'checked' : ''}><span>Acepto que el consultor me contacte para una conversación breve sobre mi experiencia.</span></label>
+    <div id="_enc_msg" role="alert" style="display:none;font-size:.8rem;margin:10px 0 0;"></div>
+    <button id="_enc_btn" onclick="_enviarEncuestaFinal()" style="margin-top:14px;width:100%;padding:11px;border-radius:9px;border:none;background:linear-gradient(135deg,#2563EB,#7C3AED);color:#fff;font-weight:700;cursor:pointer;">Enviar mi opinión</button>
+  `);
+  const caja = ov.querySelector('div'); if (caja) { caja.style.maxWidth = '560px'; }
+  ov.setAttribute('role', 'dialog'); ov.setAttribute('aria-modal', 'true'); ov.setAttribute('aria-label', 'Encuesta final de ATDC');
+  // Marca visual de la opción elegida (los radios están ocultos pero siguen siendo accesibles por teclado)
+  const pintar = () => ov.querySelectorAll('input[type=radio]').forEach(i => {
+    const sp = i.nextElementSibling; if (!sp) return;
+    sp.style.background = i.checked ? 'linear-gradient(135deg,#2563EB,#7C3AED)' : 'transparent';
+    sp.style.color = i.checked ? '#fff' : 'var(--text)';
+    sp.style.borderColor = i.checked ? 'transparent' : 'var(--border2)';
+  });
+  ov.querySelectorAll('input[type=radio]').forEach(i => {
+    i.addEventListener('change', () => { pintar(); const m = document.getElementById('_enc_msg'); if (m) m.style.display = 'none'; });
+    i.addEventListener('focus', () => { if (i.nextElementSibling) i.nextElementSibling.style.outline = '2px solid var(--blue2)'; });
+    i.addEventListener('blur', () => { if (i.nextElementSibling) i.nextElementSibling.style.outline = 'none'; });
+  });
+  pintar();
+  ov.addEventListener('keydown', ev => { if (ev.key === 'Escape') ov.remove(); });
+  setTimeout(() => ov.querySelector('input[type=radio]')?.focus(), 60);
+}
+async function _enviarEncuestaFinal() {
+  const ov = document.getElementById('_encuestaModal'); if (!ov) return;
+  const radio = n => { const x = ov.querySelector(`input[name="_enc_${n}"]:checked`); return x ? x.value : ''; };
+  const msg = document.getElementById('_enc_msg');
+  const faltan = [];
+  if (!radio('nota')) faltan.push('la nota (pregunta 1)');
+  if (radio('recomendaria') === '') faltan.push('si nos recomendarías (pregunta 2)');
+  if (!radio('facilidad')) faltan.push('qué tan fácil fue (pregunta 3)');
+  if (faltan.length) { msg.style.display = 'block'; msg.style.color = 'var(--red)'; msg.textContent = 'Falta responder ' + faltan.join(', ') + '.'; return; }
+  const utilidad = {};
+  ov.querySelectorAll('._enc_util').forEach(s => { if (s.value !== '') utilidad[s.dataset.mod] = parseInt(s.value, 10); });
+  const v = id => (document.getElementById(id)?.value || '').trim();
+  const body = {
+    nota: parseInt(radio('nota'), 10), recomendaria: parseInt(radio('recomendaria'), 10), facilidad: parseInt(radio('facilidad'), 10),
+    utilidad, pagaria: radio('pagaria'), lo_mejor: v('_enc_mejor'), mejorar: v('_enc_mejorar'), problemas: v('_enc_problemas'),
+    testimonio: v('_enc_testimonio'), autoriza_testimonio: document.getElementById('_enc_aut').checked,
+    acepta_contacto: document.getElementById('_enc_contacto').checked,
+  };
+  const btn = document.getElementById('_enc_btn'); btn.disabled = true; btn.textContent = 'Enviando…';
+  try {
+    const r = await fetch(`${_BACKEND}/api/piloto/encuesta`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${_obtenerToken()}` },
+      body: JSON.stringify(body)
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(_textoErrorApi(d.detail) || 'No se pudo enviar la encuesta.');
+    const st = window._PILOTO_ESTADO = window._PILOTO_ESTADO || {};
+    st.encuesta_respondida = true; st.encuesta = { ...body };
+    _pintarBotonOpinion();
+    ov.remove();
+    agentMsg('🙏 **¡Gracias por tu opinión!** La revisamos personalmente para mejorar ATDC. Si recuerdas algo más, puedes editarla desde «Dar mi opinión» en el panel.');
+  } catch (e) {
+    msg.style.display = 'block'; msg.style.color = 'var(--red)'; msg.textContent = e.message || 'No se pudo enviar. Intenta de nuevo.';
+    btn.disabled = false; btn.textContent = 'Enviar mi opinión';
+  }
+}
+
+/* ================================================================
    GOOGLE OAUTH — "Continuar con Google"
    ================================================================ */
 async function _iniciarGoogleOAuth(plan) {
@@ -2888,7 +3128,7 @@ async function _procesarRetornoGoogle() {
     const res = await fetch(CONFIG.auth_google_callback_url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code, plan }),
+      body: JSON.stringify({ code, plan, codigo_piloto: _codigoPiloto() || null }),
       signal: AbortSignal.timeout(70000)
     });
     if (!res.ok) {
@@ -3024,10 +3264,12 @@ async function _arrancarAppSiCorresponde() {
   if (_appIniciada) return;         // evitar doble arranque
   if (typeof init !== 'function') return;  // init() aún no se ha definido
   _appIniciada = true;
+  await _canjearPilotoSiCorresponde();  // REQ-PILOTO (cuenta ya existente que llega por el enlace)
   await _rehidratarPerfilCompleto();   // Fix QA-REHIDRATAR-01
   /* Fix SEG-AUTH-01: el panel solo se muestra una vez autenticada la persona */
   document.body.classList.remove('auth-pendiente');
   init();
+  setTimeout(() => { try { _pilotoInit(); } catch (e) {} }, 1800);   // REQ-PILOTO
 }
 
 /* ================================================================
@@ -4325,6 +4567,7 @@ function abrirInforme() {
 }
 
 function cerrarInforme() {
+  if (window._encuestaAlCerrarInforme) setTimeout(() => _abrirEncuestaFinal(), 400);   // REQ-PILOTO
   informeAbierto = false;
   tabActiva = 0; // Fix BUG-02: resetear estado de tab al cerrar para evitar desincronía visual al reabrir
   cancelarTimersLoading(); // Fix CHAT-PERF-01: cancelar timers de animación pendientes al cerrar
@@ -4515,6 +4758,7 @@ async function generarInforme() {
 
   renderInformeCompleto(informe);
   _mostrarExportes(informe);
+  try { _pilotoTrasInforme(); } catch (e) {}   // REQ-PILOTO: encuesta final
 
   if (btnPrincipal) {
     btnPrincipal.classList.remove('generando');

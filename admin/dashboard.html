@@ -87,6 +87,18 @@
 
   /* ===== RESUMEN (KPIs + gráfico de planes) ===== */
   .resumen-grid { display:grid; grid-template-columns: repeat(4, 1fr); gap:14px; margin-bottom:18px; }
+  /* REQ-PILOTO */
+  .pil-camp { border:1px solid var(--border2); border-radius:10px; padding:12px 14px; margin-bottom:10px; background:var(--bg); }
+  .pil-barra { height:8px; border-radius:99px; background:var(--bg3, rgba(148,163,184,.15)); overflow:hidden; margin:6px 0; }
+  .pil-barra > span { display:block; height:100%; background:linear-gradient(90deg,#2563EB,#7C3AED); }
+  .pil-embudo { display:grid; grid-template-columns:minmax(90px,max-content) 1fr 70px; gap:6px 10px; align-items:center; font-size:12.5px; }
+  .pil-chip { display:inline-block; min-width:18px; padding:1px 6px; margin:1px; border-radius:6px; font-size:10.5px; font-weight:700; text-align:center; }
+  .pil-chip.si { background:rgba(34,197,94,.18); color:#4ADE80; }
+  .pil-chip.no { background:rgba(148,163,184,.12); color:var(--muted); }
+  .pil-kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px; margin:12px 0; }
+  .pil-coment { border-left:3px solid #7C3AED; padding:6px 10px; margin:6px 0; background:var(--bg); border-radius:0 8px 8px 0; font-size:12.5px; }
+  .pil-tabla-wrap { overflow-x:auto; }
+  @media (max-width: 700px) { .pil-embudo { grid-template-columns:minmax(80px,40%) 1fr 56px; } }
   @media (max-width: 900px) { .resumen-grid { grid-template-columns: repeat(2, 1fr); } }
   .kpi-card { background:var(--bg2); border:1px solid var(--border); border-radius:12px; padding:16px 18px; }
   .kpi-label { font-size:11.5px; color:var(--muted); text-transform:uppercase; letter-spacing:.03em; margin-bottom:6px; }
@@ -179,6 +191,7 @@
     <a class="nav-item" data-sec="secDonut" href="#secDonut"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg> Planes</a>
     <a class="nav-item" data-sec="secTareas" href="#secTareas"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg> Tareas</a>
     <a class="nav-item" data-sec="secParticipantes" href="#secParticipantes"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg> Participantes</a>
+    <a class="nav-item" data-sec="secPiloto" href="#secPiloto">🎁 Piloto</a>
     <a class="nav-item" data-sec="secSesiones" href="#secSesiones">Sesiones</a>
     <a class="nav-item" data-sec="secListaNegra" href="#secListaNegra">Lista negra</a>
     <a class="nav-item" data-sec="secAuditoria" href="#secAuditoria"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect><path d="M9 4H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-3"></path><line x1="8" y1="11" x2="16" y2="11"></line><line x1="8" y1="15" x2="16" y2="15"></line></svg> Auditoría</a>
@@ -222,6 +235,7 @@
       <option value="">Todos los accesos</option>
       <option value="pagado">Pagados</option>
       <option value="cortesia">Cortesía (gratis concedidos)</option>
+      <option value="piloto">Programa piloto</option>
       <option value="pendiente">Pago pendiente</option>
       <option value="gratis">Gratis (Inicial)</option>
     </select>
@@ -253,6 +267,40 @@
   </div>
   <div id="_ln_msg" class="msg"></div>
   <div id="listaNegraWrap"><div class="loading">Cargando…</div></div>
+  </div>
+
+  <div class="panel-section" id="secPiloto">
+    <h2 style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">🎁 Programa piloto
+      <span style="flex:1"></span>
+      <button class="btn-secondary" onclick="cargarPiloto()">Actualizar</button>
+      <button class="btn-secondary" onclick="_exportarPiloto()">Descargar Excel (CSV)</button>
+    </h2>
+    <div style="font-size:12.5px;color:var(--muted);margin-bottom:10px;">
+      Enlaces que regalan un plan por tiempo limitado a cambio de la opinión de usuarios reales. Cada canal (LinkedIn, WhatsApp, un grupo…)
+      puede tener su propio código y cupo. Los inscritos aparecen como «Piloto» en la lista de participantes y no cuentan como venta.
+    </div>
+    <div id="pilotoCampanas"><div class="loading">Cargando programa piloto…</div></div>
+    <details id="pilotoNueva" style="margin:6px 0 14px;">
+      <summary style="cursor:pointer;font-weight:700;font-size:13px;">+ Crear o editar un enlace del piloto</summary>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;margin-top:10px;">
+        <div><label for="_pil_cod" style="display:block;font-size:11.5px;color:var(--muted);margin-bottom:3px;">Código (va en el enlace)</label>
+          <input id="_pil_cod" type="text" maxlength="30" placeholder="LINKEDIN" style="width:140px;text-transform:uppercase;"></div>
+        <div><label for="_pil_nom" style="display:block;font-size:11.5px;color:var(--muted);margin-bottom:3px;">Nombre interno</label>
+          <input id="_pil_nom" type="text" maxlength="80" placeholder="Publicación LinkedIn noviembre" style="width:220px;"></div>
+        <div><label for="_pil_plan" style="display:block;font-size:11.5px;color:var(--muted);margin-bottom:3px;">Plan de regalo</label>
+          <select id="_pil_plan"><option>Esencial</option><option selected>Profesional</option><option>Premium</option></select></div>
+        <div><label for="_pil_cupo" style="display:block;font-size:11.5px;color:var(--muted);margin-bottom:3px;">Cupo</label>
+          <input id="_pil_cupo" type="number" min="1" max="1000" value="50" style="width:80px;"></div>
+        <div><label for="_pil_dias" style="display:block;font-size:11.5px;color:var(--muted);margin-bottom:3px;">Días de acceso</label>
+          <input id="_pil_dias" type="number" min="1" max="365" value="60" style="width:80px;"></div>
+        <label style="display:flex;gap:6px;align-items:center;font-size:12.5px;"><input id="_pil_activo" type="checkbox" checked> Inscripciones abiertas</label>
+        <button class="btn-primary" id="_pil_btn" onclick="_guardarCampanaPiloto()">Guardar enlace</button>
+      </div>
+      <div id="_pil_msg" class="msg"></div>
+    </details>
+    <div id="pilotoResumen"></div>
+    <div id="pilotoProbadores"></div>
+    <div id="pilotoComentarios"></div>
   </div>
 
   <div class="panel-section" id="secSesiones" style="padding-bottom:4px;">
@@ -729,6 +777,7 @@ function _salir() {
 const _ACCESO = {
   pagado:    { txt: 'Pagado',         cls: 'badge-ok',             ico: 'credit-card' },
   cortesia:  { txt: 'Cortesía',       cls: 'badge-cortesia',       ico: 'smile' },
+  piloto:    { txt: 'Piloto',         cls: 'badge-cortesia',       ico: 'smile' },
   pendiente: { txt: 'Pago pendiente', cls: 'badge-pago-pendiente', ico: 'credit-card' },
   gratis:    { txt: 'Gratis (Inicial)', cls: 'badge-muted',        ico: 'user' },
 };
@@ -2494,8 +2543,134 @@ async function _eliminarDefinitivo(id) {
   } catch (e) { alert(e.message); }
 }
 
+
+/* ================================================================
+   REQ-PILOTO — panel del programa piloto
+   ================================================================ */
+let PILOTO = null;
+const _PIL_ETAPAS = [['cv','CV'],['disc','DISC'],['kostick','Kostick'],['mercado','Mercado'],['chat','Chat'],['informe','Informe'],['encuesta','Encuesta']];
+async function cargarPiloto() {
+  try { PILOTO = await _apiGet('/api/admin/piloto'); renderPiloto(); }
+  catch (e) { document.getElementById('pilotoCampanas').innerHTML = `<div class="empty">No se pudo cargar el programa piloto: ${escHtml(e.message)}</div>`; }
+}
+function _copiarTexto(t, btn) {
+  const ok = () => { if (btn) { const o = btn.textContent; btn.textContent = '¡Copiado!'; setTimeout(() => btn.textContent = o, 1500); } };
+  if (navigator.clipboard) navigator.clipboard.writeText(t).then(ok).catch(() => prompt('Copia el enlace:', t));
+  else prompt('Copia el enlace:', t);
+}
+function _editarCampanaPiloto(cod) {
+  const c = (PILOTO.campanas || []).find(x => x.codigo === cod); if (!c) return;
+  document.getElementById('_pil_cod').value = c.codigo; document.getElementById('_pil_nom').value = c.nombre || '';
+  document.getElementById('_pil_plan').value = c.plan; document.getElementById('_pil_cupo').value = c.cupo;
+  document.getElementById('_pil_dias').value = c.dias; document.getElementById('_pil_activo').checked = !!c.activo;
+  const d = document.getElementById('pilotoNueva'); d.open = true; d.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+async function _guardarCampanaPiloto() {
+  const cod = document.getElementById('_pil_cod').value.trim().toUpperCase().replace(/[^A-Z0-9-]/g, '');
+  if (cod.length < 2) { _mostrarMsg('_pil_msg', 'Escribe un código de al menos 2 letras o números (ej. LINKEDIN).', true); return; }
+  const body = { codigo: cod, nombre: document.getElementById('_pil_nom').value.trim(), plan: document.getElementById('_pil_plan').value,
+    cupo: parseInt(document.getElementById('_pil_cupo').value, 10) || 50, dias: parseInt(document.getElementById('_pil_dias').value, 10) || 60,
+    activo: document.getElementById('_pil_activo').checked };
+  try {
+    const c = await _apiSend('POST', '/api/admin/piloto/campanas', body);
+    _mostrarMsg('_pil_msg', `Enlace ${c.codigo} guardado. Ya puedes compartirlo: ${c.enlace}`, false);
+    await cargarPiloto();
+  } catch (e) { _mostrarMsg('_pil_msg', e.message, true); }
+}
+async function _cerrarCampanaPiloto(cod, abrir) {
+  const c = (PILOTO.campanas || []).find(x => x.codigo === cod); if (!c) return;
+  if (!abrir && !confirm(`¿Cerrar las inscripciones del enlace ${cod}? Quienes ya entraron conservan su plan.`)) return;
+  try { await _apiSend('POST', '/api/admin/piloto/campanas', { ...c, activo: !!abrir }); await cargarPiloto(); }
+  catch (e) { alert(e.message); }
+}
+async function _exportarPiloto() {
+  try {
+    const r = await fetch(`${BACKEND}/api/admin/piloto/exportar`, { headers: { 'X-Admin-Key': ADMIN_KEY } });
+    if (r.status === 401 || r.status === 403) { _salir(); return; }
+    if (!r.ok) throw new Error('No se pudo generar el archivo.');
+    const b = await r.blob(); const a = document.createElement('a');
+    a.href = URL.createObjectURL(b); a.download = `piloto_atdc_${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+  } catch (e) { alert(e.message); }
+}
+function _promTxt(v, max) { return v == null ? '—' : `${String(v).replace('.', ',')}${max ? ` / ${max}` : ''}`; }
+function renderPiloto() {
+  const P = PILOTO || {}; const R = P.resumen || {};
+  // Campañas
+  const camps = P.campanas || [];
+  document.getElementById('pilotoCampanas').innerHTML = camps.length ? camps.map(c => {
+    const pct = Math.min(100, Math.round(100 * c.inscritos / Math.max(1, c.cupo)));
+    return `<div class="pil-camp">
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
+        <strong style="font-size:14px;">${escHtml(c.nombre || c.codigo)}</strong>
+        <span class="badge ${c.activo ? 'badge-ok' : 'badge-muted'}">${c.activo ? 'Inscripciones abiertas' : 'Cerrado'}</span>
+        <span style="font-size:12px;color:var(--muted);">Código ${escHtml(c.codigo)} · plan ${escHtml(c.plan)} por ${c.dias} días</span>
+        <span style="flex:1"></span>
+        <button class="btn-secondary" onclick="_editarCampanaPiloto('${escHtml(c.codigo)}')">Editar</button>
+        ${c.activo ? `<button class="btn-secondary" onclick="_cerrarCampanaPiloto('${escHtml(c.codigo)}', false)">Cerrar inscripciones</button>`
+                   : `<button class="btn-secondary" onclick="_cerrarCampanaPiloto('${escHtml(c.codigo)}', true)">Reabrir</button>`}
+      </div>
+      <div class="pil-barra" role="progressbar" aria-valuemin="0" aria-valuemax="${c.cupo}" aria-valuenow="${c.inscritos}" aria-label="Cupos usados"><span style="width:${pct}%"></span></div>
+      <div style="font-size:12.5px;"><b>${c.inscritos}</b> de ${c.cupo} cupos usados · quedan <b>${c.cupos_restantes}</b></div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:8px;font-size:12px;">
+        <span style="color:var(--muted);">Enlace para publicar:</span>
+        <code style="word-break:break-all;">${escHtml(c.enlace)}</code>
+        <button class="btn-secondary" onclick="_copiarTexto('${escHtml(c.enlace)}', this)">Copiar enlace</button>
+      </div>
+    </div>`; }).join('')
+    : '<div class="empty">Todavía no hay enlaces del piloto. Créalo abajo con «+ Crear o editar un enlace del piloto».</div>';
+  if (!camps.length) document.getElementById('pilotoNueva').open = true;
+  // Resumen
+  const E = R.embudo || {}, EP = R.embudo_pct || {};
+  const nps = R.nps == null ? '—' : (R.nps > 0 ? '+' : '') + R.nps;
+  const pag = R.pagaria || {};
+  document.getElementById('pilotoResumen').innerHTML = (R.inscritos || R.encuestas) ? `
+    <div class="pil-kpis">
+      <div class="kpi-card"><div class="kpi-label">Probadores</div><div class="kpi-value">${R.inscritos || 0}</div><div class="kpi-sub">${R.sin_actividad_7d || 0} sin actividad hace 7+ días</div></div>
+      <div class="kpi-card"><div class="kpi-label">Encuestas</div><div class="kpi-value">${R.encuestas || 0}</div><div class="kpi-sub">de ${E.informe || 0} con Informe Final</div></div>
+      <div class="kpi-card"><div class="kpi-label">Nota promedio</div><div class="kpi-value">${_promTxt(R.nota_promedio)}</div><div class="kpi-sub">escala 1 a 7</div></div>
+      <div class="kpi-card"><div class="kpi-label">NPS</div><div class="kpi-value">${nps}</div><div class="kpi-sub">% que recomienda (9–10) menos % que no (0–6)</div></div>
+      <div class="kpi-card"><div class="kpi-label">Facilidad de uso</div><div class="kpi-value">${_promTxt(R.facilidad_promedio)}</div><div class="kpi-sub">escala 1 a 5</div></div>
+      <div class="kpi-card"><div class="kpi-label">¿Pagaría?</div><div class="kpi-value" style="font-size:18px;">${pag['sí'] || 0} sí · ${pag['tal vez'] || 0} tal vez · ${pag['no'] || 0} no</div></div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:18px;margin:6px 0 14px;">
+      <div><div style="font-weight:700;font-size:13px;margin-bottom:6px;">Hasta dónde llegan (embudo)</div>
+        <div class="pil-embudo">${_PIL_ETAPAS.map(([k, n]) => `<span>${n}</span><div class="pil-barra" style="margin:0;"><span style="width:${EP[k] || 0}%"></span></div><span style="text-align:right;">${E[k] || 0} · ${EP[k] || 0}%</span>`).join('')}</div>
+        <div style="font-size:11.5px;color:var(--muted);margin-top:6px;">La etapa con la caída más grande es la que más conviene mejorar.</div></div>
+      <div><div style="font-weight:700;font-size:13px;margin-bottom:6px;">Utilidad de cada parte (1 a 5)</div>
+        <div class="pil-embudo">${(R.utilidad || []).map(u => `<span>${escHtml(u.nombre)}</span><div class="pil-barra" style="margin:0;"><span style="width:${u.promedio ? u.promedio * 20 : 0}%"></span></div><span style="text-align:right;">${_promTxt(u.promedio)}${u.no_lo_uso ? ` <span title="No lo usaron" style="color:var(--muted);">(${u.no_lo_uso}✕)</span>` : ''}</span>`).join('')}</div></div>
+    </div>` : '<div class="empty" style="margin:8px 0;">Aún no hay probadores inscritos. Cuando alguien entre por el enlace, aquí verás su avance.</div>';
+  // Probadores
+  const pr = P.probadores || [];
+  document.getElementById('pilotoProbadores').innerHTML = pr.length ? `
+    <div style="font-weight:700;font-size:13px;margin:8px 0;">Probadores (${pr.length})</div>
+    <div class="pil-tabla-wrap"><table><thead><tr><th>Persona</th><th>Código</th><th>Días</th><th>Avance</th><th>ATS</th><th>Chat</th><th>Última actividad</th><th>Encuesta</th></tr></thead><tbody>
+    ${pr.map(x => `<tr style="cursor:pointer;" onclick="abrirDetalle('${escHtml(x.id)}')" title="Abrir la ficha">
+      <td><div style="font-weight:600;">${escHtml(x.nombre)}</div><div style="font-size:11.5px;color:var(--muted);">${escHtml(x.id)} · ${escHtml(x.cargo || '')}</div></td>
+      <td>${escHtml(x.codigo)}</td><td>${x.dias_en_piloto ?? '—'}</td>
+      <td style="white-space:nowrap;">${_PIL_ETAPAS.map(([k, n]) => `<span class="pil-chip ${x.etapas[k] ? 'si' : 'no'}" title="${n}: ${x.etapas[k] ? 'hecho' : 'pendiente'}">${n.slice(0, 2)}</span>`).join('')} <b style="font-size:11.5px;">${x.avance}%</b></td>
+      <td>${x.ats || '—'}</td><td>${x.mensajes_chat}</td>
+      <td style="white-space:nowrap;color:var(--muted);">${x.ultima_actividad ? _fmtFecha(x.ultima_actividad) : '—'}</td>
+      <td>${x.encuesta && x.encuesta.nota ? `<b>${x.encuesta.nota}</b>/7 · ${x.encuesta.recomendaria}/10` : '<span style="color:var(--muted);">Pendiente</span>'}</td>
+    </tr>`).join('')}</tbody></table></div>
+    <div style="font-size:11px;color:var(--muted);margin-top:6px;">Avance: CV · Di = DISC · Ko = Kostick · Me = Mercado · Ch = Chat · In = Informe Final · En = Encuesta. Verde = hecho. Haz clic en una fila para abrir la ficha.</div>` : '';
+  // Comentarios
+  const todas = pr.filter(x => x.encuesta && x.encuesta.nota).map(x => ({ nombre: x.nombre, id: x.id, e: x.encuesta }))
+    .concat((P.encuestas_otras || []).map(o => ({ nombre: o.nombre, id: o.id, e: o.encuesta, fuera: true })));
+  const bloque = (titulo, campo) => {
+    const items = todas.filter(t => (t.e[campo] || '').trim());
+    if (!items.length) return '';
+    return `<div style="margin-top:12px;"><div style="font-weight:700;font-size:13px;">${titulo} (${items.length})</div>
+      ${items.map(t => `<div class="pil-coment">«${escHtml(t.e[campo])}»<div style="font-size:11px;color:var(--muted);margin-top:3px;">— ${escHtml(t.nombre)} (${escHtml(t.id)})${t.fuera ? ' · fuera del piloto' : ''}${campo === 'testimonio' ? (t.e.autoriza_testimonio ? ' · ✅ autoriza publicarlo' : ' · no autoriza publicarlo') : ''}${t.e.acepta_contacto ? ' · acepta que lo contactes' : ''}</div></div>`).join('')}</div>`;
+  };
+  document.getElementById('pilotoComentarios').innerHTML = todas.length
+    ? bloque('🐞 Problemas reportados', 'problemas') + bloque('🔧 Qué mejorarían', 'mejorar') + bloque('👍 Lo que más les sirvió', 'lo_mejor') + bloque('💬 Testimonios', 'testimonio')
+    : '';
+}
+
 cargarListado();
 cargarAuditoria(0);
+cargarPiloto();
 cargarPlantillas();
 cargarEstudiosMercado();
 cargarSesiones();
