@@ -199,6 +199,7 @@
     <a class="nav-item" data-sec="secTareas" href="#secTareas"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg> Tareas</a>
     <a class="nav-item" data-sec="secParticipantes" href="#secParticipantes"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg> Participantes</a>
     <a class="nav-item" data-sec="secPiloto" href="#secPiloto">🎁 Piloto</a>
+    <a class="nav-item" data-sec="secRecordatorios" href="#secRecordatorios">📬 Recordatorios</a>
     <a class="nav-item" data-sec="secSesiones" href="#secSesiones">Sesiones</a>
     <a class="nav-item" data-sec="secListaNegra" href="#secListaNegra">Lista negra</a>
     <a class="nav-item" data-sec="secAuditoria" href="#secAuditoria"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect><path d="M9 4H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-3"></path><line x1="8" y1="11" x2="16" y2="11"></line><line x1="8" y1="15" x2="16" y2="15"></line></svg> Auditoría</a>
@@ -274,6 +275,21 @@
   </div>
   <div id="_ln_msg" class="msg"></div>
   <div id="listaNegraWrap"><div class="loading">Cargando…</div></div>
+  </div>
+
+  <div class="panel-section" id="secRecordatorios">
+    <h2 style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">📬 Recordatorios automáticos
+      <span style="flex:1"></span>
+      <label style="display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;"><input type="checkbox" id="_rec_activo" onchange="_guardarRecordatorios(this.checked)"> Enviar recordatorios</label>
+      <button class="btn-secondary" onclick="cargarRecordatorios()">Actualizar</button>
+    </h2>
+    <div style="font-size:12.5px;color:var(--muted);margin-bottom:10px;">
+      Correo a quien no sube su CV (a las 24 horas y a los 3 días de registrarse) y a quien lleva 7 días sin entrar.
+      Cada correo trae botones para contar el motivo en un clic; las respuestas aparecen aquí y te llegan por correo.
+      Los textos se editan en «Plantillas de correo».
+    </div>
+    <div id="recordatoriosCont"><div class="loading">Cargando recordatorios…</div></div>
+    <div id="_rec_msg" class="msg"></div>
   </div>
 
   <div class="panel-section" id="secPiloto">
@@ -2566,6 +2582,26 @@ async function _eliminarDefinitivo(id) {
    ================================================================ */
 let PILOTO = null;
 const _PIL_ETAPAS = [['cv','CV'],['disc','DISC'],['kostick','Kostick'],['mercado','Mercado'],['chat','Chat'],['informe','Informe'],['encuesta','Encuesta']];
+async function cargarRecordatorios() {
+  const w = document.getElementById('recordatoriosCont');
+  try {
+    const d = await _apiGet('/api/admin/recordatorios');
+    document.getElementById('_rec_activo').checked = !!d.activo;
+    const kpi = (l, v, sub) => `<div class="kpi-card"><div class="kpi-label">${l}</div><div class="kpi-value">${v}</div><div class="kpi-sub">${sub}</div></div>`;
+    const chips = d.resumen.length ? d.resumen.map(r => `<span style="display:inline-block;margin:0 6px 6px 0;padding:5px 10px;border-radius:999px;border:1px solid var(--border2);font-size:12.5px;">${escHtml(r.motivo)} · <strong>${r.n}</strong></span>`).join('') : '';
+    const filas = d.motivos.map(m => `<tr><td>${escHtml((m.fecha || '').slice(0, 16).replace('T', ' '))}</td>
+        <td><a href="#" onclick="abrirDetalle('${escHtml(m.id)}');return false;">${escHtml(m.nombre)}</a></td>
+        <td>${escHtml(m.motivo)}</td><td>${escHtml(m.comentario || '—')}</td></tr>`).join('');
+    w.innerHTML = `<div class="resumen-grid">${kpi('Sin CV', d.sin_cv, 'aún no lo suben')}${kpi('Inactivos', d.inactivos, `${d.reglas.dias_inactivo}+ días sin entrar`)}${kpi('Recordatorios enviados', d.enviados, 'en total')}${kpi('Respuestas', d.respuestas, 'motivos recibidos')}</div>
+      ${chips ? `<div style="margin-bottom:10px;">${chips}</div>` : ''}
+      ${filas ? `<table><thead><tr><th>Fecha</th><th>Participante</th><th>Motivo</th><th>Comentario</th></tr></thead><tbody>${filas}</tbody></table>`
+              : '<div class="empty">Todavía nadie ha respondido un recordatorio.</div>'}`;
+  } catch (e) { w.innerHTML = `<div class="empty">No se pudieron cargar los recordatorios: ${escHtml(e.message)}</div>`; }
+}
+async function _guardarRecordatorios(activo) {
+  try { const d = await _apiSend('PUT', '/api/admin/recordatorios', { activo }); _mostrarMsg('_rec_msg', d.mensaje, false); }
+  catch (e) { _mostrarMsg('_rec_msg', e.message, true); document.getElementById('_rec_activo').checked = !activo; }
+}
 async function cargarPiloto() {
   try { PILOTO = await _apiGet('/api/admin/piloto'); renderPiloto(); }
   catch (e) { document.getElementById('pilotoCampanas').innerHTML = `<div class="empty">No se pudo cargar el programa piloto: ${escHtml(e.message)}</div>`; }
@@ -2720,6 +2756,7 @@ function renderPiloto() {
 cargarListado();
 cargarAuditoria(0);
 cargarPiloto();
+cargarRecordatorios();
 cargarPlantillas();
 cargarEstudiosMercado();
 cargarSesiones();
