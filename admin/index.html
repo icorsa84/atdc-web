@@ -2,6 +2,13 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
+<script>
+  /* QA7: la app vive en outplacement.atdc.app; si se abre la copia de atdc.app se redirige
+     allí (misma sesión, mismo inicio con Google y una sola versión de la app). */
+  (function () { var h = location.hostname; if (h === 'atdc.app' || h === 'www.atdc.app')
+    location.replace('https://outplacement.atdc.app' + location.pathname + location.search + location.hash); })();
+</script>
+
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>ATDC — Panel de Administración</title>
 <link rel="icon" href="/favicon.ico" sizes="any">

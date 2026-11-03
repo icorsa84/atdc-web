@@ -2,6 +2,13 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
+<script>
+  /* QA7: la app vive en outplacement.atdc.app; si se abre la copia de atdc.app se redirige
+     allí (misma sesión, mismo inicio con Google y una sola versión de la app). */
+  (function () { var h = location.hostname; if (h === 'atdc.app' || h === 'www.atdc.app')
+    location.replace('https://outplacement.atdc.app' + location.pathname + location.search + location.hash); })();
+</script>
+
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>ATDC — Panel de Administración</title>
 <link rel="icon" href="/favicon.ico" sizes="any">
@@ -293,6 +300,8 @@
           <input id="_pil_cupo" type="number" min="1" max="1000" value="50" style="width:80px;"></div>
         <div><label for="_pil_dias" style="display:block;font-size:11.5px;color:var(--muted);margin-bottom:3px;">Días de acceso</label>
           <input id="_pil_dias" type="number" min="1" max="365" value="60" style="width:80px;"></div>
+        <div><label for="_pil_comparte" style="display:block;font-size:11.5px;color:var(--muted);margin-bottom:3px;">Cupos</label>
+          <select id="_pil_comparte"><option value="">Propios de este enlace</option></select></div>
         <label style="display:flex;gap:6px;align-items:center;font-size:12.5px;"><input id="_pil_activo" type="checkbox" checked> Inscripciones abiertas</label>
         <button class="btn-primary" id="_pil_btn" onclick="_guardarCampanaPiloto()">Guardar enlace</button>
       </div>
@@ -395,6 +404,7 @@
 <div id="plantillaOverlay" class="overlay" style="display:none;"></div>
 
 <script src="/informe-pdf.js"></script>
+<script src="/dialogos.js"></script>
 <script>
 /* ADM-QA-09: si el panel lo sirve el propio backend (outplacement.atdc.app,
    Render o local), se usa el mismo origen: sin consulta CORS previa en cada
@@ -950,7 +960,7 @@ async function _agregarListaNegra() {
   } catch (e) { _mostrarMsg('_ln_msg', e.message, true); }
 }
 async function _quitarListaNegra(v) {
-  if (!confirm(`¿Desbloquear «${v}»?`)) return;
+  if (!(await atdcConfirmar(`¿Desbloquear «${v}»?`))) return;
   try {
     const d = await _apiSend('DELETE', `/api/admin/lista-negra/${encodeURIComponent(v)}`);
     _mostrarMsg('_ln_msg', d.mensaje || 'Desbloqueado.', false); cargarListaNegra();
@@ -1039,7 +1049,7 @@ async function _conectarCalendario() {
   catch (e) { _mostrarMsg('_cal_msg', e.message, true); }
 }
 async function _desconectarCalendario() {
-  if (!confirm('¿Desconectar Google Calendar? Las sesiones ya creadas siguen en tu calendario.')) return;
+  if (!(await atdcConfirmar('¿Desconectar Google Calendar? Las sesiones ya creadas siguen en tu calendario.'))) return;
   try { const d = await _apiSend('DELETE', '/api/admin/calendario/google'); _mostrarMsg('_cal_msg', d.mensaje, false); cargarCalendario(); }
   catch (e) { _mostrarMsg('_cal_msg', e.message, true); }
 }
@@ -1412,12 +1422,12 @@ async function _guardarPlantilla(clave) {
 }
 
 async function _restablecerPlantilla(clave) {
-  if (!confirm('¿Restablecer esta plantilla a su versión de fábrica? Se perderá la personalización.')) return;
+  if (!(await atdcConfirmar('¿Restablecer esta plantilla a su versión de fábrica? Se perderá la personalización.'))) return;
   try {
     await _apiSend('DELETE', `/api/admin/plantillas-correo/${clave}`, undefined);
     cerrarEditorPlantilla();
     await cargarPlantillas();
-  } catch (e) { alert(e.message); }
+  } catch (e) { atdcAvisar(e.message); }
 }
 
 /* ================================================================
@@ -1551,11 +1561,11 @@ async function _copiarResumenEstudio(id) {
 
 async function _eliminarEstudioMercado(id) {
   const e = ESTUDIOS_MERCADO.find(x => x.id === id);
-  if (!confirm(`¿Eliminar el estudio "${e ? e.titulo : id}"? Deja de citarse como fuente para los participantes.`)) return;
+  if (!(await atdcConfirmar(`¿Eliminar el estudio "${e ? e.titulo : id}"? Deja de citarse como fuente para los participantes.`))) return;
   try {
     await _apiSend('DELETE', `/api/admin/estudios-mercado/${id}`, undefined);
     await cargarEstudiosMercado();
-  } catch (e) { alert(e.message); }
+  } catch (e) { atdcAvisar(e.message); }
 }
 
 /* REQ-ESTUDIO-URL: el estudio puede venir de un PDF subido o de una dirección web */
@@ -1580,7 +1590,7 @@ async function _cargarEstudioUrl() {
     _mostrarMsg('_em_msg', 'Indica el año del estudio con 4 dígitos (por ejemplo 2026).', true); return;
   }
   const repetido = ESTUDIOS_MERCADO.find(x => x.nombre_archivo === url && x.pais === pais && String(x.anio) === anio);
-  if (repetido && !confirm(`Ya cargaste esa dirección para ${pais} ${anio}. ¿Procesarla de nuevo de todas formas?`)) return;
+  if (repetido && !await atdcConfirmar(`Ya cargaste esa dirección para ${pais} ${anio}. ¿Procesarla de nuevo de todas formas?`)) return;
 
   const btn = document.getElementById('_em_btn_url');
   if (btn) { btn.disabled = true; btn.textContent = 'Leyendo…'; }
@@ -1625,7 +1635,7 @@ async function _subirEstudioMercado() {
     _mostrarMsg('_em_msg', 'Indica el año del estudio con 4 dígitos (por ejemplo 2026).', true); return;
   }
   const repetido = ESTUDIOS_MERCADO.find(x => x.nombre_archivo === archivo.name && x.pais === pais && String(x.anio) === anio);
-  if (repetido && !confirm(`Ya cargaste "${archivo.name}" para ${pais} ${anio}. ¿Subirlo de nuevo de todas formas?`)) return;
+  if (repetido && !await atdcConfirmar(`Ya cargaste "${archivo.name}" para ${pais} ${anio}. ¿Subirlo de nuevo de todas formas?`)) return;
 
   const btn = document.getElementById('_em_btn');
   if (btn) { btn.disabled = true; btn.textContent = 'Procesando…'; }
@@ -1772,7 +1782,7 @@ async function _guardarInformeAdmin(id) {
   } catch (e) { _mostrarMsg('_inf_msg', e.message, true); }
 }
 async function _aprobarInformeAdmin(id) {
-  if (!confirm('¿Aprobar y entregar el informe? El participante podrá verlo y recibirá un correo.')) return;
+  if (!(await atdcConfirmar('¿Aprobar y entregar el informe? El participante podrá verlo y recibirá un correo.'))) return;
   try {
     const nota = document.getElementById('_inf_nota')?.value ?? null;
     await _apiSend('PUT', `/api/admin/participantes/${id}/informe`, { secciones: _seccionesEditadas(), nota_consultor: nota });
@@ -1785,7 +1795,7 @@ async function _aprobarInformeAdmin(id) {
 
 /* Acciones de soporte: funciones del servidor que no tenían botón */
 async function _devolverIntentosCv(id) {
-  if (!confirm('¿Devolver los intentos de subida de CV a este participante?')) return;
+  if (!(await atdcConfirmar('¿Devolver los intentos de subida de CV a este participante?'))) return;
   try {
     const d = await _apiSend('POST', `/api/ats/reset-rechazos?pid=${encodeURIComponent(id)}`, {});
     _mostrarMsg('_sop_msg', d.mensaje || 'Intentos devueltos.', false);
@@ -1808,7 +1818,7 @@ function _estadoTestsTxt(p) {
   }).join(' &nbsp;·&nbsp; ');
 }
 async function _reiniciarTest(id, tipo) {
-  const razon = prompt(`Motivo para reiniciar el test ${tipo === 'disc' ? 'DISC' : 'Kostick'} (queda en auditoría):`, 'Se desconectó a mitad del test');
+  const razon = await atdcPedirTexto(`Motivo para reiniciar el test ${tipo === 'disc' ? 'DISC' : 'Kostick'} (queda en auditoría):`, 'Se desconectó a mitad del test');
   if (razon === null) return;
   try {
     const d = await _apiSend('POST', `/api/admin/test/resetear/${id}/${tipo}`, { razon: razon.trim() || 'Reset administrativo' });
@@ -1825,7 +1835,7 @@ async function _revisarVencimientos() {
 }
 /* REQ-PLAN-VIGENCIA: ampliar el periodo de acceso del plan pagado */
 async function _extenderAcceso(id) {
-  const dias = prompt('¿Cuántos días de acceso quieres agregar? (si ya venció, se cuentan desde hoy)', '15');
+  const dias = await atdcPedirTexto('¿Cuántos días de acceso quieres agregar? (si ya venció, se cuentan desde hoy)', '15');
   if (dias === null) return;
   const n = parseInt(dias, 10);
   if (!(n >= 1 && n <= 365)) { _mostrarMsg('_sop_msg', 'Indica un número de días entre 1 y 365.', true); return; }
@@ -1964,7 +1974,7 @@ function _pdfInformeAdmin() {
   const datos = { nombre: p.nombre, cargo: p.cargo_objetivo, sector: p.sector, ats_score: (p.cv || {}).ats_score, disc: p.disc,
                   kostick_max: km && esc[km] ? [esc[km].nombre, esc[km].score] : null };
   ATDC_PDF.imprimir(ATDC_PDF.html({ ...inf, participante: inf.participante || p.nombre }, datos),
-    () => alert('No se pudo abrir la impresión en PDF.'));
+    () => atdcAvisar('No se pudo abrir la impresión en PDF.'));
 }
 async function _descargarCvVersion(id, idx) {
   try {
@@ -1985,7 +1995,8 @@ function _htmlRegistroAdmin(p) {
   const cvHtml = vs.length ? vs.map((v, i) => caja(`
       <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;">
         <div style="font-size:12.5px;"><b>Versión ${i + 1}</b> · ${escHtml(v.cargo || '—')} · ${escHtml((v.fecha || '').slice(0, 10))} · ATS ${escHtml(String(v.ats_score ?? '—'))}/100 · ${escHtml(v.estado || '')}${v.archivo ? ' · ' + escHtml(v.archivo) : ''}</div>
-        <button class="btn-secondary" onclick="_descargarCvVersion('${escHtml(p.id)}', ${i})">${icono('paperclip',13)} ${v.mejorado ? 'CV mejorado (Word)' : 'Texto del CV'}</button>
+        ${(v.mejorado || (v.texto || '').trim()) ? `<button class="btn-secondary" onclick="_descargarCvVersion('${escHtml(p.id)}', ${i})">${icono('paperclip',13)} ${v.mejorado ? 'CV mejorado (Word)' : 'Texto del CV'}</button>`
+          : '<span style="font-size:11.5px;color:var(--muted);">Sin texto descargable (CV muy breve o escaneado)</span>'}
       </div>
       ${(v.mejoras || []).length ? `<ul style="margin:6px 0 0 18px;font-size:12.5px;">${v.mejoras.map(m => `<li>${estadoMejora(m.estado)} — ${escHtml(m.texto)}</li>`).join('')}</ul>` : ''}
       ${(v.kw_faltantes || []).length ? `<div style="font-size:12px;color:var(--muted);margin-top:4px;">Palabras clave faltantes: ${v.kw_faltantes.map(escHtml).join(', ')}</div>` : ''}
@@ -2387,8 +2398,8 @@ async function _aprobarPlan(id) {
   // equivocado) reasignaba el plan de un participante sin aviso. Ahora pide
   // confirmación explícita, igual que ya hacía _confirmarPago().
   const cortesia = plan !== 'Inicial';
-  if (!confirm(cortesia ? `¿Conceder el plan ${plan} de cortesía (gratis) a este participante? Se activa ahora y no cuenta como venta.`
-                        : `¿Pasar a este participante al plan Inicial (gratis)?`)) return;
+  if (!(await atdcConfirmar(cortesia ? `¿Conceder el plan ${plan} de cortesía (gratis) a este participante? Se activa ahora y no cuenta como venta.`
+                        : `¿Pasar a este participante al plan Inicial (gratis)?`))) return;
 
   const btn = document.getElementById('_d_plan_btn');
   if (btn) { btn.disabled = true; btn.textContent = 'Asignando…'; }
@@ -2408,9 +2419,9 @@ async function _aprobarPlan(id) {
 async function _responderSesion(id, accion) {
   let body = {};
   if (accion === 'aceptar') {
-    if (!confirm('¿Aceptar la sesión? Se le enviará al participante un correo de confirmación.')) return;
+    if (!(await atdcConfirmar('¿Aceptar la sesión? Se le enviará al participante un correo de confirmación.'))) return;
   } else {
-    const motivo = prompt('Motivo del rechazo (se incluye en el correo al participante; opcional):', '');
+    const motivo = await atdcPedirTexto('Motivo del rechazo (se incluye en el correo al participante; opcional):', '');
     if (motivo === null) return;
     body = { motivo: motivo.trim() };
   }
@@ -2423,12 +2434,12 @@ async function _responderSesion(id, accion) {
 }
 
 async function _confirmarPago(id) {
-  if (!confirm('¿Confirmas que recibiste la transferencia de este participante? Esto activará su plan y le enviará el correo de bienvenida.')) return;
+  if (!(await atdcConfirmar('¿Confirmas que recibiste la transferencia de este participante? Esto activará su plan y le enviará el correo de bienvenida.'))) return;
   try {
     const data = await _apiSend('PATCH', `/api/admin/participantes/${id}/confirmar-pago`, {});
     abrirDetalle(id);
     cargarListado();
-  } catch (e) { alert(e.message); }
+  } catch (e) { atdcAvisar(e.message); }
 }
 
 // Fix QA-PREMIUM-GATE-02: registra el análisis de entrevista para el
@@ -2534,13 +2545,15 @@ async function _resolverEliminacion(id, estado) {
 }
 
 async function _eliminarDefinitivo(id) {
-  if (!confirm('Esto eliminará al participante y TODOS sus datos de forma permanente, incluyendo su cuenta de acceso. ¿Confirmas?')) return;
-  if (!confirm('Esta acción no se puede deshacer. ¿Eliminar definitivamente?')) return;
+  if (!(await atdcConfirmar('Esto eliminará al participante y TODOS sus datos de forma permanente, incluyendo su cuenta de acceso.', { titulo: 'Eliminar participante', ok: 'Sí, eliminar', peligro: true }))) return;
+  if (!(await atdcConfirmar('Esta acción no se puede deshacer. ¿Eliminar definitivamente?', { titulo: 'Confirmación final', ok: 'Eliminar definitivamente', peligro: true }))) return;
   try {
     await _apiSend('DELETE', `/api/admin/participantes/${id}`);
     cerrarDetalle();
     cargarListado();
-  } catch (e) { alert(e.message); }
+    try { cargarPiloto(); } catch (e) {}
+    atdcAvisar(`El participante ${id} y todos sus datos fueron eliminados.`, { titulo: 'Participante eliminado' });
+  } catch (e) { atdcAvisar(e.message); }
 }
 
 
@@ -2555,14 +2568,15 @@ async function cargarPiloto() {
 }
 function _copiarTexto(t, btn) {
   const ok = () => { if (btn) { const o = btn.textContent; btn.textContent = '¡Copiado!'; setTimeout(() => btn.textContent = o, 1500); } };
-  if (navigator.clipboard) navigator.clipboard.writeText(t).then(ok).catch(() => prompt('Copia el enlace:', t));
-  else prompt('Copia el enlace:', t);
+  if (navigator.clipboard) navigator.clipboard.writeText(t).then(ok).catch(() => atdcPedirTexto('Copia el enlace:', t));
+  else atdcPedirTexto('Copia el enlace:', t);
 }
 function _editarCampanaPiloto(cod) {
   const c = (PILOTO.campanas || []).find(x => x.codigo === cod); if (!c) return;
   document.getElementById('_pil_cod').value = c.codigo; document.getElementById('_pil_nom').value = c.nombre || '';
   document.getElementById('_pil_plan').value = c.plan; document.getElementById('_pil_cupo').value = c.cupo;
   document.getElementById('_pil_dias').value = c.dias; document.getElementById('_pil_activo').checked = !!c.activo;
+  _pintarOpcionesComparte(c.codigo); document.getElementById('_pil_comparte').value = c.comparte || '';
   const d = document.getElementById('pilotoNueva'); d.open = true; d.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 async function _guardarCampanaPiloto() {
@@ -2570,7 +2584,7 @@ async function _guardarCampanaPiloto() {
   if (cod.length < 2) { _mostrarMsg('_pil_msg', 'Escribe un código de al menos 2 letras o números (ej. LINKEDIN).', true); return; }
   const body = { codigo: cod, nombre: document.getElementById('_pil_nom').value.trim(), plan: document.getElementById('_pil_plan').value,
     cupo: parseInt(document.getElementById('_pil_cupo').value, 10) || 50, dias: parseInt(document.getElementById('_pil_dias').value, 10) || 60,
-    activo: document.getElementById('_pil_activo').checked };
+    activo: document.getElementById('_pil_activo').checked, comparte_con: document.getElementById('_pil_comparte').value };
   try {
     const c = await _apiSend('POST', '/api/admin/piloto/campanas', body);
     _mostrarMsg('_pil_msg', `Enlace ${c.codigo} guardado. Ya puedes compartirlo: ${c.enlace}`, false);
@@ -2579,9 +2593,9 @@ async function _guardarCampanaPiloto() {
 }
 async function _cerrarCampanaPiloto(cod, abrir) {
   const c = (PILOTO.campanas || []).find(x => x.codigo === cod); if (!c) return;
-  if (!abrir && !confirm(`¿Cerrar las inscripciones del enlace ${cod}? Quienes ya entraron conservan su plan.`)) return;
-  try { await _apiSend('POST', '/api/admin/piloto/campanas', { ...c, activo: !!abrir }); await cargarPiloto(); }
-  catch (e) { alert(e.message); }
+  if (!abrir && !await atdcConfirmar(`¿Cerrar las inscripciones del enlace ${cod}? Quienes ya entraron conservan su plan.`)) return;
+  try { await _apiSend('POST', '/api/admin/piloto/campanas', { ...c, activo: !!abrir, comparte_con: c.comparte || '' }); await cargarPiloto(); }
+  catch (e) { atdcAvisar(e.message); }
 }
 async function _exportarPiloto() {
   try {
@@ -2591,7 +2605,25 @@ async function _exportarPiloto() {
     const b = await r.blob(); const a = document.createElement('a');
     a.href = URL.createObjectURL(b); a.download = `piloto_atdc_${new Date().toISOString().slice(0, 10)}.csv`;
     document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
-  } catch (e) { alert(e.message); }
+  } catch (e) { atdcAvisar(e.message); }
+}
+function _pintarOpcionesComparte(actual) {
+  const sel = document.getElementById('_pil_comparte'); if (!sel) return;
+  const v = sel.value;
+  sel.innerHTML = '<option value="">Propios de este enlace</option>' + (PILOTO && PILOTO.campanas || [])
+    .filter(c => c.codigo !== actual && !c.comparte)
+    .map(c => `<option value="${escHtml(c.codigo)}">Compartidos con ${escHtml(c.codigo)} (${c.cupo_bolsa} en total)</option>`).join('');
+  sel.value = v;
+}
+async function _exportarEspera() {
+  try {
+    const r = await fetch(`${BACKEND}/api/admin/piloto/espera/exportar`, { headers: { 'X-Admin-Key': ADMIN_KEY } });
+    if (r.status === 401 || r.status === 403) { _salir(); return; }
+    if (!r.ok) throw new Error('No se pudo generar el archivo.');
+    const b = await r.blob(); const a = document.createElement('a');
+    a.href = URL.createObjectURL(b); a.download = `lista_espera_atdc_${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+  } catch (e) { atdcAvisar(e.message); }
 }
 function _promTxt(v, max) { return v == null ? '—' : `${String(v).replace('.', ',')}${max ? ` / ${max}` : ''}`; }
 function renderPiloto() {
@@ -2599,7 +2631,7 @@ function renderPiloto() {
   // Campañas
   const camps = P.campanas || [];
   document.getElementById('pilotoCampanas').innerHTML = camps.length ? camps.map(c => {
-    const pct = Math.min(100, Math.round(100 * c.inscritos / Math.max(1, c.cupo)));
+    const pct = Math.min(100, Math.round(100 * c.inscritos_bolsa / Math.max(1, c.cupo_bolsa)));
     return `<div class="pil-camp">
       <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
         <strong style="font-size:14px;">${escHtml(c.nombre || c.codigo)}</strong>
@@ -2611,7 +2643,9 @@ function renderPiloto() {
                    : `<button class="btn-secondary" onclick="_cerrarCampanaPiloto('${escHtml(c.codigo)}', true)">Reabrir</button>`}
       </div>
       <div class="pil-barra" role="progressbar" aria-valuemin="0" aria-valuemax="${c.cupo}" aria-valuenow="${c.inscritos}" aria-label="Cupos usados"><span style="width:${pct}%"></span></div>
-      <div style="font-size:12.5px;"><b>${c.inscritos}</b> de ${c.cupo} cupos usados · quedan <b>${c.cupos_restantes}</b></div>
+      <div style="font-size:12.5px;">${c.comparte || camps.some(x => x.comparte === c.codigo)
+        ? `<b>${c.inscritos}</b> inscritos por este enlace · cupo compartido${c.comparte ? ` con ${escHtml(c.comparte)}` : ''}: <b>${c.inscritos_bolsa}</b> de ${c.cupo_bolsa} usados · quedan <b>${c.cupos_restantes}</b>`
+        : `<b>${c.inscritos}</b> de ${c.cupo_bolsa} cupos usados · quedan <b>${c.cupos_restantes}</b>`}</div>
       <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:8px;font-size:12px;">
         <span style="color:var(--muted);">Enlace para publicar:</span>
         <code style="word-break:break-all;">${escHtml(c.enlace)}</code>
@@ -2620,6 +2654,7 @@ function renderPiloto() {
     </div>`; }).join('')
     : '<div class="empty">Todavía no hay enlaces del piloto. Créalo abajo con «+ Crear o editar un enlace del piloto».</div>';
   if (!camps.length) document.getElementById('pilotoNueva').open = true;
+  _pintarOpcionesComparte(document.getElementById('_pil_cod').value.trim().toUpperCase());
   // Resumen
   const E = R.embudo || {}, EP = R.embudo_pct || {};
   const nps = R.nps == null ? '—' : (R.nps > 0 ? '+' : '') + R.nps;
@@ -2663,9 +2698,19 @@ function renderPiloto() {
     return `<div style="margin-top:12px;"><div style="font-weight:700;font-size:13px;">${titulo} (${items.length})</div>
       ${items.map(t => `<div class="pil-coment">«${escHtml(t.e[campo])}»<div style="font-size:11px;color:var(--muted);margin-top:3px;">— ${escHtml(t.nombre)} (${escHtml(t.id)})${t.fuera ? ' · fuera del piloto' : ''}${campo === 'testimonio' ? (t.e.autoriza_testimonio ? ' · ✅ autoriza publicarlo' : ' · no autoriza publicarlo') : ''}${t.e.acepta_contacto ? ' · acepta que lo contactes' : ''}</div></div>`).join('')}</div>`;
   };
-  document.getElementById('pilotoComentarios').innerHTML = todas.length
+  const esp = P.lista_espera || [];
+  let htmlEsp = '';
+  if (esp.length) {
+    htmlEsp = `<div style="margin-top:14px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;"><div style="font-weight:700;font-size:13px;">⏳ Lista de espera (${esp.length})</div>
+      <span style="flex:1"></span><button class="btn-secondary" onclick="_exportarEspera()">Descargar lista de espera (CSV)</button></div>
+      <div style="font-size:11.5px;color:var(--muted);margin:2px 0 6px;">Personas que llegaron cuando no quedaban cupos. Úsala para invitar a la próxima ronda.</div>
+      <div class="pil-tabla-wrap"><table><thead><tr><th>Fecha</th><th>Nombre</th><th>Correo</th><th>Cargo</th><th>Enlace</th></tr></thead><tbody>
+      ${esp.slice(0, 100).map(x => `<tr><td style="white-space:nowrap;color:var(--muted);">${_fmtFecha(x.fecha)}</td><td>${escHtml(x.nombre)}${x.ya_tiene_cuenta ? ' <span class="badge badge-muted">ya tiene cuenta</span>' : ''}</td><td>${escHtml(x.email)}</td><td>${escHtml(x.cargo || '—')}</td><td>${escHtml(x.codigo || '—')}</td></tr>`).join('')}
+      </tbody></table></div>${esp.length > 100 ? '<div style="font-size:11.5px;color:var(--muted);margin-top:4px;">Se muestran las 100 más recientes; descarga el CSV para ver todas.</div>' : ''}`;
+  }
+  document.getElementById('pilotoComentarios').innerHTML = htmlEsp + (todas.length
     ? bloque('🐞 Problemas reportados', 'problemas') + bloque('🔧 Qué mejorarían', 'mejorar') + bloque('👍 Lo que más les sirvió', 'lo_mejor') + bloque('💬 Testimonios', 'testimonio')
-    : '';
+    : '');
 }
 
 cargarListado();

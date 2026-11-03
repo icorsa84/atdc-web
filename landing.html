@@ -173,6 +173,13 @@ ul{list-style:none}
   color:#fff;font-weight:700;text-decoration:none}
 .piloto-aviso .piloto-cupos{display:block;margin-top:6px;font-size:13px;opacity:.85}
 .piloto-aviso.cerrado{background:rgba(148,163,184,.12);border-color:rgba(148,163,184,.4)}
+.piloto-espera{display:grid;gap:6px;margin-top:12px}
+.piloto-espera label{font-size:13px;font-weight:600}
+.piloto-espera input:not([type=checkbox]){width:100%;box-sizing:border-box;padding:10px 12px;border-radius:9px;border:1px solid rgba(148,163,184,.45);background:rgba(15,23,42,.55);color:var(--text-primary);font-size:15px}
+.piloto-espera .pe-check{display:flex;gap:8px;align-items:flex-start;font-weight:400;font-size:13px;margin-top:4px}
+.piloto-espera .piloto-cta{border:none;cursor:pointer;justify-self:start;font-size:15px}
+.piloto-espera .pe-msg{font-size:13px;color:#FCA5A5;min-height:1em}
+.pe-ok{margin:0;font-weight:600}
 .hero-title{
   font-family:'Sora',sans-serif;
   font-size:clamp(36px,4.5vw,58px);
@@ -1211,8 +1218,35 @@ document.addEventListener('keydown', function(e) {
     if (!caja) return;
     if (!d.valido) { caja.className = 'piloto-aviso visible cerrado'; caja.textContent = 'El enlace del programa piloto no es válido. Igual puedes comenzar gratis con el plan Inicial.'; return; }
     if (!d.disponible) {
-      caja.className = 'piloto-aviso visible cerrado';
-      caja.innerHTML = '<strong>Programa piloto ATDC</strong><br>' + esc(d.mensaje) + ' Igual puedes comenzar gratis con el plan Inicial.';
+      // Cupos agotados o enlace cerrado: lista de espera para la próxima ronda
+      caja.className = 'piloto-aviso visible';
+      caja.innerHTML = '<span class="piloto-tag">Programa piloto</span><br><strong>' + esc(d.mensaje) + '</strong> ' +
+        'Déjanos tus datos y te avisamos primero cuando abramos nuevos cupos. Mientras tanto, puedes comenzar gratis con el plan Inicial.' +
+        '<form id="pilotoEspera" class="piloto-espera" novalidate>' +
+        '<label for="pe_nombre">Nombre</label><input id="pe_nombre" autocomplete="name" maxlength="80" required>' +
+        '<label for="pe_email">Correo</label><input id="pe_email" type="email" autocomplete="email" maxlength="120" required>' +
+        '<label for="pe_cargo">Cargo que buscas (opcional)</label><input id="pe_cargo" maxlength="120">' +
+        '<label class="pe-check"><input id="pe_acepta" type="checkbox"> Acepto que ATDC me contacte por correo sobre el programa piloto.</label>' +
+        '<button type="submit" class="piloto-cta">Anotarme en la lista de espera</button>' +
+        '<div id="pe_msg" role="alert" class="pe-msg"></div></form>';
+      document.getElementById('pilotoEspera').addEventListener('submit', function (ev) {
+        ev.preventDefault();
+        var m = document.getElementById('pe_msg');
+        var body = { codigo: cod, nombre: document.getElementById('pe_nombre').value.trim(),
+                     email: document.getElementById('pe_email').value.trim(), cargo: document.getElementById('pe_cargo').value.trim(),
+                     acepta: document.getElementById('pe_acepta').checked };
+        if (body.nombre.length < 2) { m.textContent = 'Escribe tu nombre.'; return; }
+        if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(body.email)) { m.textContent = 'Escribe un correo válido.'; return; }
+        if (!body.acepta) { m.textContent = 'Marca la casilla para que podamos avisarte.'; return; }
+        m.textContent = 'Enviando…';
+        fetch(API + '/api/piloto/espera', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+          .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+          .then(function (x) {
+            if (!x.ok) { m.textContent = (x.j && typeof x.j.detail === 'string') ? x.j.detail : 'No se pudo anotar. Intenta de nuevo.'; return; }
+            document.getElementById('pilotoEspera').innerHTML = '<p class="pe-ok">✅ ' + esc(x.j.mensaje) + '</p>';
+          })
+          .catch(function () { m.textContent = 'No se pudo conectar. Intenta de nuevo en un momento.'; });
+      });
       return;
     }
     var destino = API + '/agente-chat.html?piloto=' + encodeURIComponent(cod);
