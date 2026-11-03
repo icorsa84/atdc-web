@@ -3767,12 +3767,13 @@ async function llamarAPI(mensaje) {
     let buffer = '';
     let textoCompleto = '';
 
-    // Crear burbuja streaming del agente
+    // Crear burbuja streaming del agente (reemplaza los puntos de "escribiendo")
+    hideTyping();
     const body = document.getElementById('chatBody');
     const w = document.createElement('div');
     w.className = 'msg agent streaming';
     const userInitials = PARTICIPANTE.nombre.split(' ').filter(Boolean).slice(0,2).map(n=>n[0]||'').join('').toUpperCase() || PARTICIPANTE.nombre[0].toUpperCase();
-    w.innerHTML = `<div class="av ag">${icono('robot',15)}</div><div><div class="bubble-text streaming-text"></div></div>`;
+    w.innerHTML = `<div class="av ag">${icono('robot',15)}</div><div><div class="bubble streaming-text"></div></div>`;
     body.appendChild(w);
     body.scrollTop = body.scrollHeight;
     const textEl = w.querySelector('.streaming-text');
@@ -3792,7 +3793,9 @@ async function llamarAPI(mensaje) {
               const evt = JSON.parse(line.slice(6));
               if (evt.type === 'delta' && evt.text) {
                 textoCompleto += evt.text;
-                textEl.innerHTML = markdownToHtml(textoCompleto);
+                // Fix QA6-CHAT-01: antes llamaba a markdownToHtml(), que no existe; el
+                // ReferenceError quedaba oculto por el catch y la respuesta salía en blanco.
+                textEl.innerHTML = fmt(textoCompleto);
                 body.scrollTop = body.scrollHeight;
               } else if (evt.type === 'done') {
                 w.classList.remove('streaming');
@@ -3803,9 +3806,10 @@ async function llamarAPI(mensaje) {
             } catch(parseErr) {}
           }
         }
-        w.classList.remove('streaming');
         if (!textoCompleto && errorStream) throw new Error(errorStream);
-        resolve(textoCompleto || '(sin respuesta)');
+        if (!textoCompleto) throw new Error('El agente no alcanzó a responder.');
+        w.remove();   // enviar() pinta la respuesta completa con hora y botones de evaluación
+        resolve(textoCompleto);
       } catch(e) {
         w.remove(); // quitar burbuja parcial si hay error
         reject(e);
@@ -3815,36 +3819,8 @@ async function llamarAPI(mensaje) {
   });
 }
 
-/* ================================================================
-   RESPUESTA FALLBACK (sin servidor)
-   ================================================================ */
-// Fix RISK-05: CTX_LOCAL derivado dinámicamente desde PARTICIPANTE para evitar doble fuente de verdad
-const CTX_LOCAL = {
-  get disc_codigo(){ return PARTICIPANTE.disc.codigo; },
-  get disc_patron(){ return PARTICIPANTE.disc.patron; },
-  get ats_score(){ return PARTICIPANTE.ats_score; },
-  get kw_faltantes(){ return PARTICIPANTE.kw_faltantes; },
-  get entrevista(){ return PARTICIPANTE.entrevista; },
-  get cargo(){ return PARTICIPANTE.cargo; },
-  get nombre(){ return PARTICIPANTE.nombre.split(' ')[0]; }
-};
-
-function respuestaLocal(msg) {
-  const t = msg.toLowerCase();
-  if (/(disc|d6|dominancia|influencia|estabilidad|conciencia)/.test(t))
-    return `Tu perfil DISC es **${CTX_LOCAL.disc_codigo}** — patrón **${CTX_LOCAL.disc_patron}**.\n\nD6 significa alta Dominancia: orientado a resultados, decisivo, toma iniciativa. C6 (Conciencia alta) lo complementa: analiza antes de decidir, riguroso con la calidad. Juntos forman el perfil ideal para Jefe de Operaciones.\n\n⚠️ Para interpretación detallada, conecta el servidor ATDC.`;
-  if (/(kostick|factor|liderazgo|tarea|interpersonal)/.test(t)) {
-    const km = _kostickMarcados(PARTICIPANTE.kostick, 3);
-    return km.length
-      ? `Tus factores Kostick más marcados son: ${km.map(l => `**${KOSTICK_ESCALAS[l]}** (${l} ${PARTICIPANTE.kostick[l]}/9)`).join(', ')}.\n\nCuando vuelva la conexión te doy la interpretación completa de los 20 factores.`
-      : 'Aún no tienes resultados Kostick. Puedes rendir el test desde el panel lateral.';
-  }
-  if (/(cv|ats|palabras clave|keyword)/.test(t))
-    return `Tu ATS está en **74/100** (objetivo 85+). Las palabras clave críticas que faltan son:\n- "gestión de inventarios"\n- "KPI logístico"\n- "mejora continua"\n- "planificación de demanda"\n\nIncorpóralas en la sección de experiencia de tu cargo más reciente.`;
-  if (/(entrevista|walmart|preparar|presentar)/.test(t))
-    return `Tu entrevista con **Walmart Chile** es el **28 oct 2026**. Para prepararla:\n\n1. Usa el ejemplo del peak navideño 2024 (equipo de 62 personas) para demostrar liderazgo bajo presión\n2. Menciona la reducción de merma 18% — Walmart valora KPIs de inventario\n3. Con tu D6: sé directo, habla de resultados concretos desde el inicio`;
-  return `Soy el agente ATDC de ${CTX_LOCAL.nombre}. En este momento estoy en **modo local**.\n\nPuedo ayudarte con preguntas básicas sobre tu DISC (${CTX_LOCAL.disc_codigo}), Kostick, CV (ATS: ${CTX_LOCAL.ats_score}/100) y tu entrevista con Walmart Chile.\n\nPara respuestas completas, asegúrate de que el servidor ATDC esté activo.`;
-}
+/* QA6-CHAT-02: se eliminó la "respuesta local" con datos de ejemplo (Walmart, ATS 74, D6):
+   si el servidor no responde, el chat lo dice y pide reintentar. */
 
 /* ================================================================
    CHAT UI
@@ -4185,17 +4161,12 @@ async function enviar(txt) {
   historial.push(msgUser); guardarHistorial(); renderHistPanel(); appendMsg('user',txt);
   showTyping();
   let respuesta, error=false;
-  let esSSE = false; // true si llamarAPI ya insertó la burbuja via SSE
+  const esSSE = false; // la burbuja parcial del streaming se reemplaza por la definitiva
   try {
-    if (modoOnline) {
-      respuesta = await llamarAPI(txt);
-      // Si el backend respondió con SSE streaming, llamarAPI inserta la burbuja directamente
-      // en el DOM y retorna el texto completo. No volvemos a llamar agentMsg.
-      esSSE = modoOnline && (document.querySelector('.msg.agent.streaming') === null);
-    } else {
-      await new Promise(r=>setTimeout(r,600+Math.random()*500));
-      respuesta = respuestaLocal(txt);
-    }
+    // Fix QA6-CHAT-02: siempre se intenta el servidor (antes, tras un corte, el chat
+    // quedaba en "modo local" para siempre y respondía con datos de ejemplo).
+    respuesta = await llamarAPI(txt);
+    if (!modoOnline) setOnline(true);
   } catch(e) {
     // Si el error es de restricción de plan, mostrar sin cambiar modo online
     const msg = e.message || '';
@@ -4207,8 +4178,12 @@ async function enviar(txt) {
       isTyping=false; document.getElementById('btnSend').disabled=false;
       return;
     }
-    setOnline(false);
-    respuesta = respuestaLocal(txt);
+    hideTyping();
+    const esCorte = /Failed to fetch|NetworkError|timeout|aborted|signal/i.test(msg);
+    appendMsg('agent', (esCorte ? '⚠️ No pude conectarme con el agente en este momento.' : `⚠️ ${msg || 'No se pudo completar la respuesta.'}`)
+      + ' Vuelve a enviar tu pregunta en unos segundos.', null, true);
+    isTyping=false; document.getElementById('btnSend').disabled=false;
+    return;
   }
   hideTyping();
   const msgAgent={role:'assistant',content:respuesta,ts:Date.now()};
