@@ -298,9 +298,9 @@
   </div>
 
   <div class="panel-section" id="secEstudios" style="padding-bottom:4px;">
-  <h2 style="display:flex;align-items:center;gap:8px;"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="1"></rect><line x1="9" y1="22" x2="9" y2="18"></line><line x1="15" y1="22" x2="15" y2="18"></line></svg> Estudios de mercado laboral (PDF)</h2>
+  <h2 style="display:flex;align-items:center;gap:8px;"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="1"></rect><line x1="9" y1="22" x2="9" y2="18"></line><line x1="15" y1="22" x2="15" y2="18"></line></svg> Estudios de mercado laboral (PDF o URL)</h2>
   <div style="font-size:12.5px;color:var(--muted);margin-bottom:10px;">
-    Carga aquí estudios de mercado laboral anuales (PDF) por país — y, si corresponde, por sector. Claude procesa el
+    Carga aquí estudios de mercado laboral anuales (PDF o dirección web) por país — y, si corresponde, por sector. Claude procesa el
     documento una sola vez al subirlo y guarda un resumen estructurado (rangos de renta, tendencias de contratación,
     perfiles más demandados) que queda disponible de inmediato como fuente real para todos los participantes que
     consulten el módulo "Mercado laboral" de ese país, citada en un apartado de fuentes separado del análisis.
@@ -325,9 +325,17 @@
     <div>
       <label style="display:block;font-size:11.5px;color:var(--muted);margin-bottom:3px;">Archivo PDF</label>
       <input id="_em_archivo" type="file" accept="application/pdf" aria-label="Archivo PDF del estudio de mercado">
-      <div style="font-size:11px;color:var(--muted);margin-top:3px;">PDF con texto, máx. 15 MB</div>
+      <div style="font-size:11px;color:var(--muted);margin-top:3px;">PDF con texto, máx. 30 MB</div>
     </div>
     <button class="btn-primary" id="_em_btn" onclick="_subirEstudioMercado()">Subir y procesar</button>
+  </div>
+  <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;margin:-4px 0 14px;">
+    <div style="flex:1;min-width:260px;">
+      <label for="_em_url" style="display:block;font-size:11.5px;color:var(--muted);margin-bottom:3px;">…o pega la dirección web (URL) de un estudio de remuneraciones</label>
+      <input id="_em_url" type="url" inputmode="url" placeholder="https://… (página del estudio o enlace directo al PDF)" style="width:100%;">
+      <div style="font-size:11px;color:var(--muted);margin-top:3px;">Usa los mismos País, Año, Sector y Título de arriba. Debe ser pública (sin inicio de sesión); si es un PDF, máx. 30 MB.</div>
+    </div>
+    <button class="btn-primary" id="_em_btn_url" onclick="_cargarEstudioUrl()">Leer URL y procesar</button>
   </div>
   <div id="_em_msg" class="msg"></div>
   <div id="estudiosMercadoWrap"><div class="loading">Cargando estudios de mercado…</div></div>
@@ -1414,7 +1422,7 @@ function renderEstudiosMercado() {
     <tr>
       <td>
         <div style="font-weight:600;">${escHtml(e.titulo)}</div>
-        <div style="font-size:12px;color:var(--muted);margin-top:2px;">${escHtml(e.nombre_archivo)} · ${Math.round((e.tamano_bytes||0)/1024)} KB</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:2px;word-break:break-all;">${_origenEstudio(e)}</div>
       </td>
       <td>${escHtml(e.pais)}</td>
       <td>${_sectorEsGeneral(e.sector) ? '<span style="color:var(--muted);">Todos los sectores</span>' : escHtml(e.sector)}</td>
@@ -1470,10 +1478,10 @@ function _verResumenEstudioMercado(id) {
         <div style="font-size:17px;font-weight:700;">${escHtml(e.titulo)}</div>
         <div style="font-size:12.5px;color:var(--muted);margin-top:4px;">
           ${escHtml(e.pais)} · ${_sectorEsGeneral(e.sector) ? 'todos los sectores' : escHtml(e.sector)} · año ${escHtml(e.anio || 's/f')}
-          · ${escHtml(e.nombre_archivo)} (${Math.round((e.tamano_bytes||0)/1024)} KB) · cargado ${_fmtFecha(e.subido_en)}
+          · <span style="word-break:break-all;">${_origenEstudio(e)}</span> · cargado ${_fmtFecha(e.subido_en)}
         </div>
         <div style="font-size:12px;color:var(--muted);margin-top:6px;">
-          Este es el resumen que Claude extrajo del PDF y que se cita como fuente a los participantes de ${escHtml(e.pais)}${_sectorEsGeneral(e.sector) ? ', de cualquier sector' : ' cuyo sector sea ' + escHtml(e.sector)}.
+          Este es el resumen que Claude extrajo del documento y que se cita como fuente a los participantes de ${escHtml(e.pais)}${_sectorEsGeneral(e.sector) ? ', de cualquier sector' : ' cuyo sector sea ' + escHtml(e.sector)}.
         </div>
       </div>
       <div class="sec md-cuerpo">${_mdAHtml(e.resumen_md)}</div>
@@ -1501,6 +1509,56 @@ async function _eliminarEstudioMercado(id) {
   } catch (e) { alert(e.message); }
 }
 
+/* REQ-ESTUDIO-URL: el estudio puede venir de un PDF subido o de una dirección web */
+function _esUrlEstudio(n) { return /^https?:\/\//i.test(n || ''); }
+function _origenEstudio(e) {
+  const n = e.nombre_archivo || '';
+  if (_esUrlEstudio(n)) {
+    return `Desde la web: <a href="${escHtml(n)}" target="_blank" rel="noopener noreferrer" style="color:#8ab4ff;text-decoration:underline;">${escHtml(n.length > 70 ? n.slice(0, 67) + '…' : n)}</a>`;
+  }
+  return `${escHtml(n)} · ${Math.round((e.tamano_bytes||0)/1024)} KB`;
+}
+
+async function _cargarEstudioUrl() {
+  const pais = document.getElementById('_em_pais').value;
+  const anio = document.getElementById('_em_anio').value.trim();
+  const sector = document.getElementById('_em_sector').value.trim();
+  const titulo = document.getElementById('_em_titulo').value.trim();
+  const url = document.getElementById('_em_url').value.trim();
+  if (!/^https?:\/\/[^\s.]+\.[^\s]+$/i.test(url)) { _mostrarMsg('_em_msg', 'Pega una dirección web completa, que empiece con https://', true); return; }
+  const anioNum = parseInt(anio, 10);
+  if (!/^\d{4}$/.test(anio) || anioNum < 2000 || anioNum > new Date().getFullYear() + 2) {
+    _mostrarMsg('_em_msg', 'Indica el año del estudio con 4 dígitos (por ejemplo 2026).', true); return;
+  }
+  const repetido = ESTUDIOS_MERCADO.find(x => x.nombre_archivo === url && x.pais === pais && String(x.anio) === anio);
+  if (repetido && !confirm(`Ya cargaste esa dirección para ${pais} ${anio}. ¿Procesarla de nuevo de todas formas?`)) return;
+
+  const btn = document.getElementById('_em_btn_url');
+  if (btn) { btn.disabled = true; btn.textContent = 'Leyendo…'; }
+  const t0 = Date.now();
+  const tick = () => _mostrarMsg('_em_msg', `Claude está leyendo la página… ${Math.round((Date.now()-t0)/1000)} s (suele tardar entre 20 y 90 s; no cierres esta pestaña).`, false);
+  tick();
+  const crono = setInterval(tick, 1000);
+  try {
+    const data = await _apiSend('POST', '/api/admin/estudios-mercado/url', { url, pais, anio, sector, titulo });
+    clearInterval(crono);
+    _mostrarMsg('_em_msg', `Estudio "${data.titulo}" leído desde la web en ${Math.round((Date.now()-t0)/1000)} s y disponible para ${data.pais}. Revísalo con «Ver resumen».`, false);
+    document.getElementById('_em_url').value = '';
+    document.getElementById('_em_sector').value = '';
+    document.getElementById('_em_titulo').value = '';
+    await cargarEstudiosMercado();
+  } catch (e) {
+    clearInterval(crono);
+    const txt = (e && e.message === 'Failed to fetch')
+      ? 'Se perdió la conexión con el servidor mientras se procesaba. Recarga la lista en un minuto: si el estudio no aparece, vuelve a intentarlo.'
+      : e.message;
+    _mostrarMsg('_em_msg', txt, true);
+  } finally {
+    clearInterval(crono);
+    if (btn) { btn.disabled = false; btn.textContent = 'Leer URL y procesar'; }
+  }
+}
+
 async function _subirEstudioMercado() {
   const pais = document.getElementById('_em_pais').value;
   const anio = document.getElementById('_em_anio').value.trim();
@@ -1512,7 +1570,7 @@ async function _subirEstudioMercado() {
   if (!archivo) { _mostrarMsg('_em_msg', 'Selecciona un archivo PDF.', true); return; }
   // ADM-QA-06: validaciones antes de gastar una llamada a Claude
   if (!/\.pdf$/i.test(archivo.name)) { _mostrarMsg('_em_msg', 'El archivo debe ser PDF.', true); return; }
-  if (archivo.size > 15 * 1024 * 1024) { _mostrarMsg('_em_msg', `El PDF pesa ${(archivo.size/1048576).toFixed(1)} MB; el máximo es 15 MB.`, true); return; }
+  if (archivo.size > 30 * 1024 * 1024) { _mostrarMsg('_em_msg', `El PDF pesa ${(archivo.size/1048576).toFixed(1)} MB; el máximo es 30 MB.`, true); return; }
   const anioNum = parseInt(anio, 10);
   if (!/^\d{4}$/.test(anio) || anioNum < 2000 || anioNum > new Date().getFullYear() + 2) {
     _mostrarMsg('_em_msg', 'Indica el año del estudio con 4 dígitos (por ejemplo 2026).', true); return;
