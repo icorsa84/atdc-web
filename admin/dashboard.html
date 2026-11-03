@@ -330,6 +330,7 @@
 <div id="detalleOverlay" class="overlay" style="display:none;"></div>
 <div id="plantillaOverlay" class="overlay" style="display:none;"></div>
 
+<script src="/informe-pdf.js"></script>
 <script>
 /* ADM-QA-09: si el panel lo sirve el propio backend (outplacement.atdc.app,
    Render o local), se usa el mismo origen: sin consulta CORS previa en cada
@@ -1071,6 +1072,8 @@ function renderTabla() {
    más abajo, luego de que icono() ya está definido arriba en este mismo
    archivo. */
 const _ACCION_LABELS = {
+  decidir_mejora: `${icono('edit',13)} Decidió una mejora de CV`, analizar_mercado: `${icono('document',13)} Análisis de mercado`, cv_mejorado: `${icono('document',13)} Generó CV mejorado (Word)`, analizar_aviso: `${icono('document',13)} Analizó un aviso`,
+  test_iniciado: `${icono('calendar',13)} Inició un test (90 min)`, test_expirado: `${icono('warning',13)} Venció el plazo de un test`,
   conectar_calendario: `${icono('calendar',13)} Conectó Google Calendar`, desconectar_calendario: `${icono('calendar',13)} Desconectó Google Calendar`, configurar_calendario: `${icono('calendar',13)} Cambió el horario de atención`,
   guardar_antecedentes: `${icono('user',13)} Actualizó su situación`,
   importar_entrevista: `${icono('document',13)} Importó entrevista (IA externa)`, prompt_entrevista_externa: `${icono('document',13)} Generó prompt de entrevista`,
@@ -1561,7 +1564,8 @@ function _htmlInformeAdmin(p, informe) {
   const est = informe.estado || 'entregado';
   const secs = informe.secciones || [];
   _INFORME_EDIT = { id: p.id, secciones: secs.map(s => ({ ...s })) };
-  const cab = `<div style="font-size:12.5px;color:var(--muted);margin-bottom:8px;">
+  const cab = `<div style="margin-bottom:8px;"><button class="btn-secondary" onclick="_pdfInformeAdmin()">${icono('document',14)} Descargar PDF (el mismo que recibe la persona)</button></div>
+    <div style="font-size:12.5px;color:var(--muted);margin-bottom:8px;">
       Plan ${escHtml(informe.plan)} · generado ${escHtml(informe.fecha)} (${_fmtFecha(informe.generado_en)})
       ${informe.editado_en ? ` · editado ${_fmtFecha(informe.editado_en)}` : ''}
       ${informe.aprobado_en ? ` · aprobado ${_fmtFecha(informe.aprobado_en)}` : ''}
@@ -1790,7 +1794,107 @@ function _kostickAdminHtml(kostick, clusters) {
     ${kostick.sintesis ? `<div style="margin-top:6px;font-size:12.5px;color:var(--text2);">${escHtml(kostick.sintesis)}</div>` : ''}`;
 }
 
+/* REQ-ADMIN-DETALLE: el consultor ve todo lo que la persona hizo y todo lo
+   que el sistema le entregó (CV y mejoras, mercado, avisos, conversación,
+   informe en PDF) más su registro de actividad. */
+let _DET_P = null;
+function _pdfInformeAdmin() {
+  const p = _DET_P, inf = p && p.informe_final;
+  if (!inf || !window.ATDC_PDF) return;
+  const esc = (p.kostick || {}).escalas || {};
+  const orden = Object.values(p.kostick?.clusters || {}).filter(c => Array.isArray(c.letras)).flatMap(c => c.letras);
+  const km = orden.slice().sort((a, b) => ((esc[b] || {}).score || 0) - ((esc[a] || {}).score || 0) || orden.indexOf(a) - orden.indexOf(b))[0];
+  const datos = { nombre: p.nombre, cargo: p.cargo_objetivo, sector: p.sector, ats_score: (p.cv || {}).ats_score, disc: p.disc,
+                  kostick_max: km && esc[km] ? [esc[km].nombre, esc[km].score] : null };
+  ATDC_PDF.imprimir(ATDC_PDF.html({ ...inf, participante: inf.participante || p.nombre }, datos),
+    () => alert('No se pudo abrir la impresión en PDF.'));
+}
+async function _descargarCvVersion(id, idx) {
+  try {
+    const res = await fetch(`${BACKEND}/api/admin/participantes/${encodeURIComponent(id)}/cv-mejorado?indice=${idx}`, { headers: { 'X-Admin-Key': ADMIN_KEY } });
+    if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(_textoError(d.detail) || 'No se pudo descargar.'); }
+    const blob = await res.blob();
+    const nombre = ((res.headers.get('Content-Disposition') || '').match(/filename="([^"]+)"/) || [])[1] || `CV_${id}_${idx + 1}`;
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = nombre; document.body.appendChild(a); a.click();
+    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+  } catch (e) { _mostrarMsg('_reg_msg', e.message, true); }
+}
+function _htmlRegistroAdmin(p) {
+  const det = (t, cuerpo) => `<details style="margin-top:6px;"><summary style="cursor:pointer;font-size:12.5px;">${t}</summary><div style="margin-top:6px;">${cuerpo}</div></details>`;
+  const caja = h => `<div class="informe-sec">${h}</div>`;
+  const estadoMejora = e => e === 'aprobada' ? '✅ aprobada' : e === 'descartada' ? '✖ descartada' : '⏳ pendiente';
+  // CV: versiones, mejoras y documentos
+  const vs = p.cv_versiones || [];
+  const cvHtml = vs.length ? vs.map((v, i) => caja(`
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;">
+        <div style="font-size:12.5px;"><b>Versión ${i + 1}</b> · ${escHtml(v.cargo || '—')} · ${escHtml((v.fecha || '').slice(0, 10))} · ATS ${escHtml(String(v.ats_score ?? '—'))}/100 · ${escHtml(v.estado || '')}${v.archivo ? ' · ' + escHtml(v.archivo) : ''}</div>
+        <button class="btn-secondary" onclick="_descargarCvVersion('${escHtml(p.id)}', ${i})">${icono('paperclip',13)} ${v.mejorado ? 'CV mejorado (Word)' : 'Texto del CV'}</button>
+      </div>
+      ${(v.mejoras || []).length ? `<ul style="margin:6px 0 0 18px;font-size:12.5px;">${v.mejoras.map(m => `<li>${estadoMejora(m.estado)} — ${escHtml(m.texto)}</li>`).join('')}</ul>` : ''}
+      ${(v.kw_faltantes || []).length ? `<div style="font-size:12px;color:var(--muted);margin-top:4px;">Palabras clave faltantes: ${v.kw_faltantes.map(escHtml).join(', ')}</div>` : ''}
+      ${v.mejorado ? `<div style="font-size:12px;color:var(--muted);margin-top:4px;">CV mejorado generado ${escHtml(String(v.mejoras_generadas || 1))} vez/veces.</div>` : ''}
+      ${v.texto ? det('Ver el texto del CV', `<pre style="white-space:pre-wrap;font-size:12px;max-height:280px;overflow:auto;">${escHtml(v.texto)}</pre>`) : ''}`)).join('')
+    : '<div style="color:var(--muted);font-size:12.5px;">Sin versiones de CV.</div>';
+  // Mercado
+  const pp = (p.mercado || {}).por_pais || {};
+  const merc = Object.values(pp);
+  const mercHtml = merc.length ? merc.map(m => caja(`
+      <div style="font-size:12.5px;"><b>${escHtml(m.pais || '')}</b> · ${escHtml((m.fecha || '').slice(0, 16).replace('T', ' '))} · ${escHtml(m.nivel || '')}${m.incompleto ? ' · ⚠ incompleto' : ''} · ${(m.portales || []).length} portales</div>
+      ${m.posicionamiento_md ? det('Ver el análisis entregado', `<div style="font-size:12.5px;">${_mdAHtml(m.posicionamiento_md)}</div>`) : ''}`)).join('')
+    : '<div style="color:var(--muted);font-size:12.5px;">No ha pedido análisis de mercado.</div>';
+  const emp = (p.mercado || {}).empresas_target || [];
+  // Avisos
+  const av = p.avisos || [];
+  const avHtml = av.length ? av.slice().reverse().map(a => caja(`
+      <div style="font-size:12.5px;"><b>${escHtml(a.titulo || 'Aviso')}</b> · ${escHtml((a.fecha || '').slice(0, 10))}${a.calce != null ? ' · calce ' + escHtml(String(a.calce)) + '%' : ''}${a.url ? ` · <a href="${escHtml(a.url)}" target="_blank" rel="noopener">enlace</a>` : ''}</div>
+      ${a.analisis_md ? det('Ver el análisis entregado', `<div style="font-size:12.5px;">${_mdAHtml(a.analisis_md)}</div>`) : ''}`)).join('')
+    : '<div style="color:var(--muted);font-size:12.5px;">No ha analizado avisos.</div>';
+  // Conversación
+  const hc = p.historial_chat || [];
+  const u = p.uso_chat || {};
+  const chatHtml = `<div style="font-size:12.5px;color:var(--text2);">Mensajes enviados: hoy ${u.dia || 0} · en el período ${u.periodo || 0}.
+      ${hc.length ? '' : (['Profesional', 'Premium'].includes(p.plan) ? ' Aún no hay conversación guardada.' : ' En este plan la conversación no se guarda en el servidor (sin memoria entre sesiones).')}</div>
+    ${hc.length ? det(`Ver la conversación guardada (${hc.length} mensajes)`, `<div style="max-height:420px;overflow:auto;">${hc.map(m => `
+      <div style="margin:6px 0;padding:8px 10px;border-radius:8px;font-size:12.5px;background:${m.role === 'user' ? 'var(--bg)' : 'rgba(37,99,235,.08)'};">
+        <div style="font-size:11px;color:var(--muted);margin-bottom:3px;">${m.role === 'user' ? 'Participante' : 'Agente'}${m.ts ? ' · ' + escHtml(String(m.ts).slice(0, 16).replace('T', ' ')) : ''}</div>
+        ${m.role === 'user' ? `<div style="white-space:pre-wrap;">${escHtml(m.content || '')}</div>` : _mdAHtml(m.content || '')}
+      </div>`).join('')}</div>`) : ''}`;
+  setTimeout(() => _cargarActividadParticipante(p.id), 0);
+  return `
+    <div class="sec">
+      <div class="sec-title">CV — versiones, mejoras y documentos</div>${cvHtml}<div id="_reg_msg" class="msg"></div>
+    </div>
+    <div class="sec">
+      <div class="sec-title">Mercado laboral entregado</div>${mercHtml}
+      ${emp.length ? `<div style="font-size:12.5px;color:var(--text2);margin-top:6px;">Empresas objetivo: ${emp.map(e => escHtml(e.nombre)).join(', ')}</div>` : ''}
+    </div>
+    <div class="sec">
+      <div class="sec-title">Avisos de empleo analizados</div>${avHtml}
+    </div>
+    <div class="sec">
+      <div class="sec-title">Conversación con el agente</div>${chatHtml}
+    </div>
+    <div class="sec">
+      <div class="sec-title">Actividad (auditoría)</div>
+      <div id="_act_wrap" style="font-size:12.5px;color:var(--muted);">Cargando actividad…</div>
+    </div>`;
+}
+async function _cargarActividadParticipante(id) {
+  const w = document.getElementById('_act_wrap');
+  if (!w) return;
+  try {
+    const d = await _apiGet(`/api/admin/auditoria?participante_id=${encodeURIComponent(id)}&limit=200`);
+    const fs = d.entradas || [];
+    w.innerHTML = fs.length ? `<div style="max-height:320px;overflow:auto;"><table style="width:100%;border-collapse:collapse;font-size:12px;">
+        <thead><tr><th style="text-align:left;">Fecha</th><th style="text-align:left;">Quién</th><th style="text-align:left;">Acción</th><th style="text-align:left;">Detalle</th></tr></thead>
+        <tbody>${fs.map(e => `<tr><td style="white-space:nowrap;">${_fmtFecha(e.timestamp || e.fecha)}</td><td>${escHtml(e.actor_nombre || e.actor || '')}</td><td>${_ACCION_LABELS[e.accion] || escHtml(e.accion || '')}</td><td>${escHtml(e.detalle || '')}</td></tr>`).join('')}</tbody></table></div>
+        <div style="margin-top:4px;color:var(--muted);">${d.total} eventos en total${d.total > fs.length ? ' (se muestran los 200 más recientes; el resto está en la pestaña Auditoría)' : ''}.</div>`
+      : 'Sin actividad registrada.';
+  } catch (e) { w.textContent = e.message; }
+}
+
 function _renderDetalle(p) {
+  _DET_P = p;
   const fotoSrc = p.foto_b64 ? `data:${escHtml(p.foto_mime)};base64,${escHtml(p.foto_b64)}` : '';
   const disc = p.disc || {};
   const dims = disc.dimensiones || {};
@@ -1880,6 +1984,8 @@ function _renderDetalle(p) {
       </div>
       <div style="font-size:12.5px;color:var(--muted);">${p.cv?.cv_archivo_nombre ? `Archivo: ${escHtml(p.cv.cv_archivo_nombre)}` : 'Aún no ha subido CV.'}</div>
     </div>
+
+    ${_htmlRegistroAdmin(p)}
 
     <div class="sec">
       <div class="sec-title">DISC — ${disc.codigo || '—'} ${disc.patron ? '· ' + disc.patron : ''}</div>
@@ -2129,7 +2235,16 @@ async function _aprobarPlan(id) {
   if (btn) { btn.disabled = true; btn.textContent = 'Asignando…'; }
   try {
     const data = await _apiSend('PATCH', `/api/admin/participantes/${id}/plan`, { plan });
-    _mostrarMsg('_d_msg', data.mensaje || 'Plan actualizado.', false);
+    let msg = data.mensaje || 'Plan actualizado.';
+    // Fix ADMIN-PLAN-PENDIENTE: si la persona pidió un plan pagado y aún no
+    // paga, cambiar el plan no lo activaba (seguía viendo Inicial). «Asignar
+    // ahora (sin pago)» lo activa también, confirmando el pago.
+    const det = await _apiGet(`/api/admin/participantes/${id}`).catch(() => null);
+    if (plan !== 'Inicial' && det && det.pago_estado === 'pendiente') {
+      await _apiSend('PATCH', `/api/admin/participantes/${id}/confirmar-pago`, {});
+      msg += ' Quedó activo de inmediato (se dio por confirmado el pago y se le avisó por correo). Si es de cortesía, marca «Plan de cortesía».';
+    }
+    _mostrarMsg('_d_msg', msg, false);
     cargarListado();
   } catch (e) {
     _mostrarMsg('_d_msg', e.message, true);
