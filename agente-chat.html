@@ -3288,8 +3288,8 @@ function _mostrarModalAdmin() {
     ">
       <div style="margin-bottom:12px;color:var(--text,#e2e8f0);">${icono('shield',32)}</div>
       <h2 style="color:var(--text,#e2e8f0);font-size:1.15rem;margin-bottom:6px;">Acceso Administrador</h2>
-      <p style="color:var(--muted,#64748b);font-size:.88rem;margin-bottom:20px;">Ingresa la <strong style="color:var(--blue,#60a5fa)">ADMIN_API_KEY</strong> para continuar</p>
-      <input id="_adminKeyInput" type="password" placeholder="ADMIN_API_KEY" autocomplete="off" style="
+      <p style="color:var(--muted,#64748b);font-size:.88rem;margin-bottom:20px;">Ingresa la <strong style="color:var(--blue,#60a5fa)">clave de administrador</strong> para continuar</p>
+      <input id="_adminKeyInput" type="password" placeholder="Clave de administrador" autocomplete="off" style="
         width:100%;padding:12px 14px;border-radius:8px;
         background:var(--bg3,#252d3d);border:1.5px solid var(--border,#2a3348);
         color:var(--text,#e2e8f0);font-size:.95rem;outline:none;
@@ -3324,7 +3324,7 @@ async function _obtenerTokenAdmin(clave) {
   });
   if (!res.ok) {
     if (res.status === 401 || res.status === 403) {
-      throw new Error('ADMIN_API_KEY incorrecta. Intenta nuevamente.');
+      throw new Error('Clave de administrador incorrecta. Intenta nuevamente.');
     }
     throw new Error('No se pudo verificar la clave con el servidor. Intenta de nuevo en un momento.');
   }
@@ -3339,7 +3339,7 @@ async function _verificarClaveAdmin() {
   const errEl  = document.getElementById('_adminKeyError');
   const btn    = document.getElementById('_adminKeyBtn');
   const clave  = (input?.value || '').trim();
-  if (!clave) { if(errEl) errEl.textContent = 'Debes ingresar la ADMIN_API_KEY.'; return; }
+  if (!clave) { if(errEl) errEl.textContent = 'Debes ingresar la clave de administrador.'; return; }
   if(btn) { btn.textContent = 'Verificando…'; btn.disabled = true; }
   if(errEl) errEl.textContent = '';
   try {
@@ -4919,7 +4919,7 @@ async function activarPlanAdmin() {
   // segundo llamado responde 400 y se ignora: no es un error real.
   const claveAdmin = sessionStorage.getItem('atdc_admin_key');
   if (!claveAdmin || !PARTICIPANTE.id) {
-    agentMsg('⚠️ No se pudo activar el plan: no hay una sesión de administrador válida. Vuelve a ingresar la ADMIN_API_KEY e intenta de nuevo.');
+    agentMsg('⚠️ No se pudo activar el plan: no hay una sesión de administrador válida. Vuelve a ingresar la clave de administrador e intenta de nuevo.');
     return;
   }
   if (btnActivar) { btnActivar.disabled = true; btnActivar.textContent = 'Activando…'; }

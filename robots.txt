@@ -1,0 +1,10 @@
+# ATDC — Asistente de Transición y Desarrollo de Carrera
+User-agent: *
+Allow: /landing.html
+Allow: /privacidad.html
+Allow: /terminos.html
+Disallow: /admin/
+Disallow: /api/
+Disallow: /agente-chat.html
+
+Sitemap: https://outplacement.atdc.app/sitemap.xml
