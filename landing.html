@@ -1224,6 +1224,8 @@ document.addEventListener('keydown', function(e) {
       '<a class="piloto-cta" href="' + destino + '">Quiero participar</a>';
     // Todos los botones de registro llevan el código del piloto
     document.querySelectorAll('a[href*="agente-chat.html"]').forEach(function (a) { a.href = destino; });
+    // «Acceder» (cuentas que ya existen) también lleva el código: el regalo se activa al entrar
+    document.querySelectorAll('a[href="https://outplacement.atdc.app"], a[href="https://outplacement.atdc.app/"]').forEach(function (a) { a.href = destino; });
   }).catch(function () {
     if (caja) { caja.className = 'piloto-aviso visible cerrado'; caja.textContent = 'No pudimos revisar los cupos del programa piloto. Recarga la página en un momento.'; }
   });
