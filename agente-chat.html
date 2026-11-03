@@ -4893,7 +4893,7 @@ async function llamarAPIInforme() {
 function renderInformeCompleto(informe) {
   // Cancelar timers de animación del loading que puedan seguir corriendo
   cancelarTimersLoading();
-  const plan = informe.plan;
+  const plan = informe.plan || getPlanActual() || "Premium";
   const badgeMap = { Esencial:'badge-esencial', Profesional:'badge-profesional', Premium:'badge-premium' };
   const overlay  = document.getElementById('informeOverlay');
   const badge    = document.getElementById('informePlanBadge');
