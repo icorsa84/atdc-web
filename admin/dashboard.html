@@ -691,6 +691,14 @@ function _valorMultiSelectConOtro(idBase) {
 let ADMIN_KEY = sessionStorage.getItem('atdc_admin_key') || '';
 let LISTADO = [];
 
+// REQ-INFORME-REVISION-MAIL: dashboard.html?participante=P007 abre su ficha (también tras iniciar sesión)
+(function () {
+  const q = new URLSearchParams(location.search).get('participante');
+  if (q && /^[A-Za-z0-9_-]{1,40}$/.test(q)) {
+    try { sessionStorage.setItem('atdc_abrir_participante', q); } catch (e) {}
+    history.replaceState(null, '', location.pathname + location.hash);
+  }
+})();
 if (!ADMIN_KEY) {
   window.location.replace('/admin');
 }
@@ -946,6 +954,13 @@ async function _desconectarCalendario() {
   try { const d = await _apiSend('DELETE', '/api/admin/calendario/google'); _mostrarMsg('_cal_msg', d.mensaje, false); cargarCalendario(); }
   catch (e) { _mostrarMsg('_cal_msg', e.message, true); }
 }
+(function _abrirParticipanteDelEnlace() {
+  let id = null;
+  try { id = sessionStorage.getItem('atdc_abrir_participante'); } catch (e) {}
+  if (!id || !ADMIN_KEY) return;
+  try { sessionStorage.removeItem('atdc_abrir_participante'); } catch (e) {}
+  setTimeout(() => { try { abrirDetalle(id); } catch (e) {} }, 1200);
+})();
 (function _avisoVueltaCalendario() {
   const q = new URLSearchParams(location.search).get('calendario');
   if (!q) return;
