@@ -157,6 +157,7 @@
   details summary { cursor:pointer; font-size:13px; color:var(--text2); margin-bottom:8px; }
   .loading { text-align:center; padding:40px; color:var(--muted); }
 .tabla-kostick th,.tabla-kostick td{border-bottom:1px solid var(--border);padding:5px 6px}
+  .badge-cortesia { background: rgba(168,85,247,.14); color: #A855F7; border: 1px solid rgba(168,85,247,.35); }
 </style>
 </head>
 <body>
@@ -216,6 +217,13 @@
       <option value="Esencial">Esencial</option>
       <option value="Profesional">Profesional</option>
       <option value="Premium">Premium</option>
+    </select>
+    <select id="filtroAcceso" aria-label="Filtrar por tipo de acceso" onchange="renderTabla()">
+      <option value="">Todos los accesos</option>
+      <option value="pagado">Pagados</option>
+      <option value="cortesia">Cortesía (gratis concedidos)</option>
+      <option value="pendiente">Pago pendiente</option>
+      <option value="gratis">Gratis (Inicial)</option>
     </select>
     <select id="filtroEliminacion" aria-label="Filtrar por solicitud de eliminación" onchange="renderTabla()">
       <option value="">Todas las solicitudes</option>
@@ -709,6 +717,23 @@ function _salir() {
   window.location.replace('/admin');
 }
 
+/* REQ-CORTESIA: cómo accede cada persona a su plan */
+const _ACCESO = {
+  pagado:    { txt: 'Pagado',         cls: 'badge-ok',             ico: 'credit-card' },
+  cortesia:  { txt: 'Cortesía',       cls: 'badge-cortesia',       ico: 'smile' },
+  pendiente: { txt: 'Pago pendiente', cls: 'badge-pago-pendiente', ico: 'credit-card' },
+  gratis:    { txt: 'Gratis (Inicial)', cls: 'badge-muted',        ico: 'user' },
+};
+function _tipoAcceso(p) {
+  if (p.tipo_acceso) return p.tipo_acceso;
+  if (p.pago_estado === 'pendiente') return 'pendiente';
+  if ((p.plan || 'Inicial') === 'Inicial') return 'gratis';
+  return p.plan_regalo ? 'cortesia' : 'pagado';
+}
+function _badgeAcceso(p) {
+  const a = _ACCESO[_tipoAcceso(p)] || _ACCESO.gratis;
+  return `<span class="badge ${a.cls}">${icono(a.ico, 12)} ${a.txt}</span>`;
+}
 function _badgePlan(plan) {
   const cls = { Inicial:'badge-inicial', Esencial:'badge-esencial', Profesional:'badge-profesional', Premium:'badge-premium' }[plan] || 'badge-muted';
   return `<span class="badge ${cls}">${plan}</span>`;
@@ -774,6 +799,8 @@ function renderResumen() {
   const conInforme = LISTADO.filter(p => p.tiene_informe_final).length;
   const eliminacionesPendientes = LISTADO.filter(p => p.solicitud_eliminacion_estado === 'pendiente').length;
   const pagosPendientes = LISTADO.filter(p => p.pago_estado === 'pendiente').length;
+  const nPagados = LISTADO.filter(p => _tipoAcceso(p) === 'pagado').length;
+  const nCortesia = LISTADO.filter(p => _tipoAcceso(p) === 'cortesia').length;
   // ADM-QA-03: antes promediaba también a quienes no han subido CV (contaban 0)
   const conAts = LISTADO.filter(p => (p.ats_score || 0) > 0);
   const atsPromedio = conAts.length ? Math.round(conAts.reduce((acc, p) => acc + p.ats_score, 0) / conAts.length) : null;
@@ -793,6 +820,11 @@ function renderResumen() {
       <div class="kpi-label">Informes finales generados</div>
       <div class="kpi-value" style="color:var(--blue2)">${conInforme}</div>
       <div class="kpi-sub">de ${total} participantes</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Planes pagados</div>
+      <div class="kpi-value" style="color:var(--green)">${nPagados}</div>
+      <div class="kpi-sub">${nCortesia} concedido${nCortesia === 1 ? '' : 's'} de cortesía (no cuentan como venta)</div>
     </div>
     <div class="kpi-card">
       <div class="kpi-label">Pagos pendientes de confirmar</div>
@@ -1044,6 +1076,8 @@ function renderTabla() {
   let filas = LISTADO.filter(p => {
     if (q && !p.nombre.toLowerCase().includes(q)) return false;
     if (planFiltro && p.plan !== planFiltro) return false;
+    const accesoFiltro = (document.getElementById('filtroAcceso') || {}).value;
+    if (accesoFiltro && _tipoAcceso(p) !== accesoFiltro) return false;
     if (eliminacionFiltro && p.solicitud_eliminacion_estado !== eliminacionFiltro) return false;
     if (document.getElementById('filtroAtencion')?.checked && !(p.etapa && p.etapa.requiere_admin)) return false;
     return true;
@@ -1062,7 +1096,7 @@ function renderTabla() {
       <td>${escHtml(p.id)}</td>
       <td>${escHtml(p.nombre)}</td>
       <td>${_badgePlan(p.plan)}</td>
-      <td>${p.pago_estado === 'pendiente' ? `<span class="badge badge-pago-pendiente">${icono('credit-card',12)} Pendiente</span>` : `<span class="badge badge-ok">${icono('check',12)} Confirmado</span>`}</td>
+      <td>${_badgeAcceso(p)}</td>
       <td>${escHtml(p.cargo_objetivo)}</td>
       <td>${escHtml(p.sector)}</td>
       <td>${escHtml(p.ats_score)}/100</td>
@@ -1075,7 +1109,7 @@ function renderTabla() {
   document.getElementById('tablaWrap').innerHTML = `
     <table>
       <thead><tr>
-        <th>ID</th><th>Nombre</th><th>Plan</th><th>Pago</th><th>Cargo objetivo</th><th>Sector</th>
+        <th>ID</th><th>Nombre</th><th>Plan</th><th>Acceso</th><th>Cargo objetivo</th><th>Sector</th>
         <th>ATS</th><th>Etapa</th><th>Informe final</th><th>Eliminación</th><th></th>
       </tr></thead>
       <tbody>${filasHtml}</tbody>
@@ -1778,6 +1812,7 @@ async function _marcarRegalo(id, valor) {
   try {
     const d = await _apiSend('PATCH', `/api/admin/participantes/${id}/regalo`, { plan_regalo: !!valor });
     _mostrarMsg('_sop_msg', d.mensaje || 'Guardado.', false);
+    cargarListado();
   } catch (e) { _mostrarMsg('_sop_msg', e.message, true); }
 }
 
@@ -1976,7 +2011,7 @@ function _renderDetalle(p) {
         </div>
         <div class="field" style="display:flex;align-items:flex-end;gap:8px;">
           <button class="btn-primary" onclick="_guardarDatos('${escHtml(p.id)}')">Guardar datos</button>
-          <button class="btn-secondary" id="_d_plan_btn" onclick="_aprobarPlan('${escHtml(p.id)}')" title="Activa el plan elegido de inmediato, sin pasar por el flujo de pago pendiente. Para confirmar un pago ya recibido, usa el botón 'Confirmar pago' más abajo en vez de este.">Asignar plan ahora (sin pago)</button>
+          <button class="btn-secondary" id="_d_plan_btn" onclick="_aprobarPlan('${escHtml(p.id)}')" title="Activa el plan elegido de inmediato y lo marca como cortesía (no cuenta como venta). Para un pago ya recibido, usa «Confirmar pago».">Conceder de cortesía (sin pago)</button>
         </div>
       </div>
       <!-- Fix QA-UX-ADMIN-PLAN-01: "Aprobar plan" cambiaba el plan al instante
@@ -1985,7 +2020,7 @@ function _renderDetalle(p) {
            deja explícito con esta nota, además de pedir confirmación en
            _aprobarPlan() antes de ejecutar el cambio. -->
       <div style="font-size:11.5px;color:var(--muted);margin-top:-8px;margin-bottom:4px;">
-        "Asignar plan ahora" activa el plan elegido de inmediato — úsalo solo si no corresponde pago (ej. cortesía, corrección de un error). Si el participante ya transfirió, usa "Confirmar pago" más abajo.
+        Acceso actual: ${_badgeAcceso(p)} · «Conceder de cortesía» activa el plan de inmediato y lo deja marcado como cortesía (no cuenta como venta). Si la persona transfirió, usa «Confirmar pago»: queda como pagado.
       </div>
       <div id="_d_msg" class="msg"></div>
     </div>
@@ -2045,7 +2080,7 @@ function _renderDetalle(p) {
         <button class="btn-secondary" onclick="_reiniciarTest('${escHtml(p.id)}','disc')">${icono('puzzle',14)} Reiniciar test DISC</button>
         <button class="btn-secondary" onclick="_reiniciarTest('${escHtml(p.id)}','kostick')">${icono('puzzle',14)} Reiniciar test Kostick</button>
         <label style="display:inline-flex;align-items:center;gap:6px;font-size:12.5px;">
-          <input type="checkbox" ${p.plan_regalo ? 'checked' : ''} onchange="_marcarRegalo('${escHtml(p.id)}', this.checked)"> Plan de cortesía (no cuenta como venta)
+          <input type="checkbox" ${p.plan_regalo ? 'checked' : ''} ${p.plan === 'Inicial' ? 'disabled' : ''} onchange="_marcarRegalo('${escHtml(p.id)}', this.checked)"> Plan de cortesía (no cuenta como venta)
         </label>
       </div>
       <div id="_sop_msg" class="msg"></div>
@@ -2244,27 +2279,22 @@ async function _aprobarPlan(id) {
   // solo clic, sin confirmación — un mal clic (o un clic sobre el select
   // equivocado) reasignaba el plan de un participante sin aviso. Ahora pide
   // confirmación explícita, igual que ya hacía _confirmarPago().
-  if (!confirm(`¿Asignar el plan ${plan} a este participante AHORA MISMO, sin pasar por el flujo de pago pendiente?`)) return;
+  const cortesia = plan !== 'Inicial';
+  if (!confirm(cortesia ? `¿Conceder el plan ${plan} de cortesía (gratis) a este participante? Se activa ahora y no cuenta como venta.`
+                        : `¿Pasar a este participante al plan Inicial (gratis)?`)) return;
 
   const btn = document.getElementById('_d_plan_btn');
   if (btn) { btn.disabled = true; btn.textContent = 'Asignando…'; }
   try {
-    const data = await _apiSend('PATCH', `/api/admin/participantes/${id}/plan`, { plan });
-    let msg = data.mensaje || 'Plan actualizado.';
-    // Fix ADMIN-PLAN-PENDIENTE: si la persona pidió un plan pagado y aún no
-    // paga, cambiar el plan no lo activaba (seguía viendo Inicial). «Asignar
-    // ahora (sin pago)» lo activa también, confirmando el pago.
-    const det = await _apiGet(`/api/admin/participantes/${id}`).catch(() => null);
-    if (plan !== 'Inicial' && det && det.pago_estado === 'pendiente') {
-      await _apiSend('PATCH', `/api/admin/participantes/${id}/confirmar-pago`, {});
-      msg += ' Quedó activo de inmediato (se dio por confirmado el pago y se le avisó por correo). Si es de cortesía, marca «Plan de cortesía».';
-    }
-    _mostrarMsg('_d_msg', msg, false);
+    // REQ-CORTESIA: el servidor activa el plan (aunque hubiera pago pendiente) y lo marca como cortesía
+    const data = await _apiSend('PATCH', `/api/admin/participantes/${id}/plan`, { plan, cortesia: cortesia ? true : null });
+    _mostrarMsg('_d_msg', (data.mensaje || 'Plan actualizado.') + (cortesia ? ' Quedó activo y marcado como cortesía.' : ''), false);
     cargarListado();
+    setTimeout(() => { try { abrirDetalle(id); } catch (e) {} }, 600);
   } catch (e) {
     _mostrarMsg('_d_msg', e.message, true);
   } finally {
-    if (btn) { btn.disabled = false; btn.textContent = 'Asignar plan ahora (sin pago)'; }
+    if (btn) { btn.disabled = false; btn.textContent = 'Conceder de cortesía (sin pago)'; }
   }
 }
 
