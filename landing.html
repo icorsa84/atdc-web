@@ -636,7 +636,7 @@ footer{
         <a href="#planes" class="nav-link" role="listitem">Planes</a>
         <a href="#agente" class="nav-link" role="listitem">Agente IA</a>
       </div>
-      <a href="https://outplacement.atdc.app" class="nav-cta" aria-label="Acceder a la plataforma ATDC" onclick="closeMenu()">Acceder →</a>
+      <a href="https://outplacement.atdc.app/agente-chat.html?ingresar=1" class="nav-cta" aria-label="Acceder a la plataforma ATDC" onclick="closeMenu()">Acceder →</a>
       <button class="hamburger" id="navBtn" aria-label="Abrir menú" aria-expanded="false" aria-controls="navMobile" onclick="toggleMenu()">
         <span></span><span></span><span></span>
       </button>
@@ -645,7 +645,7 @@ footer{
       <a href="#proceso" class="mobile-link" onclick="closeMenu()">Proceso</a>
       <a href="#planes" class="mobile-link" onclick="closeMenu()">Planes</a>
       <a href="#agente" class="mobile-link" onclick="closeMenu()">Agente IA</a>
-      <a href="https://outplacement.atdc.app" class="mobile-cta">Acceder a la plataforma →</a>
+      <a href="https://outplacement.atdc.app/agente-chat.html?ingresar=1" class="mobile-cta">Acceder a la plataforma →</a>
     </div>
   </nav>
 </header>
@@ -1030,7 +1030,7 @@ footer{
         </svg>
         Comenzar gratis
       </a>
-      <a href="https://outplacement.atdc.app" class="btn-secondary" aria-label="Ir a la plataforma ATDC">Ya tengo cuenta → Ir a mi proceso</a>
+      <a href="https://outplacement.atdc.app/agente-chat.html?ingresar=1" class="btn-secondary" aria-label="Ir a la plataforma ATDC">Ya tengo cuenta → Ir a mi proceso</a>
     </div>
   </div>
 </div>
@@ -1257,7 +1257,10 @@ document.addEventListener('keydown', function(e) {
       '<span class="piloto-cupos">Quedan <b>' + esc(d.cupos_restantes) + '</b> de ' + esc(d.cupo) + ' cupos.</span>' +
       '<a class="piloto-cta" href="' + destino + '">Quiero participar</a>';
     // Todos los botones de registro llevan el código del piloto
-    document.querySelectorAll('a[href*="agente-chat.html"]').forEach(function (a) { a.href = destino; });
+    document.querySelectorAll('a[href*="agente-chat.html"]').forEach(function (a) {
+      // «Acceder» / «Ya tengo cuenta» abren la pestaña de ingreso (el regalo se activa al entrar)
+      a.href = /ingresar=1/.test(a.getAttribute('href')) ? destino + (destino.indexOf('?') >= 0 ? '&' : '?') + 'ingresar=1' : destino;
+    });
     // «Acceder» (cuentas que ya existen) también lleva el código: el regalo se activa al entrar
     document.querySelectorAll('a[href="https://outplacement.atdc.app"], a[href="https://outplacement.atdc.app/"]').forEach(function (a) { a.href = destino; });
   }).catch(function () {

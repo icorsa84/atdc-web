@@ -2732,7 +2732,13 @@ function _mostrarOnboarding(planPreseleccionado) {
   _pintarPilotoAuth();   // REQ-PILOTO
 
   setTimeout(() => {
-    document.getElementById('_ob_nombre')?.focus();
+    // «Acceder» / «Ya tengo cuenta» desde la página de inicio: quien ya tiene cuenta ve
+    // directo la pestaña de ingreso (antes caía en «Crear cuenta»).
+    if (new URLSearchParams(location.search).get('ingresar') === '1') {
+      _cambiarTabAuth('login'); document.getElementById('_login_email')?.focus();
+    } else {
+      document.getElementById('_ob_nombre')?.focus();
+    }
     document.querySelectorAll('#_onboardingModal input').forEach(el => {
       el.addEventListener('focus', () => el.style.borderColor = 'var(--blue2)');
       el.addEventListener('blur',  () => el.style.borderColor = 'var(--border)');
