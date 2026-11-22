@@ -1304,10 +1304,21 @@ function renderAuditoria(entradas, total, limit, offset) {
     return;
   }
   const filas = entradas.map(e => {
-    const esAdmin = e.actor === 'admin';
+    const actor = String(e.actor || '').toLowerCase();
+    const esAdmin = actor === 'admin';
+    const esSistema = actor === 'sistema' || actor === 'system' || String(e.participante_id || '').toUpperCase() === 'SYSTEM';
+    const esVistaAdmin = String(e.participante_id || '') === 'ADMIN';
+    // Solo se enlaza la ficha de participantes que todavía existen (antes «Admin»/«Sistema»
+    // y participantes ya eliminados abrían una ficha con «Participante no encontrado»).
+    const existe = e.participante_id && LISTADO.some(x => x.id === e.participante_id);
+    const nombre = escHtml(e.actor_nombre || e.participante_id || e.actor || '');
     const quien = esAdmin
       ? `<span class="badge badge-muted">Admin</span>`
-      : (e.participante_id ? `<a onclick="abrirDetalle('${escHtml(e.participante_id)}')">${escHtml(e.actor_nombre || e.participante_id)}</a>` : escHtml(e.actor_nombre || e.actor));
+      : esSistema ? `<span class="badge badge-muted">Sistema</span>`
+      : esVistaAdmin ? `<span class="badge badge-muted">Vista Administrador</span>`
+      : existe ? `<a onclick="abrirDetalle('${escHtml(e.participante_id)}')">${nombre}</a>`
+      : e.participante_id ? `${nombre} <span style="color:var(--muted);font-size:11.5px;">(cuenta eliminada)</span>`
+      : nombre;
     const accionTxt = _ACCION_LABELS[e.accion] || escHtml(e.accion);   // las etiquetas son HTML propio (ícono + texto)
     return `<tr>
       <td style="white-space:nowrap;color:var(--muted);" title="${escHtml(e.fecha)}">${_fmtFecha(e.fecha)}</td>
@@ -2786,8 +2797,8 @@ function renderPiloto() {
     : '');
 }
 
-cargarListado();
-cargarAuditoria(0);
+// la auditoría espera la lista para saber qué fichas existen (y enlazar solo esas)
+cargarListado().finally(() => cargarAuditoria(0));
 cargarPiloto();
 cargarRecordatorios();
 cargarPlantillas();
