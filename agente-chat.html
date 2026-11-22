@@ -1788,8 +1788,15 @@
       </div>
       <div id="sidePanelAtsNote" style="font-size:.73rem;color:var(--muted);margin-top:4px">Objetivo: 85+ · Faltan KW de logística</div>
       <div id="sidePanelAtsCats" style="display:none;margin-top:6px;font-size:.72rem;"></div>
+      <div id="cvDatosBox" role="region" aria-labelledby="cvDatosTit" style="display:none;margin-top:10px;padding:10px;border:1px solid var(--blue2);border-radius:10px;background:rgba(37,99,235,.08);">
+        <div id="cvDatosTit" style="font-weight:700;font-size:.8rem;margin-bottom:2px;">Antes de analizar tu CV</div>
+        <div style="font-size:.72rem;color:var(--muted);margin-bottom:8px;">Cuéntanos a qué apuntas: con esto el análisis ATS compara tu CV con el cargo y el sector que buscas.</div>
+        <div id="cvDatosCampos"></div>
+        <button type="button" id="cvDatosBtn" onclick="_guardarDatosCv()" style="margin-top:8px;width:100%;padding:8px 10px;border-radius:8px;border:none;background:var(--blue2);color:#fff;font-weight:700;font-size:.78rem;cursor:pointer;">Guardar y subir mi CV</button>
+        <div id="cvDatosMsg" role="status" style="display:none;margin-top:6px;font-size:.72rem;"></div>
+      </div>
       <input type="file" id="cvFileInput" accept=".pdf,.txt" style="display:none" onchange="_subirCV()">
-      <button id="btnSubirCV" onclick="document.getElementById('cvFileInput').click()" title="Sube tu CV en PDF o TXT (máx. 5 MB). La IA lo analiza y actualiza tu puntaje ATS al instante." style="margin-top:8px;width:100%;padding:8px 10px;border-radius:8px;border:1px solid var(--border2);background:var(--blue2);color:#fff;font-weight:700;font-size:.78rem;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05 12.25 20.24a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg> Subir mi CV (PDF o TXT)</button>
+      <button id="btnSubirCV" onclick="_clicSubirCV()" title="Sube tu CV en PDF o TXT (máx. 5 MB). La IA lo analiza y actualiza tu puntaje ATS al instante." style="margin-top:8px;width:100%;padding:8px 10px;border-radius:8px;border:1px solid var(--border2);background:var(--blue2);color:#fff;font-weight:700;font-size:.78rem;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05 12.25 20.24a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg> Subir mi CV (PDF o TXT)</button>
       <div id="cvVersionesBox" style="display:none;margin-top:8px;font-size:.73rem;color:var(--muted);"></div>
       <button id="btnCvWord" onclick="_cvMejoradoWord()" style="display:none;margin-top:8px;width:100%;padding:8px 10px;border-radius:8px;border:1px solid var(--border2);background:transparent;color:var(--text);font-weight:700;font-size:.76rem;cursor:pointer;align-items:center;justify-content:center;gap:6px;" title="Versión mejorada de tu último CV aprobado para este cargo: Word, Arial 10, máximo 2 páginas.">⬇ <span id="btnCvWordTxt">Mi CV mejorado (Word)</span></button>
       <button id="btnAvisos" onclick="_abrirAvisos()" style="display:none;margin-top:8px;width:100%;padding:8px 10px;border-radius:8px;border:1px solid var(--border2);background:transparent;color:var(--text);font-weight:700;font-size:.76rem;cursor:pointer;" title="Pega un aviso de Laborum, Trabajando, LinkedIn u otro portal y revisa qué tan bien calza con tu CV.">🔎 Analizar un aviso de empleo</button>
@@ -2520,12 +2527,24 @@ function _obtenerToken() {
 /* Cerrar sesión por completo — vuelve a pedir ingreso */
 function cerrarSesion() {
   try { localStorage.removeItem(_SESION_KEY); } catch(e) {}
+  // Consultor: también se borra la clave de administrador. Antes quedaba guardada
+  // y, al recargar, la página volvía a entrar sola en «Vista Administrador»,
+  // así que cerrar sesión parecía no funcionar.
+  const eraConsultor = (typeof IS_ADMIN !== 'undefined' && IS_ADMIN) || _planDesdeAdmin();
+  try { sessionStorage.removeItem('atdc_admin_key'); sessionStorage.removeItem('atdc_admin_path'); } catch(e) {}
+  if (eraConsultor) { window.location.replace('/admin/'); return; }
   window.location.href = window.location.pathname;
 }
 
 /* Fix QA-UX-LOGOUT-01: confirmación antes de cerrar sesión, para que un
    clic accidental no deje a la persona fuera sin aviso. */
 async function _confirmarCerrarSesion() {
+  const consultor = (typeof IS_ADMIN !== 'undefined' && IS_ADMIN) || _planDesdeAdmin();
+  if (consultor) {
+    // el consultor no responde la encuesta de satisfacción de participantes
+    if (await atdcConfirmar('¿Cerrar tu sesión de consultor? Tendrás que volver a ingresar la clave de administrador.', { ok: 'Cerrar sesión' })) cerrarSesion();
+    return;
+  }
   if (await atdcConfirmar('¿Cerrar tu sesión en este dispositivo? Tendrás que volver a ingresar tu correo y contraseña.')) {
     // Mostrar encuesta (60% de probabilidad) antes de cerrar sesión
     _mostrarEncuestaAleatorio(cerrarSesion);
@@ -2663,15 +2682,8 @@ function _mostrarOnboarding(planPreseleccionado) {
              ser opcionales — ahora son obligatorios para crear la cuenta,
              con asterisco y validación tanto acá (_registrarParticipante)
              como en el backend (auth_registro rechaza con 422 si faltan). -->
-        <div style="margin-top:2px;padding-top:12px;border-top:1px solid var(--border);">
-          <div style="font-size:11.5px;color:var(--muted);margin-bottom:8px;">Datos para tu proceso (obligatorios)</div>
-          <label style="display:block;font-size:11.5px;color:var(--muted);margin-bottom:3px;">Cargo objetivo <span style="color:var(--red);">*</span></label>
-          <div style="margin-bottom:8px;">${_multiSelectConOtro('_ob_cargo', CATALOGO_CARGOS, [])}</div>
-          <label style="display:block;font-size:11.5px;color:var(--muted);margin-bottom:3px;">Sector <span style="color:var(--red);">*</span></label>
-          <div style="margin-bottom:8px;">${_multiSelectConOtro('_ob_sector', CATALOGO_SECTORES, [])}</div>
-          <label style="display:block;font-size:11.5px;color:var(--muted);margin-bottom:3px;">Renta líquida mensual que buscas <span style="color:var(--red);">*</span><span style="display:block;font-size:10.5px;color:var(--muted);margin-top:1px;">Lo que te llega a tu cuenta cada mes, después de AFP, salud e impuesto.</span></label>
-          <div>${_multiSelectConOtro('_ob_renta', CATALOGO_RENTAS, [])}</div>
-        </div>
+        <!-- Cargo objetivo, sector y renta ya no se piden aquí: se piden dentro de la app,
+             en la sección «CV + ATS», justo antes de analizar el CV (registro más corto). -->
       </div>
 
       <!-- FORMULARIO LOGIN (oculto por defecto) -->
@@ -2787,9 +2799,6 @@ async function _registrarParticipante(plan) {
   const email    = (document.getElementById('_ob_email')?.value || '').trim();
   const password = (document.getElementById('_ob_password')?.value || '');
   const passwordConfirmar = (document.getElementById('_ob_password_confirmar')?.value || '');
-  const cargo_objetivo = _valorMultiSelectConOtro('_ob_cargo');
-  const sector = _valorMultiSelectConOtro('_ob_sector');
-  const renta_objetivo = _valorMultiSelectConOtro('_ob_renta');
   const btn      = document.getElementById('_ob_btn');
 
   if (!nombre)    { _mostrarErrorAuth('Por favor ingresa tu nombre.'); document.getElementById('_ob_nombre')?.focus(); return; }
@@ -2799,9 +2808,6 @@ async function _registrarParticipante(plan) {
   if (password !== passwordConfirmar) { _mostrarErrorAuth('Las contraseñas no coinciden.'); document.getElementById('_ob_password_confirmar')?.focus(); return; }
   // Fix QA-UX-CATALOGO-02: Cargo/Sector/Renta ahora son arrays obligatorios
   // (el usuario puede elegir múltiples valores por campo)
-  if (cargo_objetivo.length < 1) { _mostrarErrorAuth('Elige al menos un cargo objetivo.'); document.getElementById('_ob_cargo')?.focus(); return; }
-  if (sector.length < 1)         { _mostrarErrorAuth('Elige al menos un sector.'); document.getElementById('_ob_sector')?.focus(); return; }
-  if (renta_objetivo.length < 1) { _mostrarErrorAuth('Elige la renta líquida mensual que buscas.'); document.getElementById('_ob_renta')?.focus(); return; }
 
   document.getElementById('_ob_error').style.display = 'none';
   if (btn) { btn.textContent = 'Creando tu cuenta…'; btn.disabled = true; }
@@ -2810,7 +2816,7 @@ async function _registrarParticipante(plan) {
     const res = await fetch(CONFIG.auth_registro_url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ nombre, apellido, email, password, plan, cargo_objetivo, sector, renta_objetivo,
+      body: JSON.stringify({ nombre, apellido, email, password, plan,
                              codigo_piloto: _codigoPiloto() || null }),
       signal: AbortSignal.timeout(70000)   // Render free plan puede tardar 60s en despertar
     });
@@ -3208,6 +3214,7 @@ function _aplicarPerfilAlEstado(d) {
   PARTICIPANTE.sector         = d.sector || 'Por definir';
   PARTICIPANTE.renta_objetivo = d.renta_objetivo || 'Por definir';
   PARTICIPANTE.dia_proceso    = d.proceso_dia || 1;
+  try { _pintarDatosCv(); } catch (e) {}
 
   if (d.disc && d.disc.codigo) {
     PARTICIPANTE.disc = d.disc;
@@ -6877,6 +6884,7 @@ async function _guardarMiPerfil() {
     const elC = document.getElementById('sidePanelCargo'); if (elC) elC.textContent = PARTICIPANTE.cargo;
     const elS = document.getElementById('sidePanelSector'); if (elS) elS.textContent = PARTICIPANTE.sector;
     const elR = document.getElementById('sidePanelRenta'); if (elR) elR.textContent = PARTICIPANTE.renta_objetivo;
+    try { _pintarDatosCv(); } catch (e) {}
   } catch (e) {
     if (msgEl) { msgEl.style.display = 'block'; msgEl.textContent = e.message || 'Error de conexión.'; msgEl.style.background = 'rgba(239,68,68,.1)'; msgEl.style.color = 'var(--red)'; }
   } finally {
@@ -7258,6 +7266,71 @@ async function _solicitarPortabilidad() {
 /* ================================================================
    SUBIR CV — disponible desde el Plan Inicial (incluye análisis ATS)
    ================================================================ */
+/* Cargo objetivo, sector y renta se piden aquí (sección CV + ATS) y no en el registro. */
+function _valorVacioPerfil(v) {
+  if (Array.isArray(v)) return !v.some(x => x && String(x).trim() && x !== 'Por definir');
+  return !v || !String(v).trim() || v === 'Por definir';
+}
+function _faltanDatosCv() {
+  if (typeof IS_ADMIN !== 'undefined' && IS_ADMIN) return false;
+  return _valorVacioPerfil(PARTICIPANTE.cargo) || _valorVacioPerfil(PARTICIPANTE.sector) || _valorVacioPerfil(PARTICIPANTE.renta_objetivo);
+}
+function _pintarDatosCv() {
+  const box = document.getElementById('cvDatosBox'); const campos = document.getElementById('cvDatosCampos');
+  if (!box || !campos) return;
+  if (!_faltanDatosCv()) { box.style.display = 'none'; return; }
+  if (!campos.dataset.listo) {
+    const lbl = 'display:block;font-size:.72rem;color:var(--muted);margin:6px 0 3px;';
+    campos.innerHTML = `
+      <label style="${lbl}">Cargo objetivo <span style="color:var(--red);">*</span></label>${_multiSelectConOtro('_cv_cargo', CATALOGO_CARGOS, PARTICIPANTE.cargo)}
+      <label style="${lbl}">Sector <span style="color:var(--red);">*</span></label>${_multiSelectConOtro('_cv_sector', CATALOGO_SECTORES, PARTICIPANTE.sector)}
+      <label style="${lbl}">Renta líquida mensual que buscas <span style="color:var(--red);">*</span>
+        <span style="display:block;font-size:.68rem;margin-top:1px;">Lo que te llega a tu cuenta cada mes, después de AFP, salud e impuesto.</span></label>${_multiSelectConOtro('_cv_renta', CATALOGO_RENTAS, PARTICIPANTE.renta_objetivo)}`;
+    campos.dataset.listo = '1';
+  }
+  box.style.display = 'block';
+}
+function _clicSubirCV() {
+  if (_faltanDatosCv()) {
+    _pintarDatosCv();
+    const side = document.getElementById('sidePanel');
+    if (side && side.classList.contains('colapsado')) _aplicarEstadoPanelLateral(false, false);
+    const box = document.getElementById('cvDatosBox');
+    box?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    const m = document.getElementById('cvDatosMsg');
+    if (m) { m.style.display = 'block'; m.style.color = 'var(--amber)'; m.textContent = 'Primero completa estos tres datos.'; }
+    setTimeout(() => box?.querySelector('.multi-search')?.focus(), 350);
+    return;
+  }
+  document.getElementById('cvFileInput').click();
+}
+async function _guardarDatosCv() {
+  const btn = document.getElementById('cvDatosBtn'); const m = document.getElementById('cvDatosMsg');
+  const body = { cargo_objetivo: _valorMultiSelectConOtro('_cv_cargo'), sector: _valorMultiSelectConOtro('_cv_sector'),
+                 renta_objetivo: _valorMultiSelectConOtro('_cv_renta') };
+  const falta = !body.cargo_objetivo.length ? ['el cargo objetivo', '_cv_cargo'] : !body.sector.length ? ['el sector', '_cv_sector']
+              : !body.renta_objetivo.length ? ['la renta que buscas', '_cv_renta'] : null;
+  if (falta) {
+    m.style.display = 'block'; m.style.color = 'var(--amber)'; m.textContent = `Elige ${falta[0]}.`;
+    document.getElementById(falta[1] + '_search')?.focus(); return;
+  }
+  btn.disabled = true; btn.textContent = 'Guardando…';
+  try {
+    const res = await fetch(`${_BACKEND}/api/mi-perfil`, { method: 'PUT',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${_obtenerToken()}` }, body: JSON.stringify(body) });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(_textoErrorApi(data.detail) || 'No se pudieron guardar tus datos.');
+    PARTICIPANTE.cargo = body.cargo_objetivo; PARTICIPANTE.sector = body.sector; PARTICIPANTE.renta_objetivo = body.renta_objetivo;
+    [['sidePanelCargo', body.cargo_objetivo], ['sidePanelSector', body.sector], ['sidePanelRenta', body.renta_objetivo]].forEach(([id, v]) => {
+      const el = document.getElementById(id); if (el) el.textContent = v.join(', ');
+    });
+    document.getElementById('cvDatosBox').style.display = 'none';
+    document.getElementById('cvFileInput').click();   // sigue directo a elegir el archivo
+  } catch (e) {
+    m.style.display = 'block'; m.style.color = 'var(--red)'; m.textContent = e.message || 'Error de conexión.';
+  } finally { btn.disabled = false; btn.textContent = 'Guardar y subir mi CV'; }
+}
+
 async function _subirCV() {
   const input = document.getElementById('cvFileInput');
   const status = document.getElementById('cvUploadStatus');
